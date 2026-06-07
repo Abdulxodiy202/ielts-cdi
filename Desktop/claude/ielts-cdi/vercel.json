@@ -1,8 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/mock-notify",
-      "schedule": "*/15 * * * *"
-    }
-  ]
-}
+{}
