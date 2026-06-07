@@ -25,14 +25,11 @@ export interface MockScheduleForFlow {
 
 type Step = 'pre-start' | 'listening' | 'reading' | 'writing' | 'done'
 
-/* ── Section durations (minutes) ── */
-const LISTEN_MINS   = 40
-const READ_MINS     = 60
-const WRITE_MINS    = 60
-const LISTEN_END_MS = LISTEN_MINS * 60 * 1000
-const READ_END_MS   = (LISTEN_MINS + READ_MINS) * 60 * 1000
-const WRITE_END_MS  = (LISTEN_MINS + READ_MINS + WRITE_MINS) * 60 * 1000
-const AUTOSAVE_MS   = 30_000
+/* ── Durations ── */
+const READ_MINS          = 60
+const WRITE_MINS         = 60
+const LISTEN_REVIEW_SECS = 120   // 2-minute answer-check window after audio ends
+const AUTOSAVE_MS        = 30_000
 
 /* ─────────────────────────── Helpers ─────────────────────────────── */
 function wordCount(text: string) {
@@ -71,14 +68,6 @@ function buildInjectScript(): string {
       }
     });
   })();<\/script>`
-}
-
-function stepFromElapsed(elapsedMs: number): Step {
-  if (elapsedMs < 0)              return 'pre-start'
-  if (elapsedMs < LISTEN_END_MS)  return 'listening'
-  if (elapsedMs < READ_END_MS)    return 'reading'
-  if (elapsedMs < WRITE_END_MS)   return 'writing'
-  return 'done'
 }
 
 /* ─────────────────── Step progress bar ─────────────────────────────── */
@@ -127,7 +116,7 @@ function StepBar({ current }: { current: Step }) {
   )
 }
 
-/* ─────────────── Section timer bar ─────────────────────────────────── */
+/* ─────────────── Section timer bar (Reading / Writing) ─────────────── */
 function SectionTimer({
   secsLeft,
   totalSecs,
@@ -192,18 +181,29 @@ function useHtmlBlobUrl(fileUrl: string | null) {
 }
 
 /* ──────────── Custom Audio Player ──────────────────────────────────────
-   - Attempts autoplay on mount; if blocked → shows a prominent start button
-   - Once audio starts, shows pause/resume toggle + visual-only progress bar
-   - No seek, no rewind, no replay after ended
-   - The <audio> element is always in the DOM so the ref never breaks
+   - Attempts autoplay; if blocked → shows prominent "Audio boshlash" button
+   - Once playing: only pause/resume allowed; no seek, no rewind, no replay
+   - Calls onEnded() the moment the audio track finishes — the parent uses
+     this to start the 2-minute answer-review countdown
+   - Uses a ref for onEnded so the stable closure never goes stale
    ───────────────────────────────────────────────────────────────────── */
-function AudioPlayer({ src }: { src: string }) {
-  const audioRef                   = useRef<HTMLAudioElement>(null)
-  const [playing,    setPlaying]   = useState(false)
-  const [hasStarted, setHasStarted] = useState(false)  // true once audio fires 'play'
-  const [ended,      setEnded]     = useState(false)
-  const [current,    setCurrent]   = useState(0)
-  const [duration,   setDuration]  = useState(0)
+function AudioPlayer({
+  src,
+  onEnded,
+}: {
+  src: string
+  onEnded: () => void
+}) {
+  const audioRef     = useRef<HTMLAudioElement>(null)
+  const onEndedRef   = useRef(onEnded)
+  // Keep the ref current on every render without re-running the effect
+  onEndedRef.current = onEnded
+
+  const [playing,    setPlaying]    = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [ended,      setEnded]      = useState(false)
+  const [current,    setCurrent]    = useState(0)
+  const [duration,   setDuration]   = useState(0)
 
   useEffect(() => {
     const audio = audioRef.current
@@ -213,19 +213,21 @@ function AudioPlayer({ src }: { src: string }) {
     const onPause = () => setPlaying(false)
     const onTime  = () => setCurrent(audio.currentTime)
     const onMeta  = () => setDuration(isFinite(audio.duration) ? audio.duration : 0)
-    const onEnded = () => { setPlaying(false); setEnded(true) }
+    const onEnd   = () => {
+      setPlaying(false)
+      setEnded(true)
+      onEndedRef.current()   // notify parent → start 2-min review
+    }
 
     audio.addEventListener('play',           onPlay)
     audio.addEventListener('pause',          onPause)
     audio.addEventListener('timeupdate',     onTime)
     audio.addEventListener('loadedmetadata', onMeta)
     audio.addEventListener('durationchange', onMeta)
-    audio.addEventListener('ended',          onEnded)
+    audio.addEventListener('ended',          onEnd)
 
-    // Attempt autoplay — works when the user just clicked "Testni boshlash".
-    // If the browser still blocks it, hasStarted stays false and the
-    // fallback "Audio boshlash" button appears.
-    audio.play().catch(() => { /* blocked — fallback button will show */ })
+    // Attempt autoplay (user just clicked "Testni boshlash")
+    audio.play().catch(() => { /* blocked → fallback button will show */ })
 
     return () => {
       audio.removeEventListener('play',           onPlay)
@@ -233,31 +235,26 @@ function AudioPlayer({ src }: { src: string }) {
       audio.removeEventListener('timeupdate',     onTime)
       audio.removeEventListener('loadedmetadata', onMeta)
       audio.removeEventListener('durationchange', onMeta)
-      audio.removeEventListener('ended',          onEnded)
+      audio.removeEventListener('ended',          onEnd)
     }
-  }, [])
+  }, []) // intentionally empty — onEnded is handled via ref
 
-  /** Called by the fallback start button — guaranteed to run inside a user gesture */
-  const startAudio = () => {
-    audioRef.current?.play().catch(() => {})
-  }
-
+  const startAudio = () => { audioRef.current?.play().catch(() => {}) }
   const toggle = () => {
     const audio = audioRef.current
     if (!audio || ended) return
-    if (playing) audio.pause()
-    else audio.play().catch(() => {})
+    if (playing) audio.pause(); else audio.play().catch(() => {})
   }
 
   const pct = duration > 0 ? (current / duration) * 100 : 0
 
   return (
     <div className="space-y-0">
-      {/* ── Hidden native audio — always in DOM so the ref is stable ── */}
+      {/* Always in DOM — keeps the ref and listeners stable */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={src} preload="auto" style={{ display: 'none' }} />
 
-      {/* ── Fallback start button — only visible if autoplay was blocked ── */}
+      {/* Fallback start button — appears when autoplay is blocked */}
       {!hasStarted && (
         <div className="card p-6 text-center space-y-4">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
@@ -272,9 +269,7 @@ function AudioPlayer({ src }: { src: string }) {
               Brauzer audio avtomatik boshlashga ruxsat bermadi
             </p>
           </div>
-          <button
-            type="button"
-            onClick={startAudio}
+          <button type="button" onClick={startAudio}
             className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
             <Play size={22} /> ▶ Audio boshlash
@@ -285,19 +280,15 @@ function AudioPlayer({ src }: { src: string }) {
         </div>
       )}
 
-      {/* ── Player controls — visible once audio has started ── */}
+      {/* Player controls — visible once audio has started */}
       {hasStarted && (
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-4">
-            {/* Icon */}
             <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
               style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)' }}>
               <Volume2 size={20} style={{ color: 'var(--success)' }} />
             </div>
-
-            {/* Progress column */}
             <div className="flex-1 space-y-2 min-w-0">
-              {/* Time */}
               <div className="flex items-center justify-between text-xs font-mono"
                 style={{ color: 'var(--text-muted)' }}>
                 <span>{fmtMmSs(current)}</span>
@@ -316,13 +307,9 @@ function AudioPlayer({ src }: { src: string }) {
                 }} />
               </div>
             </div>
-
-            {/* Pause / Resume — the ONLY control after audio starts */}
+            {/* Pause / Resume — ONLY control after audio starts */}
             {!ended ? (
-              <button
-                type="button"
-                aria-label={playing ? 'Pauza' : 'Davom ettirish'}
-                onClick={toggle}
+              <button type="button" aria-label={playing ? 'Pauza' : 'Davom ettirish'} onClick={toggle}
                 className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all hover:opacity-80 active:scale-95"
                 style={{ background: 'var(--success)', color: 'white' }}>
                 {playing ? <Pause size={17} /> : <Play size={17} />}
@@ -334,11 +321,10 @@ function AudioPlayer({ src }: { src: string }) {
               </div>
             )}
           </div>
-
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
             {ended
-              ? 'Audio yakunlandi — javoblarni to\'ldirishni davom eting'
-              : 'Faqat pauza tugmasi mavjud · Orqaga qaytib yoki qayta boshlab bo\'lmaydi'}
+              ? 'Audio yakunlandi'
+              : 'Faqat pauza tugmasi mavjud · Orqaga qaytib bo\'lmaydi'}
           </p>
         </div>
       )}
@@ -347,18 +333,25 @@ function AudioPlayer({ src }: { src: string }) {
 }
 
 /* ──────────────────── Listening Section ────────────────────────────── */
+/*
+   reviewSecsLeft:
+   - null  → audio is still playing (no countdown shown)
+   - 0..120 → 2-minute review phase (countdown + "Reading ga o'tish" button)
+*/
 function ListeningSection({
   fileUrl,
   answers,
   onChange,
   onNext,
-  secsLeft,
+  onAudioEnd,
+  reviewSecsLeft,
 }: {
   fileUrl: string | null
   answers: Record<string, string>
   onChange: (a: Record<string, string>) => void
   onNext: () => void
-  secsLeft: number
+  onAudioEnd: () => void
+  reviewSecsLeft: number | null
 }) {
   const ext      = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
   const isAudio  = ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)
@@ -387,7 +380,7 @@ function ListeningSection({
     )
   }
 
-  /* ── CDI HTML — iframe fills remaining space ── */
+  /* ── CDI HTML — iframe fills remaining space; no timer ── */
   if (isHtml) {
     if (loading) return (
       <div className="flex items-center justify-center h-full">
@@ -396,9 +389,6 @@ function ListeningSection({
     )
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 16px', flexShrink: 0 }}>
-          <SectionTimer secsLeft={secsLeft} totalSecs={LISTEN_MINS * 60} label="Listening vaqti" />
-        </div>
         <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
           <iframe
             src={blobUrl ?? fileUrl}
@@ -406,9 +396,7 @@ function ListeningSection({
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
           />
           {cdiDone && (
-            <button
-              type="button"
-              onClick={onNext}
+            <button type="button" onClick={onNext}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
               style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10 }}>
               Reading ga o&apos;tish <ArrowRight size={15} />
@@ -419,18 +407,44 @@ function ListeningSection({
     )
   }
 
-  /* ── Audio — custom player + 40-answer grid ── */
+  /* ── Audio file ── */
+  const inReview = reviewSecsLeft !== null
   const setAnswer = (q: string, val: string) => onChange({ ...answers, [q]: val })
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
       <div style={{ maxWidth: 896, margin: '0 auto', padding: '16px 16px 40px' }} className="space-y-5">
-        <SectionTimer secsLeft={secsLeft} totalSecs={LISTEN_MINS * 60} label="Listening vaqti" />
 
-        {/* Custom audio player — autoplay, pause-only, no seek */}
-        <AudioPlayer src={fileUrl} />
+        {/* ── 2-minute review countdown (appears after audio ends) ── */}
+        {inReview && (
+          <div className="rounded-2xl p-4 flex items-center justify-between gap-4"
+            style={{
+              background: (reviewSecsLeft ?? 0) < 30
+                ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+              border: `1px solid ${(reviewSecsLeft ?? 0) < 30
+                ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.3)'}`,
+            }}>
+            <div>
+              <p className="font-semibold text-sm"
+                style={{ color: (reviewSecsLeft ?? 0) < 30 ? 'var(--error)' : 'var(--warning)' }}>
+                2 daqiqa javoblarni tekshiring
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Vaqt tugagach Reading bo&apos;limiga o&apos;tiladi
+              </p>
+            </div>
+            <div
+              className={`font-mono font-bold text-2xl tabular-nums shrink-0 ${(reviewSecsLeft ?? 0) < 30 ? 'animate-pulse' : ''}`}
+              style={{ color: (reviewSecsLeft ?? 0) < 30 ? 'var(--error)' : 'var(--warning)' }}>
+              {fmtTimer(reviewSecsLeft ?? 0)}
+            </div>
+          </div>
+        )}
 
-        {/* Answer inputs */}
+        {/* ── Audio player (autoplay + pause-only) ── */}
+        <AudioPlayer src={fileUrl} onEnded={onAudioEnd} />
+
+        {/* ── 40 answer inputs ── */}
         <div className="card p-5 space-y-4">
           <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Javoblar (1–40)</h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -439,9 +453,7 @@ function ListeningSection({
               return (
                 <div key={q} className="flex items-center gap-2">
                   <span className="text-xs w-5 shrink-0 font-mono text-right"
-                    style={{ color: 'var(--text-muted)' }}>
-                    {q}.
-                  </span>
+                    style={{ color: 'var(--text-muted)' }}>{q}.</span>
                   <input
                     type="text"
                     className="input-field text-sm py-1.5 px-2 flex-1 min-w-0"
@@ -455,13 +467,14 @@ function ListeningSection({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onNext}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95"
-          style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
-          Reading ga o&apos;tish <ArrowRight size={16} />
-        </button>
+        {/* ── "Reading ga o'tish" — only during review period ── */}
+        {inReview && (
+          <button type="button" onClick={onNext}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
+            Reading ga o&apos;tish <ArrowRight size={16} />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -489,7 +502,6 @@ function ReadingSection({
     return () => window.removeEventListener('message', h)
   }, [isHtml])
 
-  /* ── No file ── */
   if (!fileUrl) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4"
@@ -509,7 +521,6 @@ function ReadingSection({
     </div>
   )
 
-  /* ── HTML (CDI) or PDF ── */
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div style={{ padding: '10px 16px', flexShrink: 0 }}>
@@ -522,9 +533,7 @@ function ReadingSection({
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
         />
         {(!isHtml || cdiDone) && (
-          <button
-            type="button"
-            onClick={onNext}
+          <button type="button" onClick={onNext}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
             style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10 }}>
             Writing ga o&apos;tish <ArrowRight size={15} />
@@ -592,7 +601,6 @@ function WritingSection({
               style={{ background: 'var(--accent)' }}>1</div>
             <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 1</h3>
           </div>
-
           {schedule.writing_task1_image_url && (
             <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -600,14 +608,12 @@ function WritingSection({
                 className="w-full max-h-72 object-contain" style={{ background: 'var(--bg-secondary)' }} />
             </div>
           )}
-
           {schedule.writing_task1_topic && (
             <div className="p-4 rounded-xl text-sm leading-relaxed"
               style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--text-secondary)' }}>
               {schedule.writing_task1_topic}
             </div>
           )}
-
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Sizning javobingiz</label>
@@ -628,14 +634,12 @@ function WritingSection({
               style={{ background: '#7c3aed' }}>2</div>
             <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 2</h3>
           </div>
-
           {schedule.writing_task2_topic && (
             <div className="p-4 rounded-xl text-sm leading-relaxed"
               style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', color: 'var(--text-secondary)' }}>
               {schedule.writing_task2_topic}
             </div>
           )}
-
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Sizning javobingiz</label>
@@ -668,23 +672,32 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   const storageKey = `mock_draft_${schedule.id}`
 
   /* ── State ── */
-  const [step,             setStep]            = useState<Step>('pre-start')
-  const [startTime,        setStartTime]       = useState<Date | null>(null)
-  const [listeningAnswers, setListeningAnswers] = useState<Record<string, string>>({})
-  const [task1,            setTask1]           = useState('')
-  const [task2,            setTask2]           = useState('')
-  const [submitting,       setSubmitting]      = useState(false)
-  const [lastSaved,        setLastSaved]       = useState<Date | null>(null)
-  const [skippedNotice,    setSkippedNotice]   = useState<string | null>(null)
-  const [nowMs,            setNowMs]           = useState(Date.now())
+  const [step,               setStep]              = useState<Step>('pre-start')
+  const [startTime,          setStartTime]         = useState<Date | null>(null)
+  /**
+   * listenReviewEndMs: epoch-ms when the 2-minute review window ends.
+   * null  → audio hasn't finished yet (no review countdown shown)
+   * >0    → review in progress; value counts down to 0, then auto-advances
+   */
+  const [listenReviewEndMs,  setListenReviewEndMs] = useState<number | null>(null)
+  /** When reading actually started (drives the 60-min reading timer) */
+  const [readingStartedAt,   setReadingStartedAt]  = useState<Date | null>(null)
+  /** When writing actually started (drives the 60-min writing timer) */
+  const [writingStartedAt,   setWritingStartedAt]  = useState<Date | null>(null)
+  const [listeningAnswers,   setListeningAnswers]  = useState<Record<string, string>>({})
+  const [task1,              setTask1]             = useState('')
+  const [task2,              setTask2]             = useState('')
+  const [submitting,         setSubmitting]        = useState(false)
+  const [skippedNotice,      setSkippedNotice]     = useState<string | null>(null)
+  const [nowMs,              setNowMs]             = useState(Date.now())
 
-  /* ── 1-second clock (drives section timers) ── */
+  /* ── 1-second clock (drives all countdowns) ── */
   useEffect(() => {
     const iv = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(iv)
   }, [])
 
-  /* ── Load draft + compute resume step on mount ── */
+  /* ── Load draft + resume on mount ── */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey)
@@ -692,6 +705,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       const draft = JSON.parse(raw) as {
         startTime?: string
         step?: Step
+        listenReviewEndMs?: number | null
+        readingStartedAt?: string | null
+        writingStartedAt?: string | null
         listeningAnswers?: Record<string, string>
         task1?: string
         task2?: string
@@ -701,76 +717,117 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       if (draft.task1)            setTask1(draft.task1)
       if (draft.task2)            setTask2(draft.task2)
 
-      if (draft.startTime) {
-        const st = new Date(draft.startTime)
-        setStartTime(st)
+      if (!draft.startTime) return
+      setStartTime(new Date(draft.startTime))
 
-        const elapsedMs   = Date.now() - st.getTime()
-        const resumeStep  = stepFromElapsed(elapsedMs)
-        const savedStep   = draft.step ?? 'listening'
+      let resumeStep: Step = draft.step ?? 'listening'
 
-        const stepOrder: Step[] = ['pre-start', 'listening', 'reading', 'writing', 'done']
-        const timeDerivedIdx    = stepOrder.indexOf(resumeStep)
-        const savedIdx          = stepOrder.indexOf(savedStep)
-        const finalStep         = timeDerivedIdx > savedIdx ? resumeStep : savedStep
-
-        setStep(finalStep)
-
-        if (finalStep === 'reading' && savedStep === 'listening') {
-          setSkippedNotice("Listening bo'limi o'tkazib yuborildi. Reading boshlandi.")
-        } else if (finalStep === 'writing' && (savedStep === 'listening' || savedStep === 'reading')) {
-          const msg = savedStep === 'listening'
-            ? "Listening va Reading bo'limlari o'tkazib yuborildi."
-            : "Reading bo'limi o'tkazib yuborildi."
-          setSkippedNotice(`${msg} Writing boshlandi.`)
+      // Listening: check if review was in progress / already over
+      if (resumeStep === 'listening' && draft.listenReviewEndMs) {
+        if (draft.listenReviewEndMs <= Date.now()) {
+          // Review period already ended while offline → skip to reading
+          resumeStep = 'reading'
+          setReadingStartedAt(new Date())
+          setSkippedNotice("Listening bo'limi tugadi. Reading boshlandi.")
+        } else {
+          setListenReviewEndMs(draft.listenReviewEndMs)
         }
       }
+
+      // Reading: restore per-section start time
+      if (resumeStep === 'reading' && draft.readingStartedAt) {
+        setReadingStartedAt(new Date(draft.readingStartedAt))
+      }
+
+      // Writing: restore per-section start time
+      if (resumeStep === 'writing' && draft.writingStartedAt) {
+        setWritingStartedAt(new Date(draft.writingStartedAt))
+      }
+
+      setStep(resumeStep)
     } catch { /* ignore corrupt draft */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* ── Section secsLeft ── */
+  /* ── Section secsLeft ──
+     Listening: 2-minute review countdown (0 when audio not done)
+     Reading:   60-min from readingStartedAt
+     Writing:   60-min from writingStartedAt
+  ── */
   const secsLeft = useMemo<number>(() => {
-    if (!startTime) return 0
-    const startMs = startTime.getTime()
-    let endMs: number
-    if      (step === 'listening') endMs = startMs + LISTEN_END_MS
-    else if (step === 'reading')   endMs = startMs + READ_END_MS
-    else if (step === 'writing')   endMs = startMs + WRITE_END_MS
-    else return 0
-    return Math.max(0, Math.floor((endMs - nowMs) / 1000))
-  }, [startTime, step, nowMs])
+    if (step === 'listening') {
+      if (!listenReviewEndMs) return 0
+      return Math.max(0, Math.floor((listenReviewEndMs - nowMs) / 1000))
+    }
+    if (step === 'reading') {
+      if (!readingStartedAt) return 0
+      return Math.max(0, Math.floor(
+        (readingStartedAt.getTime() + READ_MINS * 60 * 1000 - nowMs) / 1000
+      ))
+    }
+    if (step === 'writing') {
+      if (!writingStartedAt) return 0
+      return Math.max(0, Math.floor(
+        (writingStartedAt.getTime() + WRITE_MINS * 60 * 1000 - nowMs) / 1000
+      ))
+    }
+    return 0
+  }, [step, nowMs, listenReviewEndMs, readingStartedAt, writingStartedAt])
 
-  /* ── Auto-advance when section timer expires ── */
+  /* ── Auto-advance when section timer hits 0 ──
+     Listening: only advances after review period ends (listenReviewEndMs set)
+     Reading / Writing: standard timer expiry
+  ── */
   useEffect(() => {
     if (step === 'pre-start' || step === 'done') return
     if (secsLeft !== 0) return
+
     if (step === 'listening') {
-      setSkippedNotice(null); setStep('reading')
+      // Guard: secsLeft is 0 before audio ends too — wait for review to start
+      if (!listenReviewEndMs) return
+      const now = new Date()
+      setListenReviewEndMs(null)
+      setStep('reading')
+      setReadingStartedAt(now)
+      setSkippedNotice(null)
     } else if (step === 'reading') {
-      setSkippedNotice(null); setStep('writing')
+      const now = new Date()
+      setStep('writing')
+      setWritingStartedAt(now)
+      setSkippedNotice(null)
     } else if (step === 'writing' && !submitting) {
       handleFinalSubmit()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secsLeft, step])
+  }, [secsLeft, step, listenReviewEndMs])
+
+  /* ── Called by AudioPlayer when audio track ends ── */
+  const handleAudioEnd = useCallback(() => {
+    setListenReviewEndMs(Date.now() + LISTEN_REVIEW_SECS * 1000)
+  }, [])
 
   /* ── Auto-save draft every 30 s ── */
   const saveDraft = useCallback((
-    currentStep: Step,
-    currentStartTime: Date | null,
-    currentListening: Record<string, string>,
-    currentTask1: string,
-    currentTask2: string,
+    s: Step,
+    st: Date | null,
+    lr: number | null,
+    rs: Date | null,
+    ws: Date | null,
+    la: Record<string, string>,
+    t1: string,
+    t2: string,
   ) => {
-    if (currentStep === 'done' || currentStep === 'pre-start') return
+    if (s === 'done' || s === 'pre-start') return
     try {
       localStorage.setItem(storageKey, JSON.stringify({
-        startTime: currentStartTime?.toISOString() ?? null,
-        step: currentStep,
-        listeningAnswers: currentListening,
-        task1: currentTask1,
-        task2: currentTask2,
+        startTime:        st?.toISOString() ?? null,
+        step:             s,
+        listenReviewEndMs: lr,
+        readingStartedAt: rs?.toISOString() ?? null,
+        writingStartedAt: ws?.toISOString() ?? null,
+        listeningAnswers: la,
+        task1: t1,
+        task2: t2,
         savedAt: new Date().toISOString(),
       }))
     } catch { /* quota */ }
@@ -780,25 +837,30 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         schedule_id: schedule.id,
-        listening_answers: currentListening,
-        writing_task1: currentTask1,
-        writing_task2: currentTask2,
+        listening_answers: la,
+        writing_task1: t1,
+        writing_task2: t2,
         status: 'draft',
       }),
-    })
-      .then(() => setLastSaved(new Date()))
-      .catch(() => {})
+    }).catch(() => {})
   }, [storageKey, schedule.id])
 
-  const stateRef = useRef({ step, startTime, listeningAnswers, task1, task2 })
+  const stateRef = useRef({
+    step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt,
+    listeningAnswers, task1, task2,
+  })
   useEffect(() => {
-    stateRef.current = { step, startTime, listeningAnswers, task1, task2 }
-  }, [step, startTime, listeningAnswers, task1, task2])
+    stateRef.current = {
+      step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt,
+      listeningAnswers, task1, task2,
+    }
+  }, [step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt, listeningAnswers, task1, task2])
 
   useEffect(() => {
     const iv = setInterval(() => {
-      const { step: s, startTime: st, listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
-      saveDraft(s, st, la, t1, t2)
+      const { step: s, startTime: st, listenReviewEndMs: lr, readingStartedAt: rs,
+              writingStartedAt: ws, listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
+      saveDraft(s, st, lr, rs, ws, la, t1, t2)
     }, AUTOSAVE_MS)
     return () => clearInterval(iv)
   }, [saveDraft])
@@ -865,7 +927,6 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
             style={{ background: 'rgba(99,102,241,0.12)', border: '2px solid rgba(99,102,241,0.3)' }}>
             <Play size={36} style={{ color: 'var(--accent)' }} />
           </div>
-
           <div>
             <h2 className="text-xl font-black mb-1" style={{ color: 'var(--text-primary)' }}>
               Mock IELTS Test
@@ -874,48 +935,35 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
               {schedule.date} — {schedule.time.slice(0, 5)}
             </p>
           </div>
-
           <div className="space-y-2 text-sm text-left rounded-xl p-4"
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
             {[
-              { icon: Headphones, label: 'Listening', mins: LISTEN_MINS, color: 'var(--success)' },
-              { icon: BookOpen,   label: 'Reading',   mins: READ_MINS,   color: 'var(--accent)'  },
-              { icon: PenTool,    label: 'Writing',   mins: WRITE_MINS,  color: 'var(--warning)' },
-            ].map(({ icon: Icon, label, mins, color }) => (
+              { icon: Headphones, label: 'Listening', desc: 'Audio tugaguncha',  color: 'var(--success)' },
+              { icon: BookOpen,   label: 'Reading',   desc: `${READ_MINS} daqiqa`,  color: 'var(--accent)'  },
+              { icon: PenTool,    label: 'Writing',   desc: `${WRITE_MINS} daqiqa`, color: 'var(--warning)' },
+            ].map(({ icon: Icon, label, desc, color }) => (
               <div key={label} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Icon size={14} style={{ color }} />
                   <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
                 </div>
-                <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{mins} daqiqa</span>
+                <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{desc}</span>
               </div>
             ))}
-            <div className="pt-2 border-t flex items-center justify-between font-semibold"
-              style={{ borderColor: 'var(--border)' }}>
-              <span style={{ color: 'var(--text-primary)' }}>Jami</span>
-              <span style={{ color: 'var(--text-primary)' }}>
-                {LISTEN_MINS + READ_MINS + WRITE_MINS} daqiqa
-              </span>
-            </div>
           </div>
-
           <div className="p-3 rounded-xl text-xs text-left flex gap-2"
             style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warning)' }}>
             <Info size={13} className="shrink-0 mt-0.5" />
             <span>
-              Testni boshlaganingizdan so&apos;ng har bo&apos;lim uchun vaqt tiklanadi.
-              Vaqt tugaganda keyingi bo&apos;limga o&apos;tiladi.
+              Listening audio tugagach 2 daqiqa javoblarni tekshirishga vaqt beriladi,
+              so&apos;ng Reading boshladi.
             </span>
           </div>
-
-          <button
-            type="button"
-            onClick={handleStart}
+          <button type="button" onClick={handleStart}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
             <Play size={18} /> Testni boshlash
           </button>
-
           <Link href="/mock-test" className="text-xs" style={{ color: 'var(--text-muted)' }}>
             ← Orqaga qaytish
           </Link>
@@ -951,21 +999,17 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     )
   }
 
-  /* ═══════════════ ACTIVE TEST ════════════════════════════════════════
-     Full-screen: fixed inset-0 z-[100], flex column.
-     Top bar is fixed-height; content area fills the rest.
-     Each section manages its own scroll / height internally.
-  ═══════════════════════════════════════════════════════════════════ */
+  /* ═══════════════ ACTIVE TEST ════════════════════════════════════════ */
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
 
-      {/* ── Step progress bar — no title, no date, no save indicator ── */}
+      {/* ── Step progress bar ── */}
       <div className="shrink-0 px-4 py-2.5"
         style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
         <StepBar current={step} />
       </div>
 
-      {/* ── Skipped section banner ── */}
+      {/* ── Skipped section notice ── */}
       {skippedNotice && (
         <div className="shrink-0 px-4 pt-2 pb-1">
           <div className="max-w-5xl mx-auto flex items-start gap-2 p-3 rounded-xl text-sm"
@@ -976,21 +1020,33 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         </div>
       )}
 
-      {/* ── Section content — fills all remaining height ── */}
+      {/* ── Section content — fills remaining height ── */}
       <div className="flex-1 min-h-0">
         {step === 'listening' && (
           <ListeningSection
             fileUrl={schedule.listening_file_url}
             answers={listeningAnswers}
             onChange={setListeningAnswers}
-            onNext={() => { setSkippedNotice(null); setStep('reading') }}
-            secsLeft={secsLeft}
+            onNext={() => {
+              const now = new Date()
+              setListenReviewEndMs(null)
+              setStep('reading')
+              setReadingStartedAt(now)
+              setSkippedNotice(null)
+            }}
+            onAudioEnd={handleAudioEnd}
+            reviewSecsLeft={listenReviewEndMs !== null ? secsLeft : null}
           />
         )}
         {step === 'reading' && (
           <ReadingSection
             fileUrl={schedule.reading_file_url}
-            onNext={() => { setSkippedNotice(null); setStep('writing') }}
+            onNext={() => {
+              const now = new Date()
+              setStep('writing')
+              setWritingStartedAt(now)
+              setSkippedNotice(null)
+            }}
             secsLeft={secsLeft}
           />
         )}
