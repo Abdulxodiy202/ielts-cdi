@@ -4,8 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /** GET /api/mock/schedules
- *  Returns upcoming mock_schedules (date >= today) enriched with the
- *  calling user's booking status for each schedule.
+ *  Returns upcoming mock_schedules enriched with:
+ *  - userBooking: { status, payment_status } | null
+ *  - isSubmitted: true if the user has a 'submitted' entry in mock_test_submissions
  */
 export async function GET() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export async function GET() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  // Upcoming schedules (all – admin controls what's "available")
+  // Upcoming schedules
   const { data: schedules, error } = await admin
     .from('mock_schedules')
     .select('*')
@@ -24,21 +25,37 @@ export async function GET() {
     .order('time', { ascending: true })
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
-
   if (!schedules?.length) return Response.json([])
 
-  // User's bookings for these specific schedules
   const ids = schedules.map(s => s.id)
-  const { data: bookings } = await supabase
-    .from('mock_bookings')
-    .select('schedule_id, status, payment_status')
-    .eq('user_id', user.id)
-    .in('schedule_id', ids)
+
+  // Fetch bookings and submissions in parallel
+  const [bookingsRes, submissionsRes] = await Promise.all([
+    supabase
+      .from('mock_bookings')
+      .select('schedule_id, status, payment_status')
+      .eq('user_id', user.id)
+      .in('schedule_id', ids),
+    supabase
+      .from('mock_test_submissions')
+      .select('schedule_id, status')
+      .eq('user_id', user.id)
+      .in('schedule_id', ids)
+      .eq('status', 'submitted'),
+  ])
 
   const bookingMap: Record<string, { status: string; payment_status: string }> =
-    Object.fromEntries((bookings ?? []).map(b => [b.schedule_id, b]))
+    Object.fromEntries((bookingsRes.data ?? []).map(b => [b.schedule_id, b]))
+
+  const submittedSet = new Set(
+    (submissionsRes.data ?? []).map(s => s.schedule_id)
+  )
 
   return Response.json(
-    schedules.map(s => ({ ...s, userBooking: bookingMap[s.id] ?? null }))
+    schedules.map(s => ({
+      ...s,
+      userBooking:  bookingMap[s.id]    ?? null,
+      isSubmitted:  submittedSet.has(s.id),
+    }))
   )
 }

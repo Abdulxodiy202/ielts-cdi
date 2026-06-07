@@ -4,15 +4,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 /** GET /api/mock/next-booking
- *  Returns the user's next upcoming confirmed mock booking, enriched with
- *  the schedule details. Used by the Sidebar countdown.
+ *  Returns the user's next upcoming confirmed mock booking + schedule.
+ *  Returns null if no booking, or if the test has already been submitted
+ *  (so the sidebar countdown card disappears after submission).
  */
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json(null)
 
-  // Get all confirmed bookings that have a schedule_id
+  // Get all confirmed bookings with a schedule_id
   const { data: bookings } = await supabase
     .from('mock_bookings')
     .select('id, schedule_id, status, booking_date, time_slot')
@@ -26,6 +27,8 @@ export async function GET() {
   const today = new Date().toISOString().split('T')[0]
 
   const admin = createAdminClient()
+
+  // Get the nearest upcoming schedule
   const { data: schedules } = await admin
     .from('mock_schedules')
     .select('*')
@@ -38,7 +41,18 @@ export async function GET() {
   if (!schedules?.length) return Response.json(null)
 
   const schedule = schedules[0]
-  const booking = bookings.find(b => b.schedule_id === schedule.id)
+  const booking  = bookings.find(b => b.schedule_id === schedule.id)
+
+  // Check if the user already submitted this test — if so, hide the sidebar card
+  const { data: submission } = await supabase
+    .from('mock_test_submissions')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('schedule_id', schedule.id)
+    .eq('status', 'submitted')
+    .maybeSingle()
+
+  if (submission) return Response.json(null)
 
   return Response.json({ schedule, booking })
 }
