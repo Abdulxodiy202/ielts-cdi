@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -23,17 +23,21 @@ export async function proxy(request: NextRequest) {
     }
   )
 
+  // Refresh the session — keeps cookies alive on every request
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthPage = request.nextUrl.pathname === '/login' ||
-    request.nextUrl.pathname === '/signup'
+  const path = request.nextUrl.pathname
 
-  const isProtected = request.nextUrl.pathname.startsWith('/dashboard') ||
-    request.nextUrl.pathname.startsWith('/reading') ||
-    request.nextUrl.pathname.startsWith('/listening') ||
-    request.nextUrl.pathname.startsWith('/mock-test') ||
-    request.nextUrl.pathname.startsWith('/results') ||
-    request.nextUrl.pathname.startsWith('/premium')
+  const isAuthPage = path === '/login' || path === '/signup'
+
+  const isProtected =
+    path.startsWith('/dashboard') ||
+    path.startsWith('/reading') ||
+    path.startsWith('/listening') ||
+    path.startsWith('/mock-test') ||
+    path.startsWith('/results') ||
+    path.startsWith('/premium') ||
+    path.startsWith('/admin')
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone()
