@@ -50,15 +50,12 @@ export default async function MockTestTakePage({ params }: Props) {
     writing_task2_topic: string | null
   }
 
-  // Check test time window: 30 min before → 4 hours after
-  const testStart   = new Date(`${schedule.date}T${schedule.time}`)
-  const now         = new Date()
-  const windowStart = new Date(testStart.getTime() - 30 * 60 * 1000)
-  const windowEnd   = new Date(testStart.getTime() + 4 * 60 * 60 * 1000)
-
-  if (now < windowStart || now > windowEnd) {
-    redirect('/mock-test')
-  }
+  // NOTE: We intentionally do NOT enforce the time window here on the server.
+  // The schedule date/time in the DB is in local (Uzbekistan, UTC+5) time, but
+  // Vercel runs in UTC — parsing "09:00" without timezone info would give a
+  // 5-hour discrepancy, causing legitimate users to be redirected.
+  // The client (MockTestClient) already gates the "Start" button by local time,
+  // and booking.status === 'confirmed' is the real auth gate.
 
   return <MockTestFlow schedule={schedule} />
 }

@@ -220,7 +220,7 @@ function ListeningSection({
       <div className="flex flex-col items-center justify-center py-20 gap-4" style={{ color: 'var(--text-muted)' }}>
         <AlertTriangle size={36} className="opacity-30" />
         <p className="text-sm">Listening fayli yuklanmagan</p>
-        <button onClick={onNext} className="btn-primary mt-2">
+        <button type="button" onClick={onNext} className="btn-primary mt-2">
           Reading ga o&apos;tish <ChevronRight size={15} />
         </button>
       </div>
@@ -245,6 +245,7 @@ function ListeningSection({
           />
           {cdiDone && (
             <button
+              type="button"
               onClick={onNext}
               className="absolute bottom-4 right-4 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
               style={{ background: 'var(--accent)', zIndex: 10 }}>
@@ -304,6 +305,7 @@ function ListeningSection({
       </div>
 
       <button
+        type="button"
         onClick={onNext}
         className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95"
         style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
@@ -340,7 +342,7 @@ function ReadingSection({
       <div className="flex flex-col items-center justify-center py-20 gap-4" style={{ color: 'var(--text-muted)' }}>
         <AlertTriangle size={36} className="opacity-30" />
         <p className="text-sm">Reading fayli yuklanmagan</p>
-        <button onClick={onNext} className="btn-primary mt-2">
+        <button type="button" onClick={onNext} className="btn-primary mt-2">
           Writing ga o&apos;tish <ChevronRight size={15} />
         </button>
       </div>
@@ -364,6 +366,7 @@ function ReadingSection({
         />
         {(!isHtml || cdiDone) && (
           <button
+            type="button"
             onClick={onNext}
             className="absolute bottom-4 right-4 flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
             style={{ background: 'var(--accent)', zIndex: 10 }}>
@@ -488,7 +491,7 @@ function WritingSection({
         </div>
       </div>
 
-      <button onClick={onSubmit} disabled={submitting}
+      <button type="button" onClick={onSubmit} disabled={submitting}
         className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
         style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
         {submitting
@@ -524,8 +527,10 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
   /* ── Load draft + compute resume step on mount ── */
   useEffect(() => {
+    console.log('[MockTestFlow] mount — schedule:', schedule.id, 'storageKey:', storageKey)
     try {
       const raw = localStorage.getItem(storageKey)
+      console.log('[MockTestFlow] localStorage draft:', raw ? JSON.parse(raw) : null)
       if (!raw) return
       const draft = JSON.parse(raw) as {
         startTime?: string
@@ -586,7 +591,11 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
   /* ── Auto-advance when section timer expires ── */
   useEffect(() => {
+    // Never fire on pre-start (secsLeft is 0 there because startTime is null)
+    // or done (nothing left to advance to)
+    if (step === 'pre-start' || step === 'done') return
     if (secsLeft !== 0) return
+    console.log('[MockTestFlow] timer expired for step:', step)
     if (step === 'listening') {
       setSkippedNotice(null)
       setStep('reading')
@@ -649,10 +658,10 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
   /* ── Start test ── */
   const handleStart = useCallback(() => {
+    console.log('[MockTestFlow] handleStart called — schedule:', schedule.id)
     const now = new Date()
-    setStartTime(now)
-    setStep('listening')
-    // Persist startTime immediately
+    // Persist startTime BEFORE updating state so that if the component
+    // re-mounts it can resume correctly
     try {
       const existing = localStorage.getItem(storageKey)
       const draft = existing ? JSON.parse(existing) : {}
@@ -662,8 +671,14 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         step: 'listening',
         savedAt: now.toISOString(),
       }))
-    } catch { /* quota */ }
-  }, [storageKey])
+      console.log('[MockTestFlow] startTime saved to localStorage:', now.toISOString())
+    } catch (e) {
+      console.error('[MockTestFlow] localStorage write failed:', e)
+    }
+    setStartTime(now)
+    setStep('listening')
+    console.log('[MockTestFlow] state updated → step=listening')
+  }, [storageKey, schedule.id])
 
   /* ── Final submit ── */
   const handleFinalSubmit = useCallback(async () => {
@@ -755,6 +770,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           </div>
 
           <button
+            type="button"
             onClick={handleStart}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
