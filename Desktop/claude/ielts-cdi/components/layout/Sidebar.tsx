@@ -217,9 +217,21 @@ export function Sidebar() {
       )
       .subscribe()
 
+    // Watch mock_test_submissions — fires when user submits the test.
+    // Re-fetches next-booking which returns null for submitted tests → hides the sidebar card.
+    const submissionChannel = supabase
+      .channel(`submissions-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mock_test_submissions', filter: `user_id=eq.${user.id}` },
+        () => { fetchNextBooking() }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(profileChannel)
       supabase.removeChannel(bookingChannel)
+      supabase.removeChannel(submissionChannel)
     }
   }, [user?.id, fetchNextBooking])
 
