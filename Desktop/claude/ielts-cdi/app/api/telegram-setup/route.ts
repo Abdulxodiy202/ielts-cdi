@@ -8,12 +8,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'TELEGRAM_BOT_TOKEN is not set' }, { status: 500 })
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
-  if (!appUrl) {
-    return Response.json({ error: 'NEXT_PUBLIC_APP_URL is not set' }, { status: 500 })
-  }
-
-  const webhookUrl = `${appUrl}/api/telegram-webhook`
+  const webhookUrl = `https://ielts-cdi.vercel.app/api/telegram-webhook`
 
   // Explicitly list all update types we need, including callback_query for
   // inline button clicks. Omitting allowed_updates can silently exclude
