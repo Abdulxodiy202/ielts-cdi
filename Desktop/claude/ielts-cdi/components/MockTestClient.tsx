@@ -40,10 +40,12 @@ function formatTime(timeStr: string) {
 }
 
 function isTestAvailable(schedule: MockScheduleWithBooking) {
-  const now = new Date()
-  const testDt = new Date(`${schedule.date}T${schedule.time}`)
-  // Available from test start time until 4 hours after
-  return now >= testDt && now <= new Date(testDt.getTime() + 4 * 60 * 60 * 1000)
+  const now     = new Date()
+  const testDt  = new Date(`${schedule.date}T${schedule.time}`)
+  // Available from 30 min before test start until 4 hours after
+  const start   = new Date(testDt.getTime() - 30 * 60 * 1000)
+  const end     = new Date(testDt.getTime() + 4 * 60 * 60 * 1000)
+  return now >= start && now <= end
 }
 
 function BookingBadge({ booking }: { booking: MockScheduleWithBooking['userBooking'] }) {
