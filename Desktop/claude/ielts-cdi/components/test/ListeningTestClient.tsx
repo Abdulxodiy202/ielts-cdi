@@ -143,13 +143,13 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
               top: 0, left: 0,
               width: '100vw', height: '100vh',
               border: 'none', margin: 0, padding: 0,
-              display: 'block', zIndex: 50,
+              display: 'block', zIndex: 100,
             }}
           />
         ) : (
           <div style={{
             position: 'fixed', top: 0, left: 0,
-            width: '100vw', height: '100vh', zIndex: 50,
+            width: '100vw', height: '100vh', zIndex: 100,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'var(--bg-primary)',
           }}>
@@ -165,7 +165,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           <Link
             href="/listening"
             style={{
-              position: 'fixed', bottom: 24, right: 24, zIndex: 60,
+              position: 'fixed', bottom: 24, right: 24, zIndex: 110,
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '12px 22px', borderRadius: 14,
               background: 'var(--accent)', color: '#fff',
@@ -191,7 +191,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
     const percentage = Math.round((result.rawScore / questions.length) * 100)
 
     return (
-      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
         <div
           className="flex items-center justify-between px-4 py-3 gap-4"
           style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
@@ -372,7 +372,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
 
       {/* Confirm submit */}
       {confirmSubmit && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmSubmit(false)} />
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             className="relative card p-6 max-w-sm w-full text-center">
