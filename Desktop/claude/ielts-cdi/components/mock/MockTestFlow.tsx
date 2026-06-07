@@ -192,23 +192,24 @@ function useHtmlBlobUrl(fileUrl: string | null) {
 }
 
 /* ──────────── Custom Audio Player ──────────────────────────────────────
-   Rules:
-   - Autoplay on mount (user clicked "Start" so gesture is active)
-   - No seek bar interaction (cursor: not-allowed)
-   - No rewind / replay once ended
-   - Only control: Pause / Resume button
+   - Attempts autoplay on mount; if blocked → shows a prominent start button
+   - Once audio starts, shows pause/resume toggle + visual-only progress bar
+   - No seek, no rewind, no replay after ended
+   - The <audio> element is always in the DOM so the ref never breaks
    ───────────────────────────────────────────────────────────────────── */
 function AudioPlayer({ src }: { src: string }) {
-  const audioRef              = useRef<HTMLAudioElement>(null)
-  const [playing,  setPlaying]  = useState(false)
-  const [ended,    setEnded]    = useState(false)
-  const [current,  setCurrent]  = useState(0)
-  const [duration, setDuration] = useState(0)
+  const audioRef                   = useRef<HTMLAudioElement>(null)
+  const [playing,    setPlaying]   = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)  // true once audio fires 'play'
+  const [ended,      setEnded]     = useState(false)
+  const [current,    setCurrent]   = useState(0)
+  const [duration,   setDuration]  = useState(0)
 
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    const onPlay  = () => setPlaying(true)
+
+    const onPlay  = () => { setPlaying(true); setHasStarted(true) }
     const onPause = () => setPlaying(false)
     const onTime  = () => setCurrent(audio.currentTime)
     const onMeta  = () => setDuration(isFinite(audio.duration) ? audio.duration : 0)
@@ -221,10 +222,10 @@ function AudioPlayer({ src }: { src: string }) {
     audio.addEventListener('durationchange', onMeta)
     audio.addEventListener('ended',          onEnded)
 
-    // Autoplay — allowed because the user just clicked "Testni boshlash"
-    audio.play().catch(() => {
-      // Browser blocked autoplay (rare after user gesture) — button will appear
-    })
+    // Attempt autoplay — works when the user just clicked "Testni boshlash".
+    // If the browser still blocks it, hasStarted stays false and the
+    // fallback "Audio boshlash" button appears.
+    audio.play().catch(() => { /* blocked — fallback button will show */ })
 
     return () => {
       audio.removeEventListener('play',           onPlay)
@@ -236,9 +237,14 @@ function AudioPlayer({ src }: { src: string }) {
     }
   }, [])
 
+  /** Called by the fallback start button — guaranteed to run inside a user gesture */
+  const startAudio = () => {
+    audioRef.current?.play().catch(() => {})
+  }
+
   const toggle = () => {
     const audio = audioRef.current
-    if (!audio || ended) return          // no replay once ended
+    if (!audio || ended) return
     if (playing) audio.pause()
     else audio.play().catch(() => {})
   }
@@ -246,70 +252,96 @@ function AudioPlayer({ src }: { src: string }) {
   const pct = duration > 0 ? (current / duration) * 100 : 0
 
   return (
-    <div className="card p-4 space-y-3">
-      {/* Hidden native element — no browser controls */}
+    <div className="space-y-0">
+      {/* ── Hidden native audio — always in DOM so the ref is stable ── */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={src} preload="auto" style={{ display: 'none' }} />
 
-      <div className="flex items-center gap-4">
-        {/* Icon */}
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-          style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)' }}>
-          <Volume2 size={20} style={{ color: 'var(--success)' }} />
-        </div>
-
-        {/* Progress column */}
-        <div className="flex-1 space-y-2 min-w-0">
-          {/* Time display */}
-          <div className="flex items-center justify-between text-xs font-mono"
-            style={{ color: 'var(--text-muted)' }}>
-            <span>{fmtMmSs(current)}</span>
-            <span>{duration > 0 ? fmtMmSs(duration) : '--:--'}</span>
+      {/* ── Fallback start button — only visible if autoplay was blocked ── */}
+      {!hasStarted && (
+        <div className="card p-6 text-center space-y-4">
+          <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
+            style={{ background: 'rgba(16,185,129,0.12)', border: '2px solid rgba(16,185,129,0.3)' }}>
+            <Volume2 size={28} style={{ color: 'var(--success)' }} />
           </div>
-          {/* Non-seekable progress bar */}
-          <div
-            title="Orqaga qaytib bo'lmaydi"
-            style={{
-              height: 6,
-              background: 'var(--bg-secondary)',
-              borderRadius: 9999,
-              cursor: 'not-allowed',
-              overflow: 'hidden',
-            }}
-          >
-            <div style={{
-              width: `${pct}%`,
-              height: '100%',
-              background: ended ? 'var(--text-muted)' : 'var(--success)',
-              borderRadius: 9999,
-              transition: 'width 0.8s linear',
-            }} />
+          <div>
+            <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+              Listening Audio
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Brauzer audio avtomatik boshlashga ruxsat bermadi
+            </p>
           </div>
-        </div>
-
-        {/* Pause / Resume — the ONLY control */}
-        {!ended ? (
           <button
             type="button"
-            aria-label={playing ? 'Pauza' : 'Davom ettirish'}
-            onClick={toggle}
-            className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all hover:opacity-80 active:scale-95"
-            style={{ background: 'var(--success)', color: 'white' }}>
-            {playing ? <Pause size={17} /> : <Play size={17} />}
+            onClick={startAudio}
+            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
+            style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
+            <Play size={22} /> ▶ Audio boshlash
           </button>
-        ) : (
-          <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' }}>
-            <CheckCircle size={17} />
-          </div>
-        )}
-      </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Audio bir marta eshitiladi — orqaga qaytib bo&apos;lmaydi
+          </p>
+        </div>
+      )}
 
-      <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-        {ended
-          ? 'Audio yakunlandi — javoblarni to\'ldirishni davom eting'
-          : 'Faqat pauza tugmasi mavjud · Orqaga qaytib yoki qayta boshlab bo\'lmaydi'}
-      </p>
+      {/* ── Player controls — visible once audio has started ── */}
+      {hasStarted && (
+        <div className="card p-4 space-y-3">
+          <div className="flex items-center gap-4">
+            {/* Icon */}
+            <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.3)' }}>
+              <Volume2 size={20} style={{ color: 'var(--success)' }} />
+            </div>
+
+            {/* Progress column */}
+            <div className="flex-1 space-y-2 min-w-0">
+              {/* Time */}
+              <div className="flex items-center justify-between text-xs font-mono"
+                style={{ color: 'var(--text-muted)' }}>
+                <span>{fmtMmSs(current)}</span>
+                <span>{duration > 0 ? fmtMmSs(duration) : '--:--'}</span>
+              </div>
+              {/* Non-seekable progress bar */}
+              <div title="Orqaga qaytib bo'lmaydi"
+                style={{
+                  height: 6, background: 'var(--bg-secondary)',
+                  borderRadius: 9999, cursor: 'not-allowed', overflow: 'hidden',
+                }}>
+                <div style={{
+                  width: `${pct}%`, height: '100%',
+                  background: ended ? 'var(--text-muted)' : 'var(--success)',
+                  borderRadius: 9999, transition: 'width 0.8s linear',
+                }} />
+              </div>
+            </div>
+
+            {/* Pause / Resume — the ONLY control after audio starts */}
+            {!ended ? (
+              <button
+                type="button"
+                aria-label={playing ? 'Pauza' : 'Davom ettirish'}
+                onClick={toggle}
+                className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all hover:opacity-80 active:scale-95"
+                style={{ background: 'var(--success)', color: 'white' }}>
+                {playing ? <Pause size={17} /> : <Play size={17} />}
+              </button>
+            ) : (
+              <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' }}>
+                <CheckCircle size={17} />
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+            {ended
+              ? 'Audio yakunlandi — javoblarni to\'ldirishni davom eting'
+              : 'Faqat pauza tugmasi mavjud · Orqaga qaytib yoki qayta boshlab bo\'lmaydi'}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
@@ -927,20 +959,10 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
 
-      {/* ── Top bar ── */}
-      <div className="shrink-0 px-4 py-3"
+      {/* ── Step progress bar — no title, no date, no save indicator ── */}
+      <div className="shrink-0 px-4 py-2.5"
         style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="text-sm font-semibold shrink-0" style={{ color: 'var(--text-primary)' }}>
-            Mock IELTS — {schedule.date} {schedule.time.slice(0, 5)}
-          </div>
-          <StepBar current={step} />
-          {lastSaved && (
-            <div className="text-xs shrink-0 hidden sm:block" style={{ color: 'var(--text-muted)' }}>
-              Saqlandi {lastSaved.toLocaleTimeString('uz', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-          )}
-        </div>
+        <StepBar current={step} />
       </div>
 
       {/* ── Skipped section banner ── */}
