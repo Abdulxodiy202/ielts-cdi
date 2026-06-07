@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'maxmudovamashxura71@gmail.com'
+const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
 async function verifyAdmin() {
   const supabase = await createClient()

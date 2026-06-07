@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AdminClient } from './AdminClient'
 
-const ADMIN_EMAIL = 'maxmudovamashxura71@gmail.com'
+const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
 export default async function AdminPage() {
   const supabase = await createClient()

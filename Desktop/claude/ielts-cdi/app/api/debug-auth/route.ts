@@ -29,6 +29,6 @@ export async function GET() {
     },
     user,
     authError,
-    isAdmin: user?.email === 'maxmudovamashxura71@gmail.com',
+    isAdmin: user?.email === 'abdulxdiymamajonov@gmail.com',
   })
 }

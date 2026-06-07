@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'maxmudovamashxura71@gmail.com'
+const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
 export async function GET() {
   const supabase = await createClient()
