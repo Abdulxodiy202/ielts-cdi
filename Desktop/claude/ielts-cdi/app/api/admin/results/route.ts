@@ -25,17 +25,31 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!results || results.length === 0) return NextResponse.json([])
 
-  // Batch fetch user emails
+  // Batch fetch user emails from auth
   const { data: { users } } = await admin.auth.admin.listUsers({ perPage: 1000 })
   const emailMap: Record<string, string> = {}
   for (const u of users ?? []) {
     emailMap[u.id] = u.email ?? u.id
   }
 
+  // Batch fetch profiles for full_name and is_premium
+  const userIds = [...new Set(results.map(r => r.user_id))]
+  const { data: profiles } = await admin
+    .from('profiles')
+    .select('id, full_name, is_premium')
+    .in('id', userIds)
+
+  const profileMap: Record<string, { full_name: string | null; is_premium: boolean }> = {}
+  for (const p of profiles ?? []) {
+    profileMap[p.id] = { full_name: p.full_name, is_premium: p.is_premium ?? false }
+  }
+
   const enriched = results.map((r) => ({
     id: r.id,
     user_id: r.user_id,
     user_email: emailMap[r.user_id] ?? r.user_id,
+    user_name: profileMap[r.user_id]?.full_name ?? emailMap[r.user_id] ?? r.user_id,
+    is_premium: profileMap[r.user_id]?.is_premium ?? false,
     test_id: r.test_id,
     test_title: (r.tests as any)?.title ?? 'Unknown',
     test_type: (r.tests as any)?.type ?? 'unknown',

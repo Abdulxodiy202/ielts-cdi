@@ -5,7 +5,7 @@ import {
   Plus, Calendar, Clock, Upload, Trash2,
   Image as ImageIcon, Edit2, Loader2, X, CheckCircle,
   BookOpen, Headphones, PenTool, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight, FileText, User,
+  ChevronLeft, ChevronRight, FileText, Crown,
 } from 'lucide-react'
 
 /* ─────────────────────────── Types ──────────────────────────────────── */
@@ -24,14 +24,20 @@ export interface MockSchedule {
 
 type FileField = 'reading' | 'listening' | 'writing_task1'
 
-interface WritingAnswer {
+interface MockSubmission {
   id: string
   user_id: string
   user_name: string
   user_email: string
-  task1_answer: string
-  task2_answer: string
-  time_taken: number | null
+  user_phone: string
+  is_premium: boolean
+  schedule_date: string | null
+  schedule_time: string | null
+  listening_answers: Record<string, string>
+  reading_answers: Record<string, string>
+  writing_task1: string
+  writing_task2: string
+  status: string
   submitted_at: string
 }
 
@@ -339,6 +345,175 @@ function FileUploadField({ label, icon, accept, currentUrl, uploading, onFile, o
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   SubmissionCard — one candidate's full submission details
+   ══════════════════════════════════════════════════════════════════════ */
+function AnswersTable({ answers, label, color }: {
+  answers: Record<string, string>
+  label: string
+  color: string
+}) {
+  const entries = Object.entries(answers).sort(([a], [b]) => Number(a) - Number(b))
+  if (entries.length === 0) {
+    return (
+      <div>
+        <p className="text-xs font-bold mb-2" style={{ color }}>{label}</p>
+        <p className="text-xs px-3 py-2 rounded-lg"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+          Javob topshirilmagan
+        </p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <p className="text-xs font-bold mb-2" style={{ color }}>{label}</p>
+      <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+        <div className="grid text-xs font-semibold px-3 py-1.5"
+          style={{ gridTemplateColumns: '48px 1fr', background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+          <span>#</span><span>Javob</span>
+        </div>
+        {entries.map(([q, ans]) => (
+          <div key={q} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
+            style={{ gridTemplateColumns: '48px 1fr', borderColor: 'var(--border)' }}>
+            <span style={{ color: 'var(--text-muted)' }}>{q}</span>
+            <span style={{ color: 'var(--text-primary)' }}>{ans || '—'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) {
+  const [open, setOpen] = useState(false)
+
+  const hasListening = Object.keys(sub.listening_answers ?? {}).length > 0
+  const hasReading   = Object.keys(sub.reading_answers ?? {}).length > 0
+  const hasWriting   = !!(sub.writing_task1 || sub.writing_task2)
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+      {/* Card header — candidate info */}
+      <button
+        className="w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors"
+        style={{ background: open ? 'var(--bg-secondary)' : 'var(--bg-card)' }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+            style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}
+          >
+            {index}
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {sub.user_name}
+              </span>
+              {sub.is_premium && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  <Crown size={10} /> Premium
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub.user_email}</span>
+              {sub.user_phone && (
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub.user_phone}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex gap-1.5">
+            {hasListening && (
+              <span className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(16,185,129,0.1)', color: 'var(--success)', border: '1px solid rgba(16,185,129,0.2)' }}>
+                L
+              </span>
+            )}
+            {hasReading && (
+              <span className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                R
+              </span>
+            )}
+            {hasWriting && (
+              <span className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                W
+              </span>
+            )}
+          </div>
+          {open ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
+        </div>
+      </button>
+
+      {/* Expanded details */}
+      {open && (
+        <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+          {/* Submitted at */}
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Topshirildi: {new Date(sub.submitted_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </p>
+
+          {/* Listening */}
+          <AnswersTable
+            answers={sub.listening_answers ?? {}}
+            label="🎧 Listening javoblari"
+            color="var(--success)"
+          />
+
+          {/* Reading */}
+          <AnswersTable
+            answers={sub.reading_answers ?? {}}
+            label="📖 Reading javoblari"
+            color="var(--accent)"
+          />
+
+          {/* Writing */}
+          <div>
+            <p className="text-xs font-bold mb-2" style={{ color: 'var(--warning)' }}>✍️ Writing</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Task 1</p>
+                <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-xl"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)', minHeight: 48 }}>
+                  {sub.writing_task1 || '(bo\'sh)'}
+                </pre>
+              </div>
+              <div>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Task 2</p>
+                <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-xl"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)', minHeight: 48 }}>
+                  {sub.writing_task2 || '(bo\'sh)'}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          {/* Natijani yuborish button */}
+          <button
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
+            style={{
+              background: 'var(--accent)',
+              color: 'white',
+              border: 'none',
+            }}
+            onClick={() => alert('Natijani yuborish funksiyasi tez orada qo\'shiladi!')}
+          >
+            <CheckCircle size={15} />
+            Natijani yuborish
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    MockScheduleEditor
    ══════════════════════════════════════════════════════════════════════ */
 export function MockScheduleEditor({ initialSchedules }: { initialSchedules: MockSchedule[] }) {
@@ -350,32 +525,28 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
   const [deleting, setDeleting]         = useState<string | null>(null)
   const [message, setMessage]           = useState<{ ok: boolean; text: string } | null>(null)
   const [uploading, setUploading]       = useState<Partial<Record<FileField, boolean>>>({})
-  const [answersOpen, setAnswersOpen]   = useState<string | null>(null)
-  const [answersData, setAnswersData]   = useState<Record<string, WritingAnswer[]>>({})
-  const [answersLoading, setAnswersLoading] = useState<string | null>(null)
+  const [modalScheduleId, setModalScheduleId] = useState<string | null>(null)
+  const [modalSchedule, setModalSchedule]     = useState<MockSchedule | null>(null)
+  const [modalSubmissions, setModalSubmissions] = useState<MockSubmission[]>([])
+  const [modalLoading, setModalLoading]       = useState(false)
 
   // All dates that have an existing schedule — used by CalendarPicker to show dots
   const scheduledDates = new Set(schedules.map(s => s.date))
 
-  /* ── Load writing answers for a schedule ── */
-  const loadAnswers = async (scheduleId: string) => {
-    if (answersData[scheduleId]) {
-      // toggle visibility if already loaded
-      setAnswersOpen(prev => prev === scheduleId ? null : scheduleId)
-      return
-    }
-    setAnswersLoading(scheduleId)
+  /* ── Open submissions modal for a schedule ── */
+  const openModal = async (s: MockSchedule) => {
+    setModalSchedule(s)
+    setModalScheduleId(s.id)
+    setModalSubmissions([])
+    setModalLoading(true)
     try {
-      const res = await fetch(`/api/admin/mock-writing?scheduleId=${scheduleId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setAnswersData(prev => ({ ...prev, [scheduleId]: data }))
-        setAnswersOpen(scheduleId)
-      }
+      const res = await fetch(`/api/admin/mock-submissions?scheduleId=${s.id}`)
+      if (res.ok) setModalSubmissions(await res.json())
     } finally {
-      setAnswersLoading(null)
+      setModalLoading(false)
     }
   }
+  const closeModal = () => { setModalScheduleId(null); setModalSchedule(null); setModalSubmissions([]) }
 
   /* ── Form open / close ── */
   const openNew = () => {
@@ -697,23 +868,18 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  {/* Writing answers button */}
-                  {(s.writing_task1_topic || s.writing_task2_topic) && (
-                    <button
-                      onClick={() => loadAnswers(s.id)}
-                      disabled={answersLoading === s.id}
-                      className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                      style={{
-                        background: answersOpen === s.id ? 'rgba(245,158,11,0.12)' : 'var(--bg-secondary)',
-                        color:      answersOpen === s.id ? 'var(--warning)'         : 'var(--text-muted)',
-                        border: '1px solid var(--border)',
-                      }}>
-                      {answersLoading === s.id
-                        ? <Loader2 size={11} className="animate-spin" />
-                        : <FileText size={11} />}
-                      Javoblar
-                    </button>
-                  )}
+                  {/* Submissions modal button */}
+                  <button
+                    onClick={() => openModal(s)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                    }}>
+                    <FileText size={11} />
+                    Javoblar
+                  </button>
 
                   <button onClick={() => isEditing ? closeForm() : openEdit(s)}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
@@ -728,66 +894,63 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                 </div>
               </div>
 
-              {/* ── Writing answers panel ── */}
-              {answersOpen === s.id && (
-                <div className="mt-3 rounded-xl overflow-hidden"
-                  style={{ border: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
-                  {(answersData[s.id] ?? []).length === 0 ? (
-                    <p className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                      Hali writing javoblari yo&apos;q.
-                    </p>
-                  ) : (
-                    <div className="divide-y" style={{ borderColor: 'rgba(245,158,11,0.12)' }}>
-                      {(answersData[s.id] ?? []).map(a => (
-                        <details key={a.id} className="group">
-                          <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none">
-                            <div className="flex items-center gap-2">
-                              <User size={13} style={{ color: 'var(--text-muted)' }} />
-                              <span className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
-                                {a.user_name}
-                              </span>
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                {a.user_email}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-3 shrink-0">
-                              {a.time_taken && (
-                                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                  {Math.floor(a.time_taken / 60)} daq
-                                </span>
-                              )}
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                                {new Date(a.submitted_at).toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
-                              </span>
-                              <ChevronDown size={12} style={{ color: 'var(--text-muted)' }}
-                                className="group-open:rotate-180 transition-transform" />
-                            </div>
-                          </summary>
-                          <div className="px-4 pb-4 space-y-3">
-                            <div>
-                              <p className="text-xs font-bold mb-1" style={{ color: 'var(--warning)' }}>Task 1</p>
-                              <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-lg"
-                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)' }}>
-                                {a.task1_answer || '(bo\'sh)'}
-                              </pre>
-                            </div>
-                            <div>
-                              <p className="text-xs font-bold mb-1" style={{ color: 'var(--warning)' }}>Task 2</p>
-                              <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-lg"
-                                style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)' }}>
-                                {a.task2_answer || '(bo\'sh)'}
-                              </pre>
-                            </div>
-                          </div>
-                        </details>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ══ SUBMISSIONS MODAL ═══════════════════════════════════════════ */}
+      {modalScheduleId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) closeModal() }}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}
+          >
+            {/* Modal header */}
+            <div
+              className="flex items-center justify-between px-6 py-4 shrink-0"
+              style={{ borderBottom: '1px solid var(--border)' }}
+            >
+              <div>
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                  Mock Test Javoblari
+                </h3>
+                {modalSchedule && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {modalSchedule.date} · {modalSchedule.time}
+                  </p>
+                )}
+              </div>
+              <button onClick={closeModal} className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {modalLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 size={28} className="animate-spin" style={{ color: 'var(--accent)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda…</p>
+                </div>
+              ) : modalSubmissions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-2">
+                  <FileText size={36} className="opacity-20" style={{ color: 'var(--text-muted)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Hali topshirilgan javoblar yo&apos;q</p>
+                </div>
+              ) : (
+                modalSubmissions.map((sub, idx) => (
+                  <SubmissionCard key={sub.id} sub={sub} index={idx + 1} />
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

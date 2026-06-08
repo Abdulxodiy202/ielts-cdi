@@ -15,6 +15,8 @@ interface TestResult {
   id: string
   user_id: string
   user_email: string
+  user_name: string
+  is_premium: boolean
   test_id: string
   test_title: string
   test_type: string
@@ -265,8 +267,10 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
 /* ── Results tab ─────────────────────────────────────────────────────── */
 function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   const [results, setResults] = useState(initialResults)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'reading' | 'listening'>('reading')
+  const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium' | 'free'>('all')
 
   const refresh = async () => {
     setRefreshing(true)
@@ -283,95 +287,187 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
     return 'var(--error)'
   }
 
+  // Apply filters
+  const filtered = results.filter(r => {
+    const matchType = r.test_type === typeFilter
+    const matchPremium =
+      premiumFilter === 'all' ? true :
+      premiumFilter === 'premium' ? r.is_premium :
+      !r.is_premium
+    return matchType && matchPremium
+  })
+
+  // Group by user_id
+  const userMap = new Map<string, { user_id: string; user_name: string; user_email: string; is_premium: boolean; tests: TestResult[] }>()
+  for (const r of filtered) {
+    if (!userMap.has(r.user_id)) {
+      userMap.set(r.user_id, {
+        user_id: r.user_id,
+        user_name: r.user_name,
+        user_email: r.user_email,
+        is_premium: r.is_premium,
+        tests: [],
+      })
+    }
+    userMap.get(r.user_id)!.tests.push(r)
+  }
+  const grouped = [...userMap.values()]
+
+  // Avatar initials
+  const initials = (name: string) => {
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+    return name.slice(0, 2).toUpperCase()
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="card p-4">
-          <div className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{results.length}</div>
-          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami natijalar</div>
+    <div className="space-y-5">
+      {/* ── Filters row 1: type ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {(['reading', 'listening'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => { setTypeFilter(t); setExpandedUserId(null) }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: typeFilter === t ? 'var(--accent)' : 'transparent',
+                color: typeFilter === t ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {t === 'reading' ? <BookOpen size={14} /> : <Headphones size={14} />}
+              {t === 'reading' ? '📖 Reading' : '🎧 Listening'}
+            </button>
+          ))}
         </div>
-        <div className="card p-4">
-          <div className="text-3xl font-black" style={{ color: 'var(--success)' }}>
-            {results.length > 0
-              ? (results.reduce((s, r) => s + r.band, 0) / results.length).toFixed(1)
-              : '—'}
-          </div>
-          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>O&apos;rtacha band</div>
+
+        {/* ── Filters row 2: premium ── */}
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {([
+            { key: 'all',     label: 'Barchasi' },
+            { key: 'premium', label: '👑 Premium' },
+            { key: 'free',    label: '👤 Oddiy' },
+          ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => { setPremiumFilter(key); setExpandedUserId(null) }}
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: premiumFilter === key ? 'var(--accent)' : 'transparent',
+                color: premiumFilter === key ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <div className="card p-4 hidden md:block">
-          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>
-            {new Set(results.map(r => r.user_id)).size}
-          </div>
-          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Unique foydalanuvchilar</div>
+
+        <div className="ml-auto">
+          <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+          </button>
         </div>
       </div>
 
-      {/* Refresh */}
-      <div className="flex justify-end">
-        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
-        </button>
-      </div>
+      {/* Summary line */}
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {grouped.length} ta foydalanuvchi · {filtered.length} ta natija
+      </p>
 
-      {/* Table */}
-      {results.length === 0 ? (
+      {/* ── Table ── */}
+      {grouped.length === 0 ? (
         <div className="card p-12 text-center">
           <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Hali natijalar yo&apos;q</p>
+          <p style={{ color: 'var(--text-muted)' }}>Natijalar yo&apos;q</p>
         </div>
       ) : (
         <div className="card overflow-hidden">
-          {/* Table header */}
-          <div className="grid gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+          {/* Header */}
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
             style={{
-              gridTemplateColumns: '1fr 1fr auto auto auto',
+              gridTemplateColumns: '36px 1fr auto auto auto',
+              gap: '12px',
               color: 'var(--text-muted)',
               background: 'var(--bg-secondary)',
               borderBottom: '1px solid var(--border)',
-            }}>
+            }}
+          >
+            <span />
             <span>Foydalanuvchi</span>
-            <span>Test</span>
-            <span>Ball</span>
-            <span>Band</span>
-            <span>Sana</span>
+            <span className="text-right">Testlar</span>
+            <span className="text-right">So&apos;ngi sana</span>
+            <span />
           </div>
 
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {results.map((r) => {
-              const isExpanded = expandedId === r.id
+            {grouped.map(ug => {
+              const isExpanded = expandedUserId === ug.user_id
+              const lastTest = ug.tests[0]
               return (
-                <div key={r.id}>
+                <div key={ug.user_id}>
+                  {/* User row */}
                   <button
-                    className="w-full text-left px-4 py-3 hover:bg-opacity-50 transition-colors"
+                    className="w-full text-left px-4 py-3 transition-colors"
                     style={{ background: isExpanded ? 'var(--bg-secondary)' : undefined }}
-                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                    onClick={() => setExpandedUserId(isExpanded ? null : ug.user_id)}
                   >
-                    <div className="grid gap-3 items-center"
-                      style={{ gridTemplateColumns: '1fr 1fr auto auto auto' }}>
+                    <div
+                      className="grid items-center"
+                      style={{ gridTemplateColumns: '36px 1fr auto auto auto', gap: '12px' }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{
+                          background: ug.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                          color: ug.is_premium ? 'var(--warning)' : 'var(--accent)',
+                        }}
+                      >
+                        {initials(ug.user_name)}
+                      </div>
+
+                      {/* Name + email */}
                       <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                          {r.user_email}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {ug.user_name}
+                          </span>
+                          {ug.is_premium && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                              style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
+                            >
+                              <Crown size={10} /> Premium
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {ug.user_email}
                         </div>
                       </div>
-                      <div className="min-w-0">
-                        <div className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
-                          {r.test_title}
-                        </div>
-                        <div className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
-                          {r.test_type}
-                        </div>
+
+                      {/* Test count */}
+                      <div
+                        className="text-sm font-bold text-right shrink-0"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {ug.tests.length}
                       </div>
-                      <div className="text-sm font-bold text-right" style={{ color: 'var(--text-primary)' }}>
-                        {r.score}/40
+
+                      {/* Last date */}
+                      <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        {lastTest ? formatDate(lastTest.completed_at) : '—'}
                       </div>
-                      <div className="text-sm font-bold text-right" style={{ color: bandColor(r.band) }}>
-                        {r.band}
-                      </div>
-                      <div className="flex items-center gap-1.5 justify-end">
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {formatDate(r.completed_at)}
-                        </span>
+
+                      {/* Chevron */}
+                      <div className="shrink-0 flex justify-end">
                         {isExpanded
                           ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} />
                           : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
@@ -379,36 +475,66 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
                     </div>
                   </button>
 
+                  {/* Expanded: individual tests */}
                   <AnimatePresence>
                     {isExpanded && (
                       <motion.div
-                        initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
-                        style={{ overflow: 'hidden' }}>
-                        <div className="px-4 pb-4 pt-2" style={{
-                          background: 'var(--bg-secondary)',
-                          borderTop: '1px solid var(--border)',
-                        }}>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                            <div>
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Email</p>
-                              <p style={{ color: 'var(--text-secondary)' }}>{r.user_email}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Test</p>
-                              <p style={{ color: 'var(--text-secondary)' }}>{r.test_title}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Ball / Band</p>
-                              <p style={{ color: bandColor(r.band), fontWeight: 700 }}>
-                                {r.score}/40 — Band {r.band}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Sana</p>
-                              <p style={{ color: 'var(--text-secondary)' }}>{formatDate(r.completed_at)}</p>
-                            </div>
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div
+                          className="border-t"
+                          style={{
+                            background: 'var(--bg-secondary)',
+                            borderColor: 'var(--border)',
+                          }}
+                        >
+                          {/* Sub-header */}
+                          <div
+                            className="grid px-6 py-2 text-xs font-semibold uppercase tracking-wide"
+                            style={{
+                              gridTemplateColumns: '1fr auto auto auto',
+                              gap: '12px',
+                              color: 'var(--text-muted)',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            <span>Test nomi</span>
+                            <span className="text-right">Ball</span>
+                            <span className="text-right">Band</span>
+                            <span className="text-right">Sana</span>
                           </div>
+
+                          {ug.tests.map(r => (
+                            <div
+                              key={r.id}
+                              className="grid px-6 py-2.5 items-center border-b last:border-b-0"
+                              style={{
+                                gridTemplateColumns: '1fr auto auto auto',
+                                gap: '12px',
+                                borderColor: 'rgba(0,0,0,0.06)',
+                              }}
+                            >
+                              <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
+                                {r.test_title}
+                              </span>
+                              <span className="text-sm font-bold text-right" style={{ color: 'var(--text-primary)' }}>
+                                {r.score}/40
+                              </span>
+                              <span
+                                className="text-sm font-bold text-right"
+                                style={{ color: bandColor(r.band) }}
+                              >
+                                {r.band}
+                              </span>
+                              <span className="text-xs text-right" style={{ color: 'var(--text-muted)' }}>
+                                {formatDate(r.completed_at)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </motion.div>
                     )}
