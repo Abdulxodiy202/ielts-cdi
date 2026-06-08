@@ -7,7 +7,8 @@ import Link from 'next/link'
 import {
   Headphones, BookOpen, PenTool, CheckCircle,
   ArrowRight, Loader2, Clock, AlertTriangle, Send,
-  ChevronRight, Play, Pause, Info, Volume2,
+  ChevronRight, Play, Pause, Info, Volume2, Maximize,
+  XCircle,
 } from 'lucide-react'
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -26,10 +27,11 @@ export interface MockScheduleForFlow {
 type Step = 'pre-start' | 'listening' | 'reading' | 'writing' | 'done'
 
 /* ── Durations ── */
-const READ_MINS          = 60
-const WRITE_MINS         = 60
-const LISTEN_REVIEW_SECS = 120   // 2-minute answer-check window after audio ends
-const AUTOSAVE_MS        = 30_000
+const READ_MINS           = 60
+const WRITE_MINS          = 60
+const LISTEN_REVIEW_SECS  = 120  // 2-minute answer-check window after audio ends
+const TRANSITION_SECS     = 60   // 1-minute cap after user clicks "Readingga o'tish"
+const AUTOSAVE_MS         = 30_000
 
 /* ─────────────────────────── Helpers ─────────────────────────────── */
 function wordCount(text: string) {
@@ -70,7 +72,7 @@ function buildInjectScript(): string {
   })();<\/script>`
 }
 
-/* ─────────────────── Step progress bar ─────────────────────────────── */
+/* ─────────────── Step progress bar ─────────────────────────────── */
 type ActiveStep = Exclude<Step, 'pre-start' | 'done'>
 
 function StepBar({ current }: { current: Step }) {
@@ -180,12 +182,116 @@ function useHtmlBlobUrl(fileUrl: string | null) {
   return { blobUrl, loading }
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   WarningModal
+   ══════════════════════════════════════════════════════════════════════ */
+function WarningModal({
+  count,
+  fullscreenExited,
+  onDismiss,
+  onRequestFullscreen,
+}: {
+  count: number
+  fullscreenExited: boolean
+  onDismiss: () => void
+  onRequestFullscreen: () => void
+}) {
+  const isLast = count >= 2
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      background: 'rgba(0,0,0,0.80)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '20px',
+    }}>
+      <div style={{
+        background: 'var(--bg-card)',
+        border: `2px solid var(--error)`,
+        borderRadius: '20px',
+        padding: '36px 32px',
+        maxWidth: '420px',
+        width: '100%',
+        textAlign: 'center',
+        boxShadow: '0 0 60px rgba(239,68,68,0.25)',
+      }}>
+        <div style={{ fontSize: 52, marginBottom: 12 }}>⚠️</div>
+        <h2 style={{
+          fontSize: 20, fontWeight: 800,
+          color: 'var(--error)',
+          marginBottom: 10,
+        }}>
+          Ogohlantirish {count}/2
+        </h2>
+        <p style={{
+          fontSize: 14, color: 'var(--text-secondary)',
+          lineHeight: 1.65,
+          marginBottom: fullscreenExited ? 20 : 28,
+        }}>
+          {isLast
+            ? 'Oxirgi ogohlantirish! Keyingi qoidabuzarlik testni bekor qiladi.'
+            : 'Boshqa oynaga o\'tish qayd etildi. Yana bir marta takrorlansa, test bekor qilinadi.'}
+        </p>
+
+        {fullscreenExited ? (
+          <div style={{
+            background: 'rgba(239,68,68,0.07)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 14,
+            padding: '16px',
+            marginBottom: 0,
+          }}>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              Iltimos, to&apos;liq ekranga qayting
+            </p>
+            <button
+              onClick={() => { onRequestFullscreen(); onDismiss() }}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                background: 'var(--error)',
+                color: 'white',
+                border: 'none',
+                borderRadius: 12,
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              <Maximize size={16} /> To&apos;liq ekran
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onDismiss}
+            style={{
+              width: '100%',
+              padding: '13px 0',
+              background: isLast ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
+              color: isLast ? 'var(--error)' : 'var(--text-primary)',
+              border: `1px solid ${isLast ? 'rgba(239,68,68,0.35)' : 'var(--border)'}`,
+              borderRadius: 12,
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: 'pointer',
+            }}
+          >
+            Tushundim
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /* ──────────── Custom Audio Player ──────────────────────────────────────
    - Attempts autoplay; if blocked → shows prominent "Audio boshlash" button
    - Once playing: only pause/resume allowed; no seek, no rewind, no replay
-   - Calls onEnded() the moment the audio track finishes — the parent uses
-     this to start the 2-minute answer-review countdown
-   - Uses a ref for onEnded so the stable closure never goes stale
+   - Calls onEnded() the moment the audio track finishes
    ───────────────────────────────────────────────────────────────────── */
 function AudioPlayer({
   src,
@@ -196,7 +302,6 @@ function AudioPlayer({
 }) {
   const audioRef     = useRef<HTMLAudioElement>(null)
   const onEndedRef   = useRef(onEnded)
-  // Keep the ref current on every render without re-running the effect
   onEndedRef.current = onEnded
 
   const [playing,    setPlaying]    = useState(false)
@@ -216,7 +321,7 @@ function AudioPlayer({
     const onEnd   = () => {
       setPlaying(false)
       setEnded(true)
-      onEndedRef.current()   // notify parent → start 2-min review
+      onEndedRef.current()
     }
 
     audio.addEventListener('play',           onPlay)
@@ -226,8 +331,7 @@ function AudioPlayer({
     audio.addEventListener('durationchange', onMeta)
     audio.addEventListener('ended',          onEnd)
 
-    // Attempt autoplay (user just clicked "Testni boshlash")
-    audio.play().catch(() => { /* blocked → fallback button will show */ })
+    audio.play().catch(() => {})
 
     return () => {
       audio.removeEventListener('play',           onPlay)
@@ -237,7 +341,7 @@ function AudioPlayer({
       audio.removeEventListener('durationchange', onMeta)
       audio.removeEventListener('ended',          onEnd)
     }
-  }, []) // intentionally empty — onEnded is handled via ref
+  }, [])
 
   const startAudio = () => { audioRef.current?.play().catch(() => {}) }
   const toggle = () => {
@@ -250,11 +354,9 @@ function AudioPlayer({
 
   return (
     <div className="space-y-0">
-      {/* Always in DOM — keeps the ref and listeners stable */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} src={src} preload="auto" style={{ display: 'none' }} />
 
-      {/* Fallback start button — appears when autoplay is blocked */}
       {!hasStarted && (
         <div className="card p-6 text-center space-y-4">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center"
@@ -280,7 +382,6 @@ function AudioPlayer({
         </div>
       )}
 
-      {/* Player controls — visible once audio has started */}
       {hasStarted && (
         <div className="card p-4 space-y-3">
           <div className="flex items-center gap-4">
@@ -294,7 +395,6 @@ function AudioPlayer({
                 <span>{fmtMmSs(current)}</span>
                 <span>{duration > 0 ? fmtMmSs(duration) : '--:--'}</span>
               </div>
-              {/* Non-seekable progress bar */}
               <div title="Orqaga qaytib bo'lmaydi"
                 style={{
                   height: 6, background: 'var(--bg-secondary)',
@@ -307,7 +407,6 @@ function AudioPlayer({
                 }} />
               </div>
             </div>
-            {/* Pause / Resume — ONLY control after audio starts */}
             {!ended ? (
               <button type="button" aria-label={playing ? 'Pauza' : 'Davom ettirish'} onClick={toggle}
                 className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all hover:opacity-80 active:scale-95"
@@ -335,8 +434,13 @@ function AudioPlayer({
 /* ──────────────────── Listening Section ────────────────────────────── */
 /*
    reviewSecsLeft:
-   - null  → audio is still playing (no countdown shown)
-   - 0..120 → 2-minute review phase (countdown + "Reading ga o'tish" button)
+   - null    → audio still playing
+   - 0..120  → 2-min review phase (countdown + button)
+
+   Transition logic:
+   - User clicks "Readingga o'tish" → starts 1-min local countdown
+   - After 1 min, calls onNext() automatically
+   - If 2-min review timer expires first (via parent), parent auto-advances
 */
 function ListeningSection({
   fileUrl,
@@ -359,6 +463,33 @@ function ListeningSection({
   const { blobUrl, loading } = useHtmlBlobUrl(isHtml ? fileUrl : null)
   const [cdiDone, setCdiDone] = useState(false)
 
+  /* ── 1-min transition countdown after user clicks the button ── */
+  const [transitionClicked, setTransitionClicked]     = useState(false)
+  const [transitionEndMs,   setTransitionEndMs]       = useState<number | null>(null)
+  const [transitionSecsLeft, setTransitionSecsLeft]   = useState(TRANSITION_SECS)
+  const onNextRef = useRef(onNext)
+  onNextRef.current = onNext
+
+  useEffect(() => {
+    if (!transitionEndMs) return
+    const iv = setInterval(() => {
+      const secs = Math.max(0, Math.floor((transitionEndMs - Date.now()) / 1000))
+      setTransitionSecsLeft(secs)
+      if (secs <= 0) {
+        clearInterval(iv)
+        onNextRef.current()
+      }
+    }, 250)
+    return () => clearInterval(iv)
+  }, [transitionEndMs])
+
+  const handleTransitionClick = () => {
+    if (transitionClicked) return
+    setTransitionClicked(true)
+    setTransitionEndMs(Date.now() + TRANSITION_SECS * 1000)
+    setTransitionSecsLeft(TRANSITION_SECS)
+  }
+
   useEffect(() => {
     if (!isHtml) return
     const h = (e: MessageEvent) => { if (e.data?.type === 'CDI_CHECK_ANSWERS') setCdiDone(true) }
@@ -380,7 +511,7 @@ function ListeningSection({
     )
   }
 
-  /* ── CDI HTML — iframe fills remaining space; no timer ── */
+  /* ── CDI HTML iframe ── */
   if (isHtml) {
     if (loading) return (
       <div className="flex items-center justify-center h-full">
@@ -409,39 +540,40 @@ function ListeningSection({
 
   /* ── Audio file ── */
   const inReview = reviewSecsLeft !== null
+  const reviewSecs = reviewSecsLeft ?? 0
   const setAnswer = (q: string, val: string) => onChange({ ...answers, [q]: val })
+
+  void isAudio // suppress unused warning
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
       <div style={{ maxWidth: 896, margin: '0 auto', padding: '16px 16px 40px' }} className="space-y-5">
 
-        {/* ── 2-minute review countdown (appears after audio ends) ── */}
+        {/* ── 2-minute review countdown ── */}
         {inReview && (
           <div className="rounded-2xl p-4 flex items-center justify-between gap-4"
             style={{
-              background: (reviewSecsLeft ?? 0) < 30
-                ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
-              border: `1px solid ${(reviewSecsLeft ?? 0) < 30
-                ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.3)'}`,
+              background: reviewSecs < 30 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+              border: `1px solid ${reviewSecs < 30 ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.3)'}`,
             }}>
             <div>
               <p className="font-semibold text-sm"
-                style={{ color: (reviewSecsLeft ?? 0) < 30 ? 'var(--error)' : 'var(--warning)' }}>
-                2 daqiqa javoblarni tekshiring
+                style={{ color: reviewSecs < 30 ? 'var(--error)' : 'var(--warning)' }}>
+                Javoblaringizni tekshiring
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                 Vaqt tugagach Reading bo&apos;limiga o&apos;tiladi
               </p>
             </div>
             <div
-              className={`font-mono font-bold text-2xl tabular-nums shrink-0 ${(reviewSecsLeft ?? 0) < 30 ? 'animate-pulse' : ''}`}
-              style={{ color: (reviewSecsLeft ?? 0) < 30 ? 'var(--error)' : 'var(--warning)' }}>
-              {fmtTimer(reviewSecsLeft ?? 0)}
+              className={`font-mono font-bold text-2xl tabular-nums shrink-0 ${reviewSecs < 30 ? 'animate-pulse' : ''}`}
+              style={{ color: reviewSecs < 30 ? 'var(--error)' : 'var(--warning)' }}>
+              {fmtMmSs(reviewSecs)}
             </div>
           </div>
         )}
 
-        {/* ── Audio player (autoplay + pause-only) ── */}
+        {/* ── Audio player ── */}
         <AudioPlayer src={fileUrl} onEnded={onAudioEnd} />
 
         {/* ── 40 answer inputs ── */}
@@ -467,13 +599,36 @@ function ListeningSection({
           </div>
         </div>
 
-        {/* ── "Reading ga o'tish" — only during review period ── */}
-        {inReview && (
-          <button type="button" onClick={onNext}
+        {/* ── Transition button / countdown — only during review period ── */}
+        {inReview && !transitionClicked && (
+          <button type="button" onClick={handleTransitionClick}
             className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95"
             style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
-            Reading ga o&apos;tish <ArrowRight size={16} />
+            Readingga o&apos;tish <ArrowRight size={16} />
           </button>
+        )}
+
+        {inReview && transitionClicked && (
+          <div className="w-full rounded-2xl p-4 flex items-center justify-between gap-4"
+            style={{
+              background: transitionSecsLeft < 15 ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.08)',
+              border: `1px solid ${transitionSecsLeft < 15 ? 'rgba(239,68,68,0.35)' : 'rgba(99,102,241,0.25)'}`,
+            }}>
+            <div>
+              <p className="font-semibold text-sm"
+                style={{ color: transitionSecsLeft < 15 ? 'var(--error)' : 'var(--accent)' }}>
+                Readingga o&apos;tilmoqda…
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Vaqt tugagach avtomatik o&apos;tadi
+              </p>
+            </div>
+            <div
+              className={`font-mono font-bold text-2xl tabular-nums shrink-0 ${transitionSecsLeft < 15 ? 'animate-pulse' : ''}`}
+              style={{ color: transitionSecsLeft < 15 ? 'var(--error)' : 'var(--accent)' }}>
+              {fmtMmSs(transitionSecsLeft)}
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -570,7 +725,6 @@ function WritingSection({
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
       <div style={{ maxWidth: 896, margin: '0 auto', padding: '16px 16px 40px' }} className="space-y-6">
-        {/* Timer */}
         <div className="flex items-center justify-between p-4 rounded-2xl"
           style={{
             background: timerDanger ? 'rgba(239,68,68,0.08)' : timerWarn ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
@@ -594,7 +748,6 @@ function WritingSection({
             }} />
         </div>
 
-        {/* Task 1 */}
         <div className="card p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
@@ -627,7 +780,6 @@ function WritingSection({
           </div>
         </div>
 
-        {/* Task 2 */}
         <div className="card p-5 space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
@@ -669,20 +821,14 @@ function WritingSection({
    MockTestFlow — main export
    ═══════════════════════════════════════════════════════════════════════ */
 export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
-  const storageKey = `mock_draft_${schedule.id}`
+  const storageKey     = `mock_draft_${schedule.id}`
+  const violationsKey  = `mock_violations_${schedule.id}`
 
   /* ── State ── */
   const [step,               setStep]              = useState<Step>('pre-start')
   const [startTime,          setStartTime]         = useState<Date | null>(null)
-  /**
-   * listenReviewEndMs: epoch-ms when the 2-minute review window ends.
-   * null  → audio hasn't finished yet (no review countdown shown)
-   * >0    → review in progress; value counts down to 0, then auto-advances
-   */
   const [listenReviewEndMs,  setListenReviewEndMs] = useState<number | null>(null)
-  /** When reading actually started (drives the 60-min reading timer) */
   const [readingStartedAt,   setReadingStartedAt]  = useState<Date | null>(null)
-  /** When writing actually started (drives the 60-min writing timer) */
   const [writingStartedAt,   setWritingStartedAt]  = useState<Date | null>(null)
   const [listeningAnswers,   setListeningAnswers]  = useState<Record<string, string>>({})
   const [task1,              setTask1]             = useState('')
@@ -691,7 +837,30 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   const [skippedNotice,      setSkippedNotice]     = useState<string | null>(null)
   const [nowMs,              setNowMs]             = useState(Date.now())
 
-  /* ── 1-second clock (drives all countdowns) ── */
+  /* ── Anti-cheat state ── */
+  const [violations,      setViolations]      = useState<number>(() => {
+    if (typeof window === 'undefined') return 0
+    try { return Math.min(3, parseInt(localStorage.getItem(violationsKey) ?? '0', 10) || 0) } catch { return 0 }
+  })
+  const [warningViolation, setWarningViolation] = useState<number | null>(null) // shown in modal
+  const [disqualified,    setDisqualified]    = useState(false)
+  const [isFullscreen,    setIsFullscreen]    = useState(false)
+  const [fullscreenExited, setFullscreenExited] = useState(false)
+
+  /* ── Anti-cheat refs (avoid stale closures in event listeners) ── */
+  const lastViolMs       = useRef(0)
+  const warningOpenRef   = useRef(false)
+  const disqualifiedRef  = useRef(false)
+  const violsRef         = useRef(violations)
+  const antiCheatEnabled = useRef(false)
+  const stepRef          = useRef(step)
+
+  useEffect(() => { violsRef.current        = violations   }, [violations])
+  useEffect(() => { stepRef.current         = step         }, [step])
+  useEffect(() => { disqualifiedRef.current = disqualified }, [disqualified])
+  useEffect(() => { warningOpenRef.current  = warningViolation !== null }, [warningViolation])
+
+  /* ── 1-second clock ── */
   useEffect(() => {
     const iv = setInterval(() => setNowMs(Date.now()), 1000)
     return () => clearInterval(iv)
@@ -722,10 +891,8 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
       let resumeStep: Step = draft.step ?? 'listening'
 
-      // Listening: check if review was in progress / already over
       if (resumeStep === 'listening' && draft.listenReviewEndMs) {
         if (draft.listenReviewEndMs <= Date.now()) {
-          // Review period already ended while offline → skip to reading
           resumeStep = 'reading'
           setReadingStartedAt(new Date())
           setSkippedNotice("Listening bo'limi tugadi. Reading boshlandi.")
@@ -733,27 +900,24 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           setListenReviewEndMs(draft.listenReviewEndMs)
         }
       }
-
-      // Reading: restore per-section start time
       if (resumeStep === 'reading' && draft.readingStartedAt) {
         setReadingStartedAt(new Date(draft.readingStartedAt))
       }
-
-      // Writing: restore per-section start time
       if (resumeStep === 'writing' && draft.writingStartedAt) {
         setWritingStartedAt(new Date(draft.writingStartedAt))
       }
 
       setStep(resumeStep)
-    } catch { /* ignore corrupt draft */ }
+
+      // If resuming an active session, enable anti-cheat after 1.5 s grace
+      if (resumeStep !== 'pre-start' && resumeStep !== 'done') {
+        setTimeout(() => { antiCheatEnabled.current = true }, 1500)
+      }
+    } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* ── Section secsLeft ──
-     Listening: 2-minute review countdown (0 when audio not done)
-     Reading:   60-min from readingStartedAt
-     Writing:   60-min from writingStartedAt
-  ── */
+  /* ── Section secsLeft ── */
   const secsLeft = useMemo<number>(() => {
     if (step === 'listening') {
       if (!listenReviewEndMs) return 0
@@ -774,16 +938,12 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     return 0
   }, [step, nowMs, listenReviewEndMs, readingStartedAt, writingStartedAt])
 
-  /* ── Auto-advance when section timer hits 0 ──
-     Listening: only advances after review period ends (listenReviewEndMs set)
-     Reading / Writing: standard timer expiry
-  ── */
+  /* ── Auto-advance when section timer hits 0 ── */
   useEffect(() => {
     if (step === 'pre-start' || step === 'done') return
     if (secsLeft !== 0) return
 
     if (step === 'listening') {
-      // Guard: secsLeft is 0 before audio ends too — wait for review to start
       if (!listenReviewEndMs) return
       const now = new Date()
       setListenReviewEndMs(null)
@@ -801,33 +961,129 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secsLeft, step, listenReviewEndMs])
 
-  /* ── Called by AudioPlayer when audio track ends ── */
+  /* ── Audio ended → start 2-min review ── */
   const handleAudioEnd = useCallback(() => {
     setListenReviewEndMs(Date.now() + LISTEN_REVIEW_SECS * 1000)
   }, [])
 
+  /* ── requestFullscreen helper ── */
+  const requestFullscreen = useCallback(() => {
+    try {
+      document.documentElement.requestFullscreen?.()?.catch(() => {})
+    } catch { /* unsupported */ }
+  }, [])
+
+  /* ── Disqualification ── */
+  const handleDisqualification = useCallback(async () => {
+    disqualifiedRef.current = true
+    setDisqualified(true)
+    setWarningViolation(null)
+    // Exit fullscreen
+    try { document.exitFullscreen?.() } catch {}
+    // Send notification + save
+    try {
+      await fetch('/api/mock/disqualify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedule_id: schedule.id }),
+      })
+    } catch {}
+    // Clear localStorage
+    try {
+      localStorage.removeItem(storageKey)
+      localStorage.removeItem(violationsKey)
+    } catch {}
+    // Redirect after 3 s
+    setTimeout(() => { window.location.href = '/dashboard' }, 3000)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedule.id, storageKey, violationsKey])
+
+  /* ── Record violation ── */
+  const recordViolation = useCallback(() => {
+    if (!antiCheatEnabled.current)   return
+    if (disqualifiedRef.current)     return
+    if (warningOpenRef.current)      return
+    // 2-second debounce
+    const now = Date.now()
+    if (now - lastViolMs.current < 2000) return
+    lastViolMs.current = now
+
+    const newCount = violsRef.current + 1
+    violsRef.current = newCount
+    setViolations(newCount)
+    try { localStorage.setItem(violationsKey, String(newCount)) } catch {}
+
+    if (newCount >= 3) {
+      handleDisqualification()
+    } else {
+      setWarningViolation(newCount)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [violationsKey, handleDisqualification])
+
+  /* ── Anti-cheat event listeners ── */
+  useEffect(() => {
+    if (step === 'pre-start' || step === 'done') return
+
+    const onVisibility = () => {
+      if (document.hidden) recordViolation()
+    }
+    const onBlur = () => {
+      // Only count blur when NOT in fullscreen (fullscreen handles its own event)
+      if (!document.fullscreenElement) recordViolation()
+    }
+    const onFullscreenChange = () => {
+      const inFS = !!document.fullscreenElement
+      setIsFullscreen(inFS)
+      if (!inFS) {
+        setFullscreenExited(true)
+        recordViolation()
+      } else {
+        setFullscreenExited(false)
+      }
+    }
+
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('blur', onBlur)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('blur', onBlur)
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
+    }
+  }, [step, recordViolation])
+
+  /* ── Auto-close warning modal when fullscreen resumes ── */
+  useEffect(() => {
+    if (isFullscreen && warningViolation !== null) {
+      setWarningViolation(null)
+      setFullscreenExited(false)
+    }
+  }, [isFullscreen, warningViolation])
+
+  /* ── Exit fullscreen when test ends ── */
+  useEffect(() => {
+    if ((step === 'done' || disqualified) && document.fullscreenElement) {
+      try { document.exitFullscreen?.() } catch {}
+    }
+  }, [step, disqualified])
+
   /* ── Auto-save draft every 30 s ── */
   const saveDraft = useCallback((
-    s: Step,
-    st: Date | null,
-    lr: number | null,
-    rs: Date | null,
-    ws: Date | null,
-    la: Record<string, string>,
-    t1: string,
-    t2: string,
+    s: Step, st: Date | null, lr: number | null, rs: Date | null,
+    ws: Date | null, la: Record<string, string>, t1: string, t2: string,
   ) => {
     if (s === 'done' || s === 'pre-start') return
     try {
       localStorage.setItem(storageKey, JSON.stringify({
-        startTime:        st?.toISOString() ?? null,
-        step:             s,
+        startTime:         st?.toISOString() ?? null,
+        step:              s,
         listenReviewEndMs: lr,
-        readingStartedAt: rs?.toISOString() ?? null,
-        writingStartedAt: ws?.toISOString() ?? null,
-        listeningAnswers: la,
-        task1: t1,
-        task2: t2,
+        readingStartedAt:  rs?.toISOString() ?? null,
+        writingStartedAt:  ws?.toISOString() ?? null,
+        listeningAnswers:  la,
+        task1: t1, task2: t2,
         savedAt: new Date().toISOString(),
       }))
     } catch { /* quota */ }
@@ -880,7 +1136,10 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     } catch { /* ok */ }
     setStartTime(now)
     setStep('listening')
-  }, [storageKey])
+    // Request fullscreen; enable anti-cheat after 2.5 s grace (for FS transition)
+    requestFullscreen()
+    setTimeout(() => { antiCheatEnabled.current = true }, 2500)
+  }, [storageKey, requestFullscreen])
 
   /* ── Final submit ── */
   const handleFinalSubmit = useCallback(async () => {
@@ -900,7 +1159,8 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         }),
       })
       if (res.ok) {
-        try { localStorage.removeItem(storageKey) } catch { /* ok */ }
+        try { localStorage.removeItem(storageKey) } catch {}
+        try { localStorage.removeItem(violationsKey) } catch {}
         setStep('done')
       }
     } catch (err) {
@@ -908,7 +1168,8 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     } finally {
       setSubmitting(false)
     }
-  }, [submitting, schedule.id, storageKey])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitting, schedule.id, storageKey, violationsKey])
 
   /* ── Dismiss skipped notice after 6 s ── */
   useEffect(() => {
@@ -916,6 +1177,47 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     const t = setTimeout(() => setSkippedNotice(null), 6000)
     return () => clearTimeout(t)
   }, [skippedNotice])
+
+  /* ═══════════════ DISQUALIFIED OVERLAY ═════════════════════════════ */
+  if (disqualified) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'var(--bg-primary)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 20, padding: 24,
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: 96, height: 96, borderRadius: '50%',
+          background: 'rgba(239,68,68,0.12)',
+          border: '2px solid rgba(239,68,68,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <XCircle size={48} style={{ color: 'var(--error)' }} />
+        </div>
+        <div style={{ maxWidth: 400 }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--error)', marginBottom: 12 }}>
+            🚫 Testdan chetlatildingiz
+          </h2>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            Siz noqonuniy harakat tufayli testdan chetlatildingiz.
+            Dashboard&apos;ga yo&apos;naltirilmoqda…
+          </p>
+        </div>
+        <div style={{
+          marginTop: 8,
+          width: 40, height: 40,
+          borderRadius: '50%',
+          border: '3px solid var(--error)',
+          borderTopColor: 'transparent',
+          animation: 'spin 1s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
 
   /* ═══════════════ PRE-START SCREEN ═════════════════════════════════ */
   if (step === 'pre-start') {
@@ -938,7 +1240,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           <div className="space-y-2 text-sm text-left rounded-xl p-4"
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
             {[
-              { icon: Headphones, label: 'Listening', desc: 'Audio tugaguncha',  color: 'var(--success)' },
+              { icon: Headphones, label: 'Listening', desc: 'Audio tugaguncha',   color: 'var(--success)' },
               { icon: BookOpen,   label: 'Reading',   desc: `${READ_MINS} daqiqa`,  color: 'var(--accent)'  },
               { icon: PenTool,    label: 'Writing',   desc: `${WRITE_MINS} daqiqa`, color: 'var(--warning)' },
             ].map(({ icon: Icon, label, desc, color }) => (
@@ -955,8 +1257,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
             style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warning)' }}>
             <Info size={13} className="shrink-0 mt-0.5" />
             <span>
-              Listening audio tugagach 2 daqiqa javoblarni tekshirishga vaqt beriladi,
-              so&apos;ng Reading boshladi.
+              Listening tugagach 2 daqiqa javoblarni tekshirishga vaqt beriladi.
+              Test to&apos;liq ekranda (fullscreen) o&apos;tkaziladi.
+              Tab almashtirish yoki ekrandan chiqish ogohlantirish sanaladi.
             </span>
           </div>
           <button type="button" onClick={handleStart}
@@ -1020,7 +1323,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         </div>
       )}
 
-      {/* ── Section content — fills remaining height ── */}
+      {/* ── Section content ── */}
       <div className="flex-1 min-h-0">
         {step === 'listening' && (
           <ListeningSection
@@ -1063,6 +1366,60 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           />
         )}
       </div>
+
+      {/* ── Warning modal (1st / 2nd violation) ── */}
+      {warningViolation !== null && (
+        <WarningModal
+          count={warningViolation}
+          fullscreenExited={fullscreenExited}
+          onDismiss={() => {
+            setWarningViolation(null)
+            if (!fullscreenExited) return
+            // If still not in fullscreen after dismissal, keep the flag
+          }}
+          onRequestFullscreen={() => {
+            requestFullscreen()
+            setFullscreenExited(false)
+          }}
+        />
+      )}
+
+      {/* ── Fullscreen return prompt (no warning modal, but FS is exited) ── */}
+      {fullscreenExited && warningViolation === null && !disqualified && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 195,
+          background: 'rgba(0,0,0,0.65)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24,
+        }}>
+          <div style={{
+            background: 'var(--bg-card)',
+            border: '1px solid rgba(245,158,11,0.4)',
+            borderRadius: 16,
+            padding: '28px 24px',
+            maxWidth: 360,
+            width: '100%',
+            textAlign: 'center',
+          }}>
+            <Maximize size={32} className="mx-auto mb-3" style={{ color: 'var(--warning)' }} />
+            <p className="font-semibold mb-3" style={{ color: 'var(--text-primary)', fontSize: 15 }}>
+              Iltimos, to&apos;liq ekranga qayting
+            </p>
+            <button
+              onClick={() => { requestFullscreen(); setFullscreenExited(false) }}
+              style={{
+                width: '100%', padding: '12px 0',
+                background: 'var(--warning)', color: 'white',
+                border: 'none', borderRadius: 12,
+                fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <Maximize size={15} /> To&apos;liq ekran
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
