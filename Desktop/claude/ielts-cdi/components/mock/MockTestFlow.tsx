@@ -30,7 +30,6 @@ type Step = 'pre-start' | 'listening' | 'reading' | 'writing' | 'done'
 const READ_MINS           = 60
 const WRITE_MINS          = 60
 const LISTEN_REVIEW_SECS  = 120  // 2-minute answer-check window after audio ends
-const TRANSITION_SECS     = 60   // 1-minute cap after user clicks "Readingga o'tish"
 const AUTOSAVE_MS         = 30_000
 
 /* ─────────────────────────── Helpers ─────────────────────────────── */
@@ -434,13 +433,13 @@ function AudioPlayer({
 /* ──────────────────── Listening Section ────────────────────────────── */
 /*
    reviewSecsLeft:
-   - null    → audio still playing
-   - 0..120  → 2-min review phase (countdown + button)
+   - null    → audio still playing (or CDI test not yet completed)
+   - 0..120  → 2-min review phase
 
-   Transition logic:
-   - User clicks "Readingga o'tish" → starts 1-min local countdown
-   - After 1 min, calls onNext() automatically
-   - If 2-min review timer expires first (via parent), parent auto-advances
+   Transition logic (simple):
+   - Timer ticks inside the "Readingga o'tish (M:SS)" button
+   - Clicking the button → immediately calls onNext() (no extra wait)
+   - When 2-min review timer hits 0 → parent auto-advances via secsLeft useEffect
 */
 function ListeningSection({
   fileUrl,
@@ -463,32 +462,16 @@ function ListeningSection({
   const { blobUrl, loading } = useHtmlBlobUrl(isHtml ? fileUrl : null)
   const [cdiDone, setCdiDone] = useState(false)
 
-  /* ── 1-min transition countdown after user clicks the button ── */
-  const [transitionClicked, setTransitionClicked]     = useState(false)
-  const [transitionEndMs,   setTransitionEndMs]       = useState<number | null>(null)
-  const [transitionSecsLeft, setTransitionSecsLeft]   = useState(TRANSITION_SECS)
   const onNextRef = useRef(onNext)
   onNextRef.current = onNext
+  const onAudioEndRef = useRef(onAudioEnd)
+  onAudioEndRef.current = onAudioEnd
 
+  /* ── CDI HTML: when student clicks "Check answers", start the 2-min review timer ── */
   useEffect(() => {
-    if (!transitionEndMs) return
-    const iv = setInterval(() => {
-      const secs = Math.max(0, Math.floor((transitionEndMs - Date.now()) / 1000))
-      setTransitionSecsLeft(secs)
-      if (secs <= 0) {
-        clearInterval(iv)
-        onNextRef.current()
-      }
-    }, 250)
-    return () => clearInterval(iv)
-  }, [transitionEndMs])
-
-  const handleTransitionClick = () => {
-    if (transitionClicked) return
-    setTransitionClicked(true)
-    setTransitionEndMs(Date.now() + TRANSITION_SECS * 1000)
-    setTransitionSecsLeft(TRANSITION_SECS)
-  }
+    if (cdiDone) onAudioEndRef.current()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cdiDone])
 
   useEffect(() => {
     if (!isHtml) return
@@ -519,9 +502,6 @@ function ListeningSection({
       </div>
     )
 
-    const fmtTransition = (s: number) =>
-      `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
-
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -531,34 +511,23 @@ function ListeningSection({
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
           />
 
-          {/* Button appears when CDI test is done; transforms to countdown after click */}
-          {cdiDone && !transitionClicked && (
-            <button type="button" onClick={handleTransitionClick}
+          {/* Button appears when CDI test is done; clicking goes directly to Reading */}
+          {cdiDone && (
+            <button type="button" onClick={() => onNextRef.current()}
               className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
-              style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10, fontSize: 15 }}>
-              Readingga o&apos;tish <ArrowRight size={15} />
-            </button>
-          )}
-
-          {transitionClicked && (
-            <div style={{
-              position: 'absolute', bottom: 16, right: 16, zIndex: 10,
-              background: transitionSecsLeft < 15 ? 'var(--error)' : '#dc2626',
-              borderRadius: 14, padding: '12px 20px',
-              boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-            }}>
-              <span style={{ color: 'white', fontWeight: 600, fontSize: 12 }}>
-                Readingga o&apos;tilmoqda
-              </span>
-              <span style={{
-                color: 'white', fontWeight: 900,
-                fontSize: 32, fontFamily: 'monospace', lineHeight: 1,
-                animation: transitionSecsLeft < 15 ? 'pulse 1s infinite' : undefined,
+              style={{
+                position: 'absolute', bottom: 16, right: 16, zIndex: 10,
+                background: reviewSecsLeft !== null && reviewSecsLeft < 15 ? 'var(--error)' : 'var(--accent)',
+                fontSize: 15,
               }}>
-                {fmtTransition(transitionSecsLeft)}
-              </span>
-            </div>
+              Readingga o&apos;tish
+              {reviewSecsLeft !== null && (
+                <span style={{ fontFamily: 'monospace' }}>
+                  ({Math.floor(reviewSecsLeft / 60)}:{String(reviewSecsLeft % 60).padStart(2, '0')})
+                </span>
+              )}
+              <ArrowRight size={15} />
+            </button>
           )}
         </div>
       </div>
@@ -569,10 +538,6 @@ function ListeningSection({
   const inReview  = reviewSecsLeft !== null
   const reviewSecs = reviewSecsLeft ?? 0
   const setAnswer  = (q: string, val: string) => onChange({ ...answers, [q]: val })
-
-  // M:SS format without leading zero on minutes — e.g. "1:00", "0:59", "0:08"
-  const fmtTransition = (s: number) =>
-    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
   void isAudio
 
@@ -631,7 +596,7 @@ function ListeningSection({
         </div>
       </div>
 
-      {/* ── Sticky transition button — always visible at bottom ── */}
+      {/* ── Sticky transition button — timer ticking inside; click = go directly to Reading ── */}
       {inReview && (
         <div style={{
           position: 'sticky', bottom: 0, zIndex: 10,
@@ -639,66 +604,23 @@ function ListeningSection({
           borderTop: '1px solid var(--border)',
           padding: '12px 16px 16px',
         }}>
-          {!transitionClicked ? (
-            <button
-              type="button"
-              onClick={handleTransitionClick}
-              className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
-              style={{
-                background: 'linear-gradient(135deg, #16a34a, #059669)',
-                padding: '16px 24px',
-                fontSize: 17,
-                letterSpacing: '0.01em',
-              }}
-            >
-              Readingga o&apos;tish <ArrowRight size={20} />
-            </button>
-          ) : (
-            /* After click: button transforms to bold countdown */
-            <div style={{
-              width: '100%',
-              borderRadius: 18,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                background: transitionSecsLeft < 15 ? 'var(--error)' : '#dc2626',
-                padding: '14px 24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <div>
-                  <p style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>
-                    Readingga o&apos;tilmoqda…
-                  </p>
-                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
-                    Avtomatik o&apos;tiladi
-                  </p>
-                </div>
-                {/* Big countdown */}
-                <div style={{
-                  color: 'white',
-                  fontFamily: 'monospace',
-                  fontWeight: 900,
-                  fontSize: 44,
-                  lineHeight: 1,
-                  letterSpacing: '-2px',
-                  animation: transitionSecsLeft < 15 ? 'pulse 0.8s infinite' : undefined,
-                }}>
-                  {fmtTransition(transitionSecsLeft)}
-                </div>
-              </div>
-              {/* Progress bar */}
-              <div style={{ height: 4, background: 'rgba(239,68,68,0.2)' }}>
-                <div style={{
-                  height: '100%',
-                  background: transitionSecsLeft < 15 ? '#f87171' : '#fca5a5',
-                  width: `${(transitionSecsLeft / TRANSITION_SECS) * 100}%`,
-                  transition: 'width 1s linear',
-                }} />
-              </div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => onNextRef.current()}
+            className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+            style={{
+              background: reviewSecs < 15 ? 'var(--error)' : 'linear-gradient(135deg, #16a34a, #059669)',
+              padding: '16px 24px',
+              fontSize: 17,
+              letterSpacing: '0.01em',
+            }}
+          >
+            Readingga o&apos;tish
+            <span style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 900 }}>
+              ({fmtMmSs(reviewSecs)})
+            </span>
+            <ArrowRight size={20} />
+          </button>
         </div>
       )}
     </div>
