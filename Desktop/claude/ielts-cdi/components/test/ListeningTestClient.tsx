@@ -54,6 +54,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
   const [showExit, setShowExit] = useState(false)   // floating Exit for HTML mode
+  const [cdiSubmitted, setCdiSubmitted] = useState(false)  // CDI_SUBMIT received
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
 
@@ -88,17 +89,31 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
 
   useEffect(() => () => { if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current) }, [])
 
-  /* ── Listen for "Check Answers" postMessage from HTML iframe ── */
+  /* ── Listen for postMessage events from HTML iframe ── */
   useEffect(() => {
     if (!isHtmlFile) return
     const onMsg = (e: MessageEvent) => {
-      if (e.data?.type !== 'CDI_CHECK_ANSWERS') return
-      fetch('/api/results', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: session.id, testId: test.id, timeRemaining: 0 }),
-      }).catch(() => {})
-      setShowExit(true)
+      // New CDI_SUBMIT: save score to DB, show success, redirect
+      if (e.data?.type === 'CDI_SUBMIT') {
+        const score = typeof e.data.score === 'number' ? e.data.score : 0
+        fetch('/api/results/cdi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: session.id, testId: test.id, score }),
+        }).catch(() => {})
+        setCdiSubmitted(true)
+        setTimeout(() => { window.location.href = '/dashboard' }, 3000)
+        return
+      }
+      // Legacy CDI_CHECK_ANSWERS: just show exit button
+      if (e.data?.type === 'CDI_CHECK_ANSWERS') {
+        fetch('/api/results', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: session.id, testId: test.id, timeRemaining: 0 }),
+        }).catch(() => {})
+        setShowExit(true)
+      }
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
@@ -160,8 +175,31 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           </div>
         )}
 
-        {/* Floating Exit button — only shown after "Check Answers" clicked inside HTML */}
-        {showExit && (
+        {/* CDI_SUBMIT received — success overlay with redirect */}
+        {cdiSubmitted && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.75)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <div style={{
+              background: 'white', borderRadius: 20, padding: '48px 56px',
+              textAlign: 'center', maxWidth: 360,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            }}>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 8 }}>
+                Test topshirildi!
+              </h2>
+              <p style={{ color: '#666', fontSize: 15 }}>
+                Dashboard&apos;ga yo&apos;naltirilmoqda…
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Exit button — only shown after legacy CDI_CHECK_ANSWERS */}
+        {showExit && !cdiSubmitted && (
           <Link
             href="/listening"
             style={{

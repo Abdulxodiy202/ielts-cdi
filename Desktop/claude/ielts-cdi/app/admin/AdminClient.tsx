@@ -5,11 +5,24 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
-  Calendar, BookOpen, Headphones, CreditCard,
+  Calendar, BookOpen, Headphones, CreditCard, BarChart2,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
 import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
+
+interface TestResult {
+  id: string
+  user_id: string
+  user_email: string
+  test_id: string
+  test_title: string
+  test_type: string
+  score: number
+  band: number
+  time_taken: number | null
+  completed_at: string
+}
 
 interface PaymentRequest {
   id: string
@@ -39,6 +52,7 @@ interface Props {
   initialPayments: PaymentRequest[]
   tests: Test[]
   initialSchedules: MockSchedule[]
+  initialResults: TestResult[]
 }
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
@@ -248,17 +262,179 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
   )
 }
 
+/* ── Results tab ─────────────────────────────────────────────────────── */
+function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
+  const [results, setResults] = useState(initialResults)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/results')
+    if (res.ok) setResults(await res.json())
+    setRefreshing(false)
+  }
+
+  const bandColor = (band: number) => {
+    if (band >= 8) return 'var(--success)'
+    if (band >= 7) return '#3b82f6'
+    if (band >= 6) return 'var(--warning)'
+    if (band >= 5) return '#f97316'
+    return 'var(--error)'
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{results.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami natijalar</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-3xl font-black" style={{ color: 'var(--success)' }}>
+            {results.length > 0
+              ? (results.reduce((s, r) => s + r.band, 0) / results.length).toFixed(1)
+              : '—'}
+          </div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>O&apos;rtacha band</div>
+        </div>
+        <div className="card p-4 hidden md:block">
+          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>
+            {new Set(results.map(r => r.user_id)).size}
+          </div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Unique foydalanuvchilar</div>
+        </div>
+      </div>
+
+      {/* Refresh */}
+      <div className="flex justify-end">
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      {/* Table */}
+      {results.length === 0 ? (
+        <div className="card p-12 text-center">
+          <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali natijalar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {/* Table header */}
+          <div className="grid gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '1fr 1fr auto auto auto',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}>
+            <span>Foydalanuvchi</span>
+            <span>Test</span>
+            <span>Ball</span>
+            <span>Band</span>
+            <span>Sana</span>
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {results.map((r) => {
+              const isExpanded = expandedId === r.id
+              return (
+                <div key={r.id}>
+                  <button
+                    className="w-full text-left px-4 py-3 hover:bg-opacity-50 transition-colors"
+                    style={{ background: isExpanded ? 'var(--bg-secondary)' : undefined }}
+                    onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                  >
+                    <div className="grid gap-3 items-center"
+                      style={{ gridTemplateColumns: '1fr 1fr auto auto auto' }}>
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                          {r.user_email}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
+                          {r.test_title}
+                        </div>
+                        <div className="text-xs capitalize" style={{ color: 'var(--text-muted)' }}>
+                          {r.test_type}
+                        </div>
+                      </div>
+                      <div className="text-sm font-bold text-right" style={{ color: 'var(--text-primary)' }}>
+                        {r.score}/40
+                      </div>
+                      <div className="text-sm font-bold text-right" style={{ color: bandColor(r.band) }}>
+                        {r.band}
+                      </div>
+                      <div className="flex items-center gap-1.5 justify-end">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {formatDate(r.completed_at)}
+                        </span>
+                        {isExpanded
+                          ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} />
+                          : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
+                      </div>
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}>
+                        <div className="px-4 pb-4 pt-2" style={{
+                          background: 'var(--bg-secondary)',
+                          borderTop: '1px solid var(--border)',
+                        }}>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Email</p>
+                              <p style={{ color: 'var(--text-secondary)' }}>{r.user_email}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Test</p>
+                              <p style={{ color: 'var(--text-secondary)' }}>{r.test_title}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Ball / Band</p>
+                              <p style={{ color: bandColor(r.band), fontWeight: 700 }}>
+                                {r.score}/40 — Band {r.band}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Sana</p>
+                              <p style={{ color: 'var(--text-secondary)' }}>{formatDate(r.completed_at)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',     Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',  Icon: BookOpen },
   { id: 'listening', label: 'Listening Tests', Icon: Headphones },
   { id: 'mock',      label: 'Mock Test',       Icon: Calendar },
+  { id: 'results',   label: 'Natijalar',       Icon: BarChart2 },
 ] as const
 type TabId = typeof TABS[number]['id']
 
 /* ── Main AdminClient ────────────────────────────────────────────────── */
-export function AdminClient({ initialPayments, tests, initialSchedules }: Props) {
+export function AdminClient({ initialPayments, tests, initialSchedules, initialResults }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
@@ -320,6 +496,9 @@ export function AdminClient({ initialPayments, tests, initialSchedules }: Props)
       )}
       {activeTab === 'mock' && (
         <MockScheduleEditor initialSchedules={initialSchedules} />
+      )}
+      {activeTab === 'results' && (
+        <ResultsTab initialResults={initialResults} />
       )}
     </div>
   )
