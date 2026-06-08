@@ -30,6 +30,7 @@ type Step = 'pre-start' | 'listening' | 'reading' | 'writing' | 'done'
 const READ_MINS           = 60
 const WRITE_MINS          = 60
 const LISTEN_REVIEW_SECS  = 120  // 2-minute answer-check window after audio ends
+const READ_REVIEW_SECS    = 120  // 2-minute answer-check window after reading ends
 const AUTOSAVE_MS         = 30_000
 
 /* ─────────────────────────── Helpers ─────────────────────────────── */
@@ -628,19 +629,46 @@ function ListeningSection({
 }
 
 /* ──────────────────────── Reading Section ──────────────────────────── */
+/*
+   reviewSecsLeft:
+   - null    → still in active reading (60-min timer running)
+   - 0..120  → 2-min review phase after reading ends
+
+   Transition logic (mirrors Listening → Reading):
+   - Timer ticks inside the "Writingga o'tish (M:SS)" sticky button
+   - Clicking the button immediately calls onNext() (no extra wait)
+   - When 2-min review timer hits 0 → parent auto-advances via secsLeft useEffect
+   - CDI HTML: cdiDone triggers onReadingDone() → starts review
+   - Non-CDI: overlay button calls onReadingDone() → starts review
+*/
 function ReadingSection({
   fileUrl,
   onNext,
+  onReadingDone,
   secsLeft,
+  reviewSecsLeft,
 }: {
   fileUrl: string | null
   onNext: () => void
+  onReadingDone: () => void
   secsLeft: number
+  reviewSecsLeft: number | null
 }) {
   const ext    = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
   const isHtml = ext === 'html' || ext === 'htm'
   const { blobUrl, loading } = useHtmlBlobUrl(isHtml ? fileUrl : null)
   const [cdiDone, setCdiDone] = useState(false)
+
+  const onNextRef       = useRef(onNext)
+  onNextRef.current     = onNext
+  const onReadingDoneRef      = useRef(onReadingDone)
+  onReadingDoneRef.current    = onReadingDone
+
+  /* ── CDI HTML: trigger 2-min review timer when reading is submitted ── */
+  useEffect(() => {
+    if (cdiDone) onReadingDoneRef.current()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cdiDone])
 
   useEffect(() => {
     if (!isHtml) return
@@ -648,6 +676,9 @@ function ReadingSection({
     window.addEventListener('message', h)
     return () => window.removeEventListener('message', h)
   }, [isHtml])
+
+  const inReview   = reviewSecsLeft !== null
+  const reviewSecs = reviewSecsLeft ?? 0
 
   if (!fileUrl) {
     return (
@@ -670,23 +701,55 @@ function ReadingSection({
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '10px 16px', flexShrink: 0 }}>
-        <SectionTimer secsLeft={secsLeft} totalSecs={READ_MINS * 60} label="Reading vaqti" />
-      </div>
+      {/* SectionTimer — only during active reading, not during review */}
+      {!inReview && (
+        <div style={{ padding: '10px 16px', flexShrink: 0 }}>
+          <SectionTimer secsLeft={secsLeft} totalSecs={READ_MINS * 60} label="Reading vaqti" />
+        </div>
+      )}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <iframe
           src={(isHtml ? blobUrl : null) ?? fileUrl}
           title="Reading test"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
         />
-        {(!isHtml || cdiDone) && (
-          <button type="button" onClick={onNext}
+        {/* Overlay button — only during active reading; click starts review */}
+        {!inReview && (!isHtml || cdiDone) && (
+          <button type="button" onClick={() => onReadingDoneRef.current()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
             style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10 }}>
             Writing ga o&apos;tish <ArrowRight size={15} />
           </button>
         )}
       </div>
+
+      {/* Sticky footer — review button with timer ticking inside; click = go directly to Writing */}
+      {inReview && (
+        <div style={{
+          flexShrink: 0,
+          background: 'var(--bg-primary)',
+          borderTop: '1px solid var(--border)',
+          padding: '12px 16px 16px',
+        }}>
+          <button
+            type="button"
+            onClick={() => onNextRef.current()}
+            className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+            style={{
+              background: reviewSecs < 15 ? 'var(--error)' : 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+              padding: '16px 24px',
+              fontSize: 17,
+              letterSpacing: '0.01em',
+            }}
+          >
+            Writingga o&apos;tish
+            <span style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 900 }}>
+              ({fmtMmSs(reviewSecs)})
+            </span>
+            <ArrowRight size={20} />
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -819,8 +882,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   /* ── State ── */
   const [step,               setStep]              = useState<Step>('pre-start')
   const [startTime,          setStartTime]         = useState<Date | null>(null)
-  const [listenReviewEndMs,  setListenReviewEndMs] = useState<number | null>(null)
-  const [readingStartedAt,   setReadingStartedAt]  = useState<Date | null>(null)
+  const [listenReviewEndMs,  setListenReviewEndMs]  = useState<number | null>(null)
+  const [readingReviewEndMs, setReadingReviewEndMs] = useState<number | null>(null)
+  const [readingStartedAt,   setReadingStartedAt]   = useState<Date | null>(null)
   const [writingStartedAt,   setWritingStartedAt]  = useState<Date | null>(null)
   const [listeningAnswers,   setListeningAnswers]  = useState<Record<string, string>>({})
   const [task1,              setTask1]             = useState('')
@@ -866,6 +930,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         startTime?: string
         step?: Step
         listenReviewEndMs?: number | null
+        readingReviewEndMs?: number | null
         readingStartedAt?: string | null
         writingStartedAt?: string | null
         listeningAnswers?: Record<string, string>
@@ -891,8 +956,17 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           setListenReviewEndMs(draft.listenReviewEndMs)
         }
       }
-      if (resumeStep === 'reading' && draft.readingStartedAt) {
-        setReadingStartedAt(new Date(draft.readingStartedAt))
+      if (resumeStep === 'reading') {
+        if (draft.readingReviewEndMs) {
+          if (draft.readingReviewEndMs <= Date.now()) {
+            resumeStep = 'writing'
+            setWritingStartedAt(new Date())
+            setSkippedNotice("Reading bo'limi tugadi. Writing boshlandi.")
+          } else {
+            setReadingReviewEndMs(draft.readingReviewEndMs)
+          }
+        }
+        if (draft.readingStartedAt) setReadingStartedAt(new Date(draft.readingStartedAt))
       }
       if (resumeStep === 'writing' && draft.writingStartedAt) {
         setWritingStartedAt(new Date(draft.writingStartedAt))
@@ -910,6 +984,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       return Math.max(0, Math.floor((listenReviewEndMs - nowMs) / 1000))
     }
     if (step === 'reading') {
+      if (readingReviewEndMs !== null) {
+        return Math.max(0, Math.floor((readingReviewEndMs - nowMs) / 1000))
+      }
       if (!readingStartedAt) return 0
       return Math.max(0, Math.floor(
         (readingStartedAt.getTime() + READ_MINS * 60 * 1000 - nowMs) / 1000
@@ -922,7 +999,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       ))
     }
     return 0
-  }, [step, nowMs, listenReviewEndMs, readingStartedAt, writingStartedAt])
+  }, [step, nowMs, listenReviewEndMs, readingReviewEndMs, readingStartedAt, writingStartedAt])
 
   /* ── Auto-advance when section timer hits 0 ── */
   useEffect(() => {
@@ -937,19 +1014,31 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       setReadingStartedAt(now)
       setSkippedNotice(null)
     } else if (step === 'reading') {
-      const now = new Date()
-      setStep('writing')
-      setWritingStartedAt(now)
-      setSkippedNotice(null)
+      if (!readingReviewEndMs) {
+        // 60-min reading timer expired → start 2-min review
+        setReadingReviewEndMs(Date.now() + READ_REVIEW_SECS * 1000)
+      } else {
+        // Review timer expired → advance to Writing
+        setReadingReviewEndMs(null)
+        const now = new Date()
+        setStep('writing')
+        setWritingStartedAt(now)
+        setSkippedNotice(null)
+      }
     } else if (step === 'writing' && !submitting) {
       handleFinalSubmit()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secsLeft, step, listenReviewEndMs])
+  }, [secsLeft, step, listenReviewEndMs, readingReviewEndMs])
 
-  /* ── Audio ended → start 2-min review ── */
+  /* ── Audio ended → start 2-min Listening review ── */
   const handleAudioEnd = useCallback(() => {
     setListenReviewEndMs(Date.now() + LISTEN_REVIEW_SECS * 1000)
+  }, [])
+
+  /* ── Reading done → start 2-min Reading review ── */
+  const handleReadingDone = useCallback(() => {
+    setReadingReviewEndMs(Date.now() + READ_REVIEW_SECS * 1000)
   }, [])
 
   /* ── requestFullscreen helper ── */
@@ -1100,18 +1189,19 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
   /* ── Auto-save draft every 30 s ── */
   const saveDraft = useCallback((
-    s: Step, st: Date | null, lr: number | null, rs: Date | null,
-    ws: Date | null, la: Record<string, string>, t1: string, t2: string,
+    s: Step, st: Date | null, lr: number | null, rr: number | null,
+    rs: Date | null, ws: Date | null, la: Record<string, string>, t1: string, t2: string,
   ) => {
     if (s === 'done' || s === 'pre-start') return
     try {
       localStorage.setItem(storageKey, JSON.stringify({
-        startTime:         st?.toISOString() ?? null,
-        step:              s,
-        listenReviewEndMs: lr,
-        readingStartedAt:  rs?.toISOString() ?? null,
-        writingStartedAt:  ws?.toISOString() ?? null,
-        listeningAnswers:  la,
+        startTime:          st?.toISOString() ?? null,
+        step:               s,
+        listenReviewEndMs:  lr,
+        readingReviewEndMs: rr,
+        readingStartedAt:   rs?.toISOString() ?? null,
+        writingStartedAt:   ws?.toISOString() ?? null,
+        listeningAnswers:   la,
         task1: t1, task2: t2,
         savedAt: new Date().toISOString(),
       }))
@@ -1131,21 +1221,22 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   }, [storageKey, schedule.id])
 
   const stateRef = useRef({
-    step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt,
-    listeningAnswers, task1, task2,
+    step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt,
+    writingStartedAt, listeningAnswers, task1, task2,
   })
   useEffect(() => {
     stateRef.current = {
-      step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt,
-      listeningAnswers, task1, task2,
+      step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt,
+      writingStartedAt, listeningAnswers, task1, task2,
     }
-  }, [step, startTime, listenReviewEndMs, readingStartedAt, writingStartedAt, listeningAnswers, task1, task2])
+  }, [step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt, writingStartedAt, listeningAnswers, task1, task2])
 
   useEffect(() => {
     const iv = setInterval(() => {
-      const { step: s, startTime: st, listenReviewEndMs: lr, readingStartedAt: rs,
-              writingStartedAt: ws, listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
-      saveDraft(s, st, lr, rs, ws, la, t1, t2)
+      const { step: s, startTime: st, listenReviewEndMs: lr, readingReviewEndMs: rr,
+              readingStartedAt: rs, writingStartedAt: ws,
+              listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
+      saveDraft(s, st, lr, rr, rs, ws, la, t1, t2)
     }, AUTOSAVE_MS)
     return () => clearInterval(iv)
   }, [saveDraft])
@@ -1374,11 +1465,14 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
             fileUrl={schedule.reading_file_url}
             onNext={() => {
               const now = new Date()
+              setReadingReviewEndMs(null)
               setStep('writing')
               setWritingStartedAt(now)
               setSkippedNotice(null)
             }}
+            onReadingDone={handleReadingDone}
             secsLeft={secsLeft}
+            reviewSecsLeft={readingReviewEndMs !== null ? secsLeft : null}
           />
         )}
         {step === 'writing' && (
