@@ -1098,53 +1098,58 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     const timer = setTimeout(() => {
       console.log('[Anti-cheat] Listeners activated for step:', step)
 
+      // 1. visibilitychange — only when tab is actually hidden
       const onVisibility = () => {
         console.log('[Anti-cheat] visibilitychange — hidden:', document.hidden)
         if (document.hidden) recordViolation()
       }
 
+      // 2. blur — check 100ms later if focus moved to an iframe (CDI test click)
+      //    If it did, this is a false positive; ignore it.
       const onBlur = () => {
-        console.log('[Anti-cheat] window.blur')
-        // Count blur regardless of fullscreen — fullscreenchange fires separately
-        recordViolation()
+        setTimeout(() => {
+          const focused = document.activeElement
+          console.log('[Anti-cheat] window.blur — activeElement:', focused?.tagName)
+          if (focused && focused.tagName === 'IFRAME') {
+            console.log('[Anti-cheat] blur ignored — focus is inside test iframe')
+            return
+          }
+          recordViolation()
+        }, 100)
       }
 
+      // 3. focus — informational: user returned to window
       const onFocus = () => {
-        // Informational only — tracks when user returns to window
         console.log('[Anti-cheat] window.focus — user returned')
       }
 
-      const onKeydown = (e: KeyboardEvent) => {
-        if (e.altKey && e.key === 'Tab') {
-          console.log('[Anti-cheat] Alt+Tab detected')
-          // Don't prevent default — let the OS switch; just record it
-          recordViolation()
-        }
-      }
-
+      // 4. fullscreenchange — only when actually exiting fullscreen
       const onFullscreenChange = () => {
         const inFS = !!document.fullscreenElement
         console.log('[Anti-cheat] fullscreenchange — inFS:', inFS)
         setIsFullscreen(inFS)
-        if (!inFS) {
+        if (inFS) {
+          // Entered fullscreen — clear the flag
+          setFullscreenExited(false)
+        } else {
+          // Exited fullscreen — genuine violation
           setFullscreenExited(true)
           recordViolation()
-        } else {
-          setFullscreenExited(false)
         }
       }
+
+      // NOTE: keydown Alt+Tab removed — it fires from inside the iframe too,
+      // causing false positives. visibilitychange is sufficient for tab switches.
 
       document.addEventListener('visibilitychange', onVisibility)
       window.addEventListener('blur',               onBlur)
       window.addEventListener('focus',              onFocus)
-      window.addEventListener('keydown',            onKeydown)
       document.addEventListener('fullscreenchange', onFullscreenChange)
 
       removeAll = () => {
         document.removeEventListener('visibilitychange', onVisibility)
         window.removeEventListener('blur',               onBlur)
         window.removeEventListener('focus',              onFocus)
-        window.removeEventListener('keydown',            onKeydown)
         document.removeEventListener('fullscreenchange', onFullscreenChange)
         console.log('[Anti-cheat] Listeners removed')
       }
