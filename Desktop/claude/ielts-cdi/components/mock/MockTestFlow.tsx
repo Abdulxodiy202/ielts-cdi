@@ -518,6 +518,10 @@ function ListeningSection({
         <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent)' }} />
       </div>
     )
+
+    const fmtTransition = (s: number) =>
+      `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -526,12 +530,35 @@ function ListeningSection({
             title="Listening test"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
           />
-          {cdiDone && (
-            <button type="button" onClick={onNext}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
-              style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10 }}>
-              Reading ga o&apos;tish <ArrowRight size={15} />
+
+          {/* Button appears when CDI test is done; transforms to countdown after click */}
+          {cdiDone && !transitionClicked && (
+            <button type="button" onClick={handleTransitionClick}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
+              style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10, fontSize: 15 }}>
+              Readingga o&apos;tish <ArrowRight size={15} />
             </button>
+          )}
+
+          {transitionClicked && (
+            <div style={{
+              position: 'absolute', bottom: 16, right: 16, zIndex: 10,
+              background: transitionSecsLeft < 15 ? 'var(--error)' : '#dc2626',
+              borderRadius: 14, padding: '12px 20px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            }}>
+              <span style={{ color: 'white', fontWeight: 600, fontSize: 12 }}>
+                Readingga o&apos;tilmoqda
+              </span>
+              <span style={{
+                color: 'white', fontWeight: 900,
+                fontSize: 32, fontFamily: 'monospace', lineHeight: 1,
+                animation: transitionSecsLeft < 15 ? 'pulse 1s infinite' : undefined,
+              }}>
+                {fmtTransition(transitionSecsLeft)}
+              </span>
+            </div>
           )}
         </div>
       </div>
@@ -539,17 +566,21 @@ function ListeningSection({
   }
 
   /* ── Audio file ── */
-  const inReview = reviewSecsLeft !== null
+  const inReview  = reviewSecsLeft !== null
   const reviewSecs = reviewSecsLeft ?? 0
-  const setAnswer = (q: string, val: string) => onChange({ ...answers, [q]: val })
+  const setAnswer  = (q: string, val: string) => onChange({ ...answers, [q]: val })
 
-  void isAudio // suppress unused warning
+  // M:SS format without leading zero on minutes — e.g. "1:00", "0:59", "0:08"
+  const fmtTransition = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+  void isAudio
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
-      <div style={{ maxWidth: 896, margin: '0 auto', padding: '16px 16px 40px' }} className="space-y-5">
+      <div style={{ maxWidth: 896, margin: '0 auto', padding: '16px 16px 8px' }} className="space-y-5">
 
-        {/* ── 2-minute review countdown ── */}
+        {/* ── 2-minute review countdown banner ── */}
         {inReview && (
           <div className="rounded-2xl p-4 flex items-center justify-between gap-4"
             style={{
@@ -598,39 +629,78 @@ function ListeningSection({
             })}
           </div>
         </div>
-
-        {/* ── Transition button / countdown — only during review period ── */}
-        {inReview && !transitionClicked && (
-          <button type="button" onClick={handleTransitionClick}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95"
-            style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
-            Readingga o&apos;tish <ArrowRight size={16} />
-          </button>
-        )}
-
-        {inReview && transitionClicked && (
-          <div className="w-full rounded-2xl p-4 flex items-center justify-between gap-4"
-            style={{
-              background: transitionSecsLeft < 15 ? 'rgba(239,68,68,0.08)' : 'rgba(99,102,241,0.08)',
-              border: `1px solid ${transitionSecsLeft < 15 ? 'rgba(239,68,68,0.35)' : 'rgba(99,102,241,0.25)'}`,
-            }}>
-            <div>
-              <p className="font-semibold text-sm"
-                style={{ color: transitionSecsLeft < 15 ? 'var(--error)' : 'var(--accent)' }}>
-                Readingga o&apos;tilmoqda…
-              </p>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Vaqt tugagach avtomatik o&apos;tadi
-              </p>
-            </div>
-            <div
-              className={`font-mono font-bold text-2xl tabular-nums shrink-0 ${transitionSecsLeft < 15 ? 'animate-pulse' : ''}`}
-              style={{ color: transitionSecsLeft < 15 ? 'var(--error)' : 'var(--accent)' }}>
-              {fmtMmSs(transitionSecsLeft)}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* ── Sticky transition button — always visible at bottom ── */}
+      {inReview && (
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 10,
+          background: 'var(--bg-primary)',
+          borderTop: '1px solid var(--border)',
+          padding: '12px 16px 16px',
+        }}>
+          {!transitionClicked ? (
+            <button
+              type="button"
+              onClick={handleTransitionClick}
+              className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+              style={{
+                background: 'linear-gradient(135deg, #16a34a, #059669)',
+                padding: '16px 24px',
+                fontSize: 17,
+                letterSpacing: '0.01em',
+              }}
+            >
+              Readingga o&apos;tish <ArrowRight size={20} />
+            </button>
+          ) : (
+            /* After click: button transforms to bold countdown */
+            <div style={{
+              width: '100%',
+              borderRadius: 18,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                background: transitionSecsLeft < 15 ? 'var(--error)' : '#dc2626',
+                padding: '14px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div>
+                  <p style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>
+                    Readingga o&apos;tilmoqda…
+                  </p>
+                  <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                    Avtomatik o&apos;tiladi
+                  </p>
+                </div>
+                {/* Big countdown */}
+                <div style={{
+                  color: 'white',
+                  fontFamily: 'monospace',
+                  fontWeight: 900,
+                  fontSize: 44,
+                  lineHeight: 1,
+                  letterSpacing: '-2px',
+                  animation: transitionSecsLeft < 15 ? 'pulse 0.8s infinite' : undefined,
+                }}>
+                  {fmtTransition(transitionSecsLeft)}
+                </div>
+              </div>
+              {/* Progress bar */}
+              <div style={{ height: 4, background: 'rgba(239,68,68,0.2)' }}>
+                <div style={{
+                  height: '100%',
+                  background: transitionSecsLeft < 15 ? '#f87171' : '#fca5a5',
+                  width: `${(transitionSecsLeft / TRANSITION_SECS) * 100}%`,
+                  transition: 'width 1s linear',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -852,7 +922,6 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   const warningOpenRef   = useRef(false)
   const disqualifiedRef  = useRef(false)
   const violsRef         = useRef(violations)
-  const antiCheatEnabled = useRef(false)
   const stepRef          = useRef(step)
 
   useEffect(() => { violsRef.current        = violations   }, [violations])
@@ -908,11 +977,6 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       }
 
       setStep(resumeStep)
-
-      // If resuming an active session, enable anti-cheat after 1.5 s grace
-      if (resumeStep !== 'pre-start' && resumeStep !== 'done') {
-        setTimeout(() => { antiCheatEnabled.current = true }, 1500)
-      }
     } catch { /* ignore */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -1000,10 +1064,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
 
   /* ── Record violation ── */
   const recordViolation = useCallback(() => {
-    if (!antiCheatEnabled.current)   return
-    if (disqualifiedRef.current)     return
-    if (warningOpenRef.current)      return
-    // 2-second debounce
+    if (disqualifiedRef.current)   return
+    if (warningOpenRef.current)    return
+    // 2-second debounce to avoid double-counting simultaneous events
     const now = Date.now()
     if (now - lastViolMs.current < 2000) return
     lastViolMs.current = now
@@ -1021,36 +1084,75 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [violationsKey, handleDisqualification])
 
-  /* ── Anti-cheat event listeners ── */
+  /* ── Anti-cheat event listeners ──
+     Registered after a 2.5 s grace period so fullscreen transitions and
+     initial page load don't trigger false violations.
+     All five events log to console for debugging.
+  ── */
   useEffect(() => {
     if (step === 'pre-start' || step === 'done') return
 
-    const onVisibility = () => {
-      if (document.hidden) recordViolation()
-    }
-    const onBlur = () => {
-      // Only count blur when NOT in fullscreen (fullscreen handles its own event)
-      if (!document.fullscreenElement) recordViolation()
-    }
-    const onFullscreenChange = () => {
-      const inFS = !!document.fullscreenElement
-      setIsFullscreen(inFS)
-      if (!inFS) {
-        setFullscreenExited(true)
-        recordViolation()
-      } else {
-        setFullscreenExited(false)
-      }
-    }
+    // Keep refs to the registered handlers so cleanup always removes the right ones
+    let removeAll: (() => void) | null = null
 
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('blur', onBlur)
-    document.addEventListener('fullscreenchange', onFullscreenChange)
+    const timer = setTimeout(() => {
+      console.log('[Anti-cheat] Listeners activated for step:', step)
+
+      const onVisibility = () => {
+        console.log('[Anti-cheat] visibilitychange — hidden:', document.hidden)
+        if (document.hidden) recordViolation()
+      }
+
+      const onBlur = () => {
+        console.log('[Anti-cheat] window.blur')
+        // Count blur regardless of fullscreen — fullscreenchange fires separately
+        recordViolation()
+      }
+
+      const onFocus = () => {
+        // Informational only — tracks when user returns to window
+        console.log('[Anti-cheat] window.focus — user returned')
+      }
+
+      const onKeydown = (e: KeyboardEvent) => {
+        if (e.altKey && e.key === 'Tab') {
+          console.log('[Anti-cheat] Alt+Tab detected')
+          // Don't prevent default — let the OS switch; just record it
+          recordViolation()
+        }
+      }
+
+      const onFullscreenChange = () => {
+        const inFS = !!document.fullscreenElement
+        console.log('[Anti-cheat] fullscreenchange — inFS:', inFS)
+        setIsFullscreen(inFS)
+        if (!inFS) {
+          setFullscreenExited(true)
+          recordViolation()
+        } else {
+          setFullscreenExited(false)
+        }
+      }
+
+      document.addEventListener('visibilitychange', onVisibility)
+      window.addEventListener('blur',               onBlur)
+      window.addEventListener('focus',              onFocus)
+      window.addEventListener('keydown',            onKeydown)
+      document.addEventListener('fullscreenchange', onFullscreenChange)
+
+      removeAll = () => {
+        document.removeEventListener('visibilitychange', onVisibility)
+        window.removeEventListener('blur',               onBlur)
+        window.removeEventListener('focus',              onFocus)
+        window.removeEventListener('keydown',            onKeydown)
+        document.removeEventListener('fullscreenchange', onFullscreenChange)
+        console.log('[Anti-cheat] Listeners removed')
+      }
+    }, 2500)
 
     return () => {
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('blur', onBlur)
-      document.removeEventListener('fullscreenchange', onFullscreenChange)
+      clearTimeout(timer)
+      removeAll?.()
     }
   }, [step, recordViolation])
 
@@ -1136,9 +1238,8 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     } catch { /* ok */ }
     setStartTime(now)
     setStep('listening')
-    // Request fullscreen; enable anti-cheat after 2.5 s grace (for FS transition)
+    // Request fullscreen — anti-cheat listeners activate 2.5 s after step changes
     requestFullscreen()
-    setTimeout(() => { antiCheatEnabled.current = true }, 2500)
   }, [storageKey, requestFullscreen])
 
   /* ── Final submit ── */
