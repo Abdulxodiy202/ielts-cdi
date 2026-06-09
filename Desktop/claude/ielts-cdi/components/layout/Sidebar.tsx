@@ -26,7 +26,28 @@ const nav = [
 interface Profile {
   full_name: string | null
   is_premium: boolean
+  premium_since: string | null
   premium_until: string | null
+}
+
+/** "09 Jun 2026" */
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  })
+}
+
+/**
+ * Derive premium_since for display when the DB column hasn't been added yet.
+ * Falls back to premium_until − 30 days.
+ */
+function displayPremiumSince(profile: Profile): string {
+  if (profile.premium_since) return fmtDate(profile.premium_since)
+  if (!profile.premium_until) return '—'
+  const d = new Date(profile.premium_until)
+  d.setDate(d.getDate() - 30)
+  return fmtDate(d.toISOString())
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -49,12 +70,26 @@ export function Sidebar() {
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
+
+    // Try fetching with premium_since (requires migration 009).
+    // If the column doesn't exist yet, fall back to the previous select.
     supabase
       .from('profiles')
-      .select('full_name, is_premium, premium_until')
+      .select('full_name, is_premium, premium_since, premium_until')
       .eq('id', user.id)
       .single()
-      .then(({ data }) => { if (data) setProfile(data) })
+      .then(({ data, error }) => {
+        if (data) { setProfile(data); return }
+        if (error?.code === '42703') {
+          // premium_since column not yet migrated — fetch without it
+          supabase
+            .from('profiles')
+            .select('full_name, is_premium, premium_until')
+            .eq('id', user.id)
+            .single()
+            .then(({ data: d2 }) => { if (d2) setProfile({ ...d2, premium_since: null }) })
+        }
+      })
   }, [user?.id])
 
   /* ── Toast helpers ─────────────────────────────────────────────────── */
@@ -80,8 +115,13 @@ export function Sidebar() {
         { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         (payload) => {
           const updated = payload.new as Profile
+          // Ensure premium_since is present (may be absent if column not yet migrated)
+          const merged: Profile = {
+            ...updated,
+            premium_since: (payload.new as Profile).premium_since ?? null,
+          }
           const wasPremium = isActivePremium(profileRef.current)
-          setProfile(updated)
+          setProfile(merged)
           if (isActivePremium(updated) && !wasPremium) {
             addToast('🎉 Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
           }
@@ -211,6 +251,37 @@ export function Sidebar() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Subscription info */}
+        {profile && (
+          <div
+            className="rounded-xl px-3 py-2.5 mb-3 text-xs"
+            style={{
+              background: isPremium ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
+              border: `1px solid ${isPremium ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
+            }}
+          >
+            {isPremium ? (
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold mb-1.5" style={{ color: 'var(--warning)' }}>
+                  <Crown size={12} /> Premium obuna
+                </div>
+                <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                  <span>Boshlangan:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{displayPremiumSince(profile)}</span>
+                </div>
+                <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                  <span>Tugaydi:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile.premium_until)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                <Zap size={12} /> Oddiy foydalanuvchi
+              </div>
+            )}
           </div>
         )}
 
