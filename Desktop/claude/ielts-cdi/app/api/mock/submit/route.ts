@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendTelegramNotification } from '@/lib/telegram'
 
 /**
  * POST /api/mock/submit
@@ -82,49 +81,6 @@ export async function POST(request: Request) {
   if (error) {
     console.error('[mock/submit] upsert error:', error)
     return Response.json({ error: error.message }, { status: 500 })
-  }
-
-  // Send Telegram notification only on final submission
-  if (status === 'submitted') {
-    try {
-      const [profileRes, scheduleRes] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('full_name, phone')
-          .eq('id', user.id)
-          .single(),
-        admin
-          .from('mock_schedules')
-          .select('date, time')
-          .eq('id', schedule_id)
-          .single(),
-      ])
-
-      const userName  = profileRes.data?.full_name ?? user.email ?? 'Foydalanuvchi'
-      const userPhone = profileRes.data?.phone ?? '—'
-      const schedDate = scheduleRes.data?.date ?? ''
-      const schedTime = scheduleRes.data?.time?.slice(0, 5) ?? ''
-
-      const t1Words = String(writing_task1).trim().split(/\s+/).filter(Boolean).length
-      const t2Words = String(writing_task2).trim().split(/\s+/).filter(Boolean).length
-
-      const msg = [
-        `📝 <b>Mock Test topshirildi!</b>`,
-        ``,
-        `👤 <b>Talaba:</b> ${userName}`,
-        `📧 <b>Email:</b> ${user.email}`,
-        `📞 <b>Telefon:</b> ${userPhone}`,
-        `📅 <b>Seans:</b> ${schedDate} ${schedTime}`,
-        ``,
-        `✍️ <b>Writing natijasi:</b>`,
-        `  • Task 1: ${t1Words} so'z`,
-        `  • Task 2: ${t2Words} so'z`,
-      ].join('\n')
-
-      await sendTelegramNotification(msg)
-    } catch (err) {
-      console.error('[mock/submit] telegram notify error:', err)
-    }
   }
 
   return Response.json({ ok: true, data })

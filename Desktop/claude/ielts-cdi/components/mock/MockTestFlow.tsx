@@ -734,12 +734,18 @@ function ReadingSection({
           <button
             type="button"
             onClick={() => onNextRef.current()}
-            className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
+            className="w-full flex items-center justify-center gap-3 hover:opacity-90 active:scale-95"
             style={{
-              background: reviewSecs < 15 ? 'var(--error)' : 'linear-gradient(135deg, #16a34a, #059669)',
               padding: '16px 24px',
-              fontSize: 17,
-              letterSpacing: '0.01em',
+              background: reviewSecs <= 15 ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'linear-gradient(135deg, #16a34a, #059669)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              fontSize: '17px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              minWidth: '200px',
             }}
           >
             Writingga o&apos;tish
