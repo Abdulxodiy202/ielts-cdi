@@ -621,7 +621,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
     console.log('[togglePremium] ▶ called — userId:', userId, '| currentPremium:', currentPremium, '→ setting:', newPremium)
     setToggling(prev => ({ ...prev, [userId]: true }))
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`/api/admin/users/${userId}/toggle-premium`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_premium: newPremium }),
