@@ -28,8 +28,20 @@ export default async function MockTestTakePage({ params }: Props) {
     redirect('/mock-test')
   }
 
-  // Load the schedule details (admin client to bypass RLS on mock_schedules)
+  // Load the schedule details + check for existing disqualified submission
   const admin = createAdminClient()
+
+  // Block disqualified users from retaking the test
+  const { data: existingSub } = await admin
+    .from('mock_test_submissions')
+    .select('status')
+    .eq('user_id', user.id)
+    .eq('schedule_id', id)
+    .maybeSingle()
+
+  if (existingSub?.status === 'disqualified') {
+    redirect('/mock-test')
+  }
   const { data: rawSchedule, error } = await admin
     .from('mock_schedules')
     .select('*')

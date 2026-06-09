@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Calendar, Clock, CheckCircle, CreditCard, BookOpen,
   Headphones, PenTool, AlertCircle, ArrowRight, Loader2,
-  RefreshCw, PartyPopper, XCircle,
+  RefreshCw, PartyPopper, XCircle, Ban,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 
@@ -20,8 +20,9 @@ export interface MockScheduleWithBooking {
   writing_task1_image_url: string | null
   writing_task1_topic: string | null
   writing_task2_topic: string | null
-  userBooking:  { status: string; payment_status: string } | null
-  isSubmitted:  boolean
+  userBooking:      { status: string; payment_status: string } | null
+  isSubmitted:      boolean
+  submissionStatus: string | null
 }
 
 interface Props {
@@ -154,12 +155,13 @@ export function MockTestClient({ userId }: Props) {
       {/* Schedule cards */}
       <AnimatePresence>
         {schedules.map((s, i) => {
-          const confirmed   = s.userBooking?.status === 'confirmed'
-          const pending     = s.userBooking?.status === 'pending'
-          const resigned    = s.userBooking?.status === 'resigned'
-          const live        = isTestLive(s)
-          const msLeft      = msUntilTest(s)         // ms to test start
-          const tooLateToBook = msLeft < 5 * 60 * 1000  // < 5 min until start (or already started)
+          const confirmed     = s.userBooking?.status === 'confirmed'
+          const pending       = s.userBooking?.status === 'pending'
+          const resigned      = s.userBooking?.status === 'resigned'
+          const disqualified  = s.submissionStatus === 'disqualified'
+          const live          = isTestLive(s)
+          const msLeft        = msUntilTest(s)          // ms to test start
+          const tooLateToBook = msLeft < 5 * 60 * 1000 // < 5 min until start (or already started)
           const hasReading  = !!s.reading_file_url
           const hasListening = !!s.listening_file_url
           const hasWriting  = !!(s.writing_task1_topic || s.writing_task2_topic)
@@ -169,7 +171,13 @@ export function MockTestClient({ userId }: Props) {
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
               className="card overflow-hidden"
-              style={{ border: confirmed ? '1px solid rgba(34,197,94,0.35)' : '1px solid var(--border)' }}>
+              style={{
+                border: disqualified
+                  ? '1px solid rgba(239,68,68,0.35)'
+                  : confirmed
+                    ? '1px solid rgba(34,197,94,0.35)'
+                    : '1px solid var(--border)',
+              }}>
 
               <div className="p-5 flex flex-wrap items-start justify-between gap-4">
                 {/* ── Left: date badge + info ── */}
@@ -221,14 +229,22 @@ export function MockTestClient({ userId }: Props) {
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <BookingBadge booking={s.userBooking} />
 
-                  {/* ① Submitted — test done */}
-                  {confirmed && s.isSubmitted ? (
+                  {/* ① Disqualified — permanently blocked */}
+                  {disqualified ? (
+                    <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
+                      style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                      <Ban size={13} className="shrink-0 mt-0.5" />
+                      Chetlatilgansiz. Sabab: Qoidabuzarlik (3x ogohlantirish)
+                    </div>
+
+                  /* ② Submitted — test successfully done */
+                  ) : s.isSubmitted ? (
                     <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
                       <PartyPopper size={14} /> Test topshirildi ✅
                     </div>
 
-                  /* ② Confirmed + test is live → Start button */
+                  /* ③ Confirmed + test is live → Start button */
                   ) : confirmed && live ? (
                     <Link href={`/mock-test/${s.id}`}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
@@ -236,7 +252,7 @@ export function MockTestClient({ userId }: Props) {
                       <ArrowRight size={14} /> Mock Test boshlash
                     </Link>
 
-                  /* ③ Confirmed + countdown active (test not yet started) */
+                  /* ④ Confirmed + countdown active (test not yet started) */
                   ) : confirmed && msLeft > 0 ? (
                     <div className="flex flex-col items-end gap-0.5">
                       <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
@@ -248,28 +264,36 @@ export function MockTestClient({ userId }: Props) {
                       </div>
                     </div>
 
-                  /* ④ Pending (awaiting admin approval) */
+                  /* ⑤ Confirmed + late (>5 min past start, no submission) */
+                  ) : confirmed && tooLateToBook && !live ? (
+                    <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
+                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <XCircle size={13} className="shrink-0 mt-0.5" />
+                      Vaqtida kirmagansiz. 5 daqiqadan ko&apos;p kech qoldingiz.
+                    </div>
+
+                  /* ⑥ Pending (awaiting admin approval) */
                   ) : pending ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
                       style={{ background: 'rgba(245,158,11,0.08)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.2)' }}>
                       <AlertCircle size={12} /> Admin tasdiqlashini kuting
                     </div>
 
-                  /* ⑤ Resigned — did not show up */
+                  /* ⑦ Resigned — did not show up */
                   ) : resigned ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
                       style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
                       ❌ Vaqtida kirmadi
                     </div>
 
-                  /* ⑥ No booking + too late → show message */
+                  /* ⑧ No booking + too late → show message */
                   ) : !s.userBooking && tooLateToBook ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-center"
                       style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
                       Vaqt o&apos;tib ketdi. Keyingi seansni tanlang
                     </div>
 
-                  /* ⑦ No booking → Book button */
+                  /* ⑨ No booking → Book button */
                   ) : !s.userBooking ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"

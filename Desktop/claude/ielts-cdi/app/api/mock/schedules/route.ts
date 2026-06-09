@@ -54,6 +54,12 @@ export async function GET() {
     (submissionsRes.data ?? []).map(s => s.schedule_id)
   )
 
+  // Map schedule_id → submission status (latest status wins)
+  const submissionStatusMap: Record<string, string> = {}
+  for (const sub of (submissionsRes.data ?? [])) {
+    submissionStatusMap[sub.schedule_id] = sub.status
+  }
+
   // Only 'submitted' ones — used for isSubmitted flag
   const submittedSet = new Set(
     (submissionsRes.data ?? []).filter(s => s.status === 'submitted').map(s => s.schedule_id)
@@ -89,8 +95,9 @@ export async function GET() {
   return Response.json(
     schedules.map(s => ({
       ...s,
-      userBooking:  bookingMap[s.id]    ?? null,
-      isSubmitted:  submittedSet.has(s.id),
+      userBooking:      bookingMap[s.id]           ?? null,
+      isSubmitted:      submittedSet.has(s.id),
+      submissionStatus: submissionStatusMap[s.id]  ?? null,
     }))
   )
 }

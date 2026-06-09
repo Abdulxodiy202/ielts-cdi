@@ -2,7 +2,6 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendTelegramNotification } from '@/lib/telegram'
 
 /**
  * POST /api/mock/disqualify
@@ -26,33 +25,7 @@ export async function POST(request: Request) {
     return Response.json({ error: 'schedule_id required' }, { status: 400 })
   }
 
-  // Fetch profile for Telegram notification
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('full_name, phone')
-    .eq('id', user.id)
-    .single()
-
-  const userName  = profile?.full_name ?? user.email ?? 'Foydalanuvchi'
-  const userPhone = profile?.phone ?? '—'
-
-  // Send Telegram notification
-  try {
-    await sendTelegramNotification([
-      `🚫 <b>Chetlatish!</b>`,
-      ``,
-      `👤 <b>Talaba:</b> ${userName}`,
-      `📧 <b>Email:</b> ${user.email}`,
-      `📞 <b>Telefon:</b> ${userPhone}`,
-      ``,
-      `⚠️ 3 marta qoidabuzarlik (tab almashtirish / to'liq ekrandan chiqish)`,
-      `❌ Test <b>bekor qilindi</b>`,
-    ].join('\n'))
-  } catch (err) {
-    console.error('[mock/disqualify] telegram error:', err)
-  }
-
-  // Mark existing submission as 'disqualified' so admin can see it was cheating
+  // Mark existing submission as 'disqualified' — admin panel shows this status
   try {
     const admin = createAdminClient()
     await admin
