@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
-  Calendar, BookOpen, Headphones, CreditCard, BarChart2,
+  Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -50,11 +50,22 @@ interface Test {
   file_url: string | null
 }
 
+interface AdminUser {
+  id: string
+  email: string
+  full_name: string | null
+  is_premium: boolean
+  premium_until: string | null
+  created_at: string
+  last_sign_in_at: string | null
+}
+
 interface Props {
   initialPayments: PaymentRequest[]
   tests: Test[]
   initialSchedules: MockSchedule[]
   initialResults: TestResult[]
+  initialUsers: AdminUser[]
 }
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
@@ -549,6 +560,252 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   )
 }
 
+/* ── Users tab ───────────────────────────────────────────────────────── */
+function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
+  const [users, setUsers] = useState(initialUsers)
+  const [subTab, setSubTab] = useState<'all' | 'premium' | 'free'>('all')
+  const [refreshing, setRefreshing] = useState(false)
+  const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  const [search, setSearch] = useState('')
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/users')
+    if (res.ok) setUsers(await res.json())
+    setRefreshing(false)
+  }
+
+  const togglePremium = async (userId: string, currentPremium: boolean) => {
+    setToggling(prev => ({ ...prev, [userId]: true }))
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_premium: !currentPremium }),
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u =>
+        u.id === userId
+          ? { ...u, is_premium: !currentPremium, premium_until: !currentPremium ? null : null }
+          : u
+      ))
+    }
+    setToggling(prev => ({ ...prev, [userId]: false }))
+  }
+
+  const initials = (name: string | null, email: string) => {
+    if (name) {
+      const parts = name.trim().split(/\s+/)
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+      return name.slice(0, 2).toUpperCase()
+    }
+    return email.slice(0, 2).toUpperCase()
+  }
+
+  const filtered = users.filter(u => {
+    const matchSub =
+      subTab === 'all' ? true :
+      subTab === 'premium' ? u.is_premium :
+      !u.is_premium
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      (u.full_name ?? '').toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    return matchSub && matchSearch
+  })
+
+  const premiumCount = users.filter(u => u.is_premium).length
+  const freeCount = users.filter(u => !u.is_premium).length
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>{users.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami foydalanuvchi</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(245,158,11,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--warning)' }}>{premiumCount}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Premium</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(99,102,241,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{freeCount}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Oddiy</div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Sub-tabs */}
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {([
+            { key: 'all',     label: 'Barchasi' },
+            { key: 'premium', label: '👑 Premium' },
+            { key: 'free',    label: '👤 Oddiy' },
+          ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setSubTab(key)}
+              className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: subTab === key ? 'var(--accent)' : 'transparent',
+                color: subTab === key ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Ism yoki email qidirish..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="input-field text-sm flex-1 min-w-[180px]"
+          style={{ maxWidth: 300 }}
+        />
+
+        {/* Refresh */}
+        <div className="ml-auto">
+          <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+          </button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {filtered.length} ta foydalanuvchi ko&apos;rsatilmoqda
+      </p>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Users size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Foydalanuvchilar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {/* Header */}
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '36px 32px 1fr auto auto auto',
+              gap: '12px',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span>#</span>
+            <span />
+            <span>Foydalanuvchi</span>
+            <span className="text-right">Qo&apos;shilgan</span>
+            <span className="text-right">So&apos;ngi kirish</span>
+            <span className="text-right">Amal</span>
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {filtered.map((u, idx) => {
+              const isToggling = toggling[u.id]
+              return (
+                <div
+                  key={u.id}
+                  className="grid items-center px-4 py-3"
+                  style={{ gridTemplateColumns: '36px 32px 1fr auto auto auto', gap: '12px' }}
+                >
+                  {/* Row number */}
+                  <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                    {idx + 1}
+                  </span>
+
+                  {/* Avatar */}
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                    style={{
+                      background: u.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                      color: u.is_premium ? 'var(--warning)' : 'var(--accent)',
+                    }}
+                  >
+                    {initials(u.full_name, u.email)}
+                  </div>
+
+                  {/* Name + email + badge */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                        {u.full_name ?? '—'}
+                      </span>
+                      {u.is_premium ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                          style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
+                        >
+                          <Crown size={10} /> Premium
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                          style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                        >
+                          <User size={10} /> Oddiy
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {u.email}
+                    </div>
+                  </div>
+
+                  {/* Joined date */}
+                  <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    {formatDate(u.created_at)}
+                  </div>
+
+                  {/* Last seen */}
+                  <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                    {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
+                  </div>
+
+                  {/* Toggle button */}
+                  <div className="shrink-0 flex justify-end">
+                    <button
+                      onClick={() => togglePremium(u.id, u.is_premium)}
+                      disabled={isToggling}
+                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+                      style={u.is_premium ? {
+                        background: 'rgba(239,68,68,0.1)',
+                        color: 'var(--error)',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                      } : {
+                        background: 'rgba(245,158,11,0.1)',
+                        color: 'var(--warning)',
+                        border: '1px solid rgba(245,158,11,0.25)',
+                      }}
+                    >
+                      {isToggling
+                        ? '...'
+                        : u.is_premium
+                          ? 'Oddiyga o\'tkazish'
+                          : 'Premiumga o\'tkazish'
+                      }
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',     Icon: CreditCard },
@@ -556,11 +813,12 @@ const TABS = [
   { id: 'listening', label: 'Listening Tests', Icon: Headphones },
   { id: 'mock',      label: 'Mock Test',       Icon: Calendar },
   { id: 'results',   label: 'Natijalar',       Icon: BarChart2 },
+  { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
 ] as const
 type TabId = typeof TABS[number]['id']
 
 /* ── Main AdminClient ────────────────────────────────────────────────── */
-export function AdminClient({ initialPayments, tests, initialSchedules, initialResults }: Props) {
+export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
@@ -579,8 +837,8 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
 
       {/* Tab bar */}
       <div
-        className="flex gap-1 mb-8 p-1 rounded-xl w-fit"
-        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        className="flex gap-1 mb-8 p-1 rounded-xl overflow-x-auto"
+        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', width: 'fit-content', maxWidth: '100%' }}
       >
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
@@ -625,6 +883,9 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       )}
       {activeTab === 'results' && (
         <ResultsTab initialResults={initialResults} />
+      )}
+      {activeTab === 'users' && (
+        <UsersTab initialUsers={initialUsers} />
       )}
     </div>
   )
