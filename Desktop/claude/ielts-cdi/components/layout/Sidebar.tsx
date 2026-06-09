@@ -57,10 +57,12 @@ export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [mobileOpen,  setMobileOpen]  = useState(false)
-  const [upgradeOpen, setUpgradeOpen] = useState(false)
-  const [profile,     setProfile]     = useState<Profile | null>(null)
-  const [toasts,      setToasts]      = useState<ToastData[]>([])
+  const [mobileOpen,   setMobileOpen]   = useState(false)
+  const [upgradeOpen,  setUpgradeOpen]  = useState(false)
+  const [profileOpen,  setProfileOpen]  = useState(false)
+  const [profile,      setProfile]      = useState<Profile | null>(null)
+  const [toasts,       setToasts]       = useState<ToastData[]>([])
+  const profilePopupRef = useRef<HTMLDivElement>(null)
 
   // Ref so realtime callbacks always see the latest profile without stale closure
   const profileRef = useRef<Profile | null>(null)
@@ -224,68 +226,101 @@ export function Sidebar() {
 
       {/* User section */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
+
+        {/* Clickable avatar row — opens profile popup */}
         {user && (
-          <div className="flex items-center gap-3 mb-3">
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-              style={{ background: 'var(--accent)' }}
+          <div className="relative" ref={profilePopupRef}>
+            <button
+              type="button"
+              onClick={() => setProfileOpen(o => !o)}
+              className="flex items-center gap-3 w-full mb-3 rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:opacity-80"
+              style={{ background: profileOpen ? 'var(--bg-secondary)' : 'transparent' }}
             >
-              {avatarLetter}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                {displayName}
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+                style={{ background: 'var(--accent)' }}
+              >
+                {avatarLetter}
               </div>
-              <div className="text-xs mt-0.5">
-                {isPremium ? (
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
-                    style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}
+              <div className="flex-1 min-w-0 text-left">
+                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                  {displayName}
+                </div>
+                <div className="text-xs mt-0.5">
+                  {isPremium ? (
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}
+                    >
+                      <CheckCircle size={10} /> Premium
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                      <Zap size={10} /> Free Plan
+                    </span>
+                  )}
+                </div>
+              </div>
+            </button>
+
+            {/* Profile popup — appears above avatar row */}
+            <AnimatePresence>
+              {profileOpen && profile && (
+                <>
+                  {/* Click-outside backdrop */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setProfileOpen(false)}
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-xl px-3 py-3 text-xs shadow-lg"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: `1px solid ${isPremium ? 'rgba(245,158,11,0.35)' : 'var(--border)'}`,
+                      boxShadow: '0 -4px 24px rgba(0,0,0,0.25)',
+                    }}
                   >
-                    <CheckCircle size={10} /> Premium
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                    <Zap size={10} /> Free Plan
-                  </span>
-                )}
-              </div>
-            </div>
+                    {isPremium ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5 font-semibold text-sm mb-2" style={{ color: 'var(--warning)' }}>
+                          <Crown size={13} /> Premium obuna
+                        </div>
+                        <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                          <span>Boshlangan:</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{displayPremiumSince(profile)}</span>
+                        </div>
+                        <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                          <span>Tugaydi:</span>
+                          <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile.premium_until)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                          <Zap size={12} /> Oddiy foydalanuvchi
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setProfileOpen(false); setUpgradeOpen(true) }}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
+                          style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                        >
+                          <Crown size={12} /> Upgrade to Premium
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         )}
 
-        {/* Subscription info */}
-        {profile && (
-          <div
-            className="rounded-xl px-3 py-2.5 mb-3 text-xs"
-            style={{
-              background: isPremium ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
-              border: `1px solid ${isPremium ? 'rgba(245,158,11,0.25)' : 'var(--border)'}`,
-            }}
-          >
-            {isPremium ? (
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold mb-1.5" style={{ color: 'var(--warning)' }}>
-                  <Crown size={12} /> Premium obuna
-                </div>
-                <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                  <span>Boshlangan:</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{displayPremiumSince(profile)}</span>
-                </div>
-                <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                  <span>Tugaydi:</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile.premium_until)}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
-                <Zap size={12} /> Oddiy foydalanuvchi
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Upgrade button — only for non-premium */}
+        {/* Upgrade button — only for non-premium, shown outside popup too */}
         {!isPremium && (
           <button
             type="button"

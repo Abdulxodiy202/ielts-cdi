@@ -54,10 +54,26 @@ interface AdminUser {
   id: string
   email: string
   full_name: string | null
+  provider: string
   is_premium: boolean
   premium_until: string | null
   created_at: string
   last_sign_in_at: string | null
+}
+
+function ProviderBadge({ provider }: { provider: string }) {
+  const cfg =
+    provider === 'google'  ? { emoji: '🔵', label: 'Google', bg: 'rgba(66,133,244,0.1)',  border: 'rgba(66,133,244,0.3)',  color: '#4285F4' } :
+    provider === 'github'  ? { emoji: '⚫', label: 'GitHub', bg: 'rgba(36,41,46,0.15)',   border: 'rgba(36,41,46,0.3)',    color: 'var(--text-secondary)' } :
+                             { emoji: '📧', label: 'Email',  bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)',  color: 'var(--accent)' }
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+      style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}
+    >
+      {cfg.emoji} {cfg.label}
+    </span>
+  )
 }
 
 interface Props {
@@ -757,8 +773,9 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                      {u.email}
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</span>
+                      <ProviderBadge provider={u.provider} />
                     </div>
                   </div>
 
