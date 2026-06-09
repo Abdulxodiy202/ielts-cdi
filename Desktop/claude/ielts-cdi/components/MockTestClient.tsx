@@ -288,13 +288,42 @@ export function MockTestClient({ userId }: Props) {
                       <PartyPopper size={14} /> Test topshirildi ✅
                     </div>
 
-                  /* ③ Confirmed + test is live → Start button */
+                  /* ③ Confirmed + test is live → warning banner + Start button */
                   ) : confirmed && live ? (
-                    <Link href={`/mock-test/${s.id}`}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
-                      style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
-                      <ArrowRight size={14} /> Mock Test boshlash
-                    </Link>
+                    <>
+                      {/* 5-minute countdown warning */}
+                      {(() => {
+                        const minsElapsed = Math.max(0, Math.floor(-msLeft / 60_000))
+                        return (
+                          <div
+                            className="px-3 py-2.5 rounded-xl text-xs leading-snug max-w-[220px] text-right"
+                            style={{
+                              background: 'rgba(245,158,11,0.1)',
+                              border: '1px solid rgba(245,158,11,0.4)',
+                              color: 'var(--warning)',
+                            }}
+                          >
+                            {minsElapsed === 0
+                              ? <>
+                                  <span className="font-bold block mb-0.5">Test boshlandi!</span>
+                                  5 daqiqa ichida kirmasangiz, seans bekor qilinadi.
+                                </>
+                              : <>
+                                  <span className="font-bold block mb-0.5">⚠️ Diqqat!</span>
+                                  Siz test boshlanganidan beri{' '}
+                                  <span className="font-bold">{minsElapsed} daqiqa</span>{' '}
+                                  o&apos;tdi. Agar 5 daqiqa ichida testga kirmasangiz, seans avtomatik ravishda bekor qilinadi.
+                                </>
+                            }
+                          </div>
+                        )
+                      })()}
+                      <Link href={`/mock-test/${s.id}`}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                        style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
+                        <ArrowRight size={14} /> Mock Test boshlash
+                      </Link>
+                    </>
 
                   /* ④ Confirmed + countdown active (test not yet started) */
                   ) : confirmed && msLeft > 0 ? (
