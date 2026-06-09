@@ -50,30 +50,25 @@ interface Test {
   file_url: string | null
 }
 
+interface AdminPaymentItem {
+  id: string
+  amount: number
+  status: string
+  type: string
+  created_at: string
+}
+
 interface AdminUser {
   id: string
   email: string
   full_name: string | null
-  provider: string
   is_premium: boolean
   premium_until: string | null
+  payment_count: number
+  last_payment_date: string | null
+  payments: AdminPaymentItem[]
   created_at: string
   last_sign_in_at: string | null
-}
-
-function ProviderBadge({ provider }: { provider: string }) {
-  const cfg =
-    provider === 'google'  ? { emoji: '🔵', label: 'Google', bg: 'rgba(66,133,244,0.1)',  border: 'rgba(66,133,244,0.3)',  color: '#4285F4' } :
-    provider === 'github'  ? { emoji: '⚫', label: 'GitHub', bg: 'rgba(36,41,46,0.15)',   border: 'rgba(36,41,46,0.3)',    color: 'var(--text-secondary)' } :
-                             { emoji: '📧', label: 'Email',  bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)',  color: 'var(--accent)' }
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
-      style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}
-    >
-      {cfg.emoji} {cfg.label}
-    </span>
-  )
 }
 
 interface Props {
@@ -583,6 +578,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [refreshing, setRefreshing] = useState(false)
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [search, setSearch] = useState('')
+  const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null)
 
   const refresh = async () => {
     setRefreshing(true)
@@ -711,8 +707,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
           <div
             className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
             style={{
-              gridTemplateColumns: '36px 32px 1fr auto auto auto',
-              gap: '12px',
+              gridTemplateColumns: '28px 32px 1fr auto auto auto auto',
+              gap: '10px',
               color: 'var(--text-muted)',
               background: 'var(--bg-secondary)',
               borderBottom: '1px solid var(--border)',
@@ -721,6 +717,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
             <span>#</span>
             <span />
             <span>Foydalanuvchi</span>
+            <span className="text-right">To&apos;lovlar</span>
             <span className="text-right">Qo&apos;shilgan</span>
             <span className="text-right">So&apos;ngi kirish</span>
             <span className="text-right">Amal</span>
@@ -729,90 +726,154 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {filtered.map((u, idx) => {
               const isToggling = toggling[u.id]
+              const paymentsExpanded = expandedPaymentId === u.id
               return (
-                <div
-                  key={u.id}
-                  className="grid items-center px-4 py-3"
-                  style={{ gridTemplateColumns: '36px 32px 1fr auto auto auto', gap: '12px' }}
-                >
-                  {/* Row number */}
-                  <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
-                    {idx + 1}
-                  </span>
-
-                  {/* Avatar */}
+                <div key={u.id}>
+                  {/* Main row */}
                   <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{
-                      background: u.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
-                      color: u.is_premium ? 'var(--warning)' : 'var(--accent)',
-                    }}
+                    className="grid items-center px-4 py-3"
+                    style={{ gridTemplateColumns: '28px 32px 1fr auto auto auto auto', gap: '10px' }}
                   >
-                    {initials(u.full_name, u.email)}
-                  </div>
+                    {/* Row number */}
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {idx + 1}
+                    </span>
 
-                  {/* Name + email + badge */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                        {u.full_name ?? '—'}
-                      </span>
-                      {u.is_premium ? (
-                        <span
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
-                          style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
-                        >
-                          <Crown size={10} /> Premium
-                        </span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
-                          style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
-                        >
-                          <User size={10} /> Oddiy
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</span>
-                      <ProviderBadge provider={u.provider} />
-                    </div>
-                  </div>
-
-                  {/* Joined date */}
-                  <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                    {formatDate(u.created_at)}
-                  </div>
-
-                  {/* Last seen */}
-                  <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                    {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
-                  </div>
-
-                  {/* Toggle button */}
-                  <div className="shrink-0 flex justify-end">
-                    <button
-                      onClick={() => togglePremium(u.id, u.is_premium)}
-                      disabled={isToggling}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-                      style={u.is_premium ? {
-                        background: 'rgba(239,68,68,0.1)',
-                        color: 'var(--error)',
-                        border: '1px solid rgba(239,68,68,0.25)',
-                      } : {
-                        background: 'rgba(245,158,11,0.1)',
-                        color: 'var(--warning)',
-                        border: '1px solid rgba(245,158,11,0.25)',
+                    {/* Avatar */}
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={{
+                        background: u.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                        color: u.is_premium ? 'var(--warning)' : 'var(--accent)',
                       }}
                     >
-                      {isToggling
-                        ? '...'
-                        : u.is_premium
-                          ? 'Oddiyga o\'tkazish'
-                          : 'Premiumga o\'tkazish'
-                      }
-                    </button>
+                      {initials(u.full_name, u.email)}
+                    </div>
+
+                    {/* Name + email */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                          {u.full_name ?? '—'}
+                        </span>
+                        {u.is_premium ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
+                          >
+                            <Crown size={10} /> Premium
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                          >
+                            <User size={10} /> Oddiy
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {u.email}
+                      </div>
+                    </div>
+
+                    {/* Payment count badge */}
+                    <div className="shrink-0 text-right">
+                      {u.payment_count > 0 ? (
+                        <button
+                          onClick={() => setExpandedPaymentId(paymentsExpanded ? null : u.id)}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                          style={{
+                            background: paymentsExpanded ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
+                            color: 'var(--accent)',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                          }}
+                        >
+                          💳 {u.payment_count} ta
+                        </button>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </div>
+
+                    {/* Joined date */}
+                    <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      {formatDate(u.created_at)}
+                    </div>
+
+                    {/* Last seen */}
+                    <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
+                    </div>
+
+                    {/* Toggle premium */}
+                    <div className="shrink-0 flex justify-end">
+                      <button
+                        onClick={() => togglePremium(u.id, u.is_premium)}
+                        disabled={isToggling}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+                        style={u.is_premium ? {
+                          background: 'rgba(239,68,68,0.1)',
+                          color: 'var(--error)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                        } : {
+                          background: 'rgba(245,158,11,0.1)',
+                          color: 'var(--warning)',
+                          border: '1px solid rgba(245,158,11,0.25)',
+                        }}
+                      >
+                        {isToggling ? '...' : u.is_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Expandable payment history */}
+                  <AnimatePresence>
+                    {paymentsExpanded && u.payments.length > 0 && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div className="px-4 pb-3 pt-1" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
+                            To&apos;lov tarixi
+                          </p>
+                          <div className="space-y-1.5">
+                            {u.payments.map(p => (
+                              <div key={p.id} className="flex items-center justify-between text-xs rounded-lg px-3 py-2"
+                                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                <div className="flex items-center gap-2">
+                                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(p.created_at)}</span>
+                                  <span className="px-1.5 py-0.5 rounded text-xs"
+                                    style={{
+                                      background: p.type === 'premium' ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
+                                      color: p.type === 'premium' ? 'var(--warning)' : 'var(--accent)',
+                                    }}>
+                                    {p.type === 'premium' ? '👑 Premium' : '📅 Mock Test'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                    {p.amount.toLocaleString()} so&apos;m
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                    style={{
+                                      background: p.status === 'approved' ? 'rgba(34,197,94,0.12)' : p.status === 'rejected' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                                      color: p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--error)' : 'var(--warning)',
+                                    }}>
+                                    {p.status === 'approved' ? '✓ Tasdiqlandi' : p.status === 'rejected' ? '✗ Rad etildi' : '⏳ Kutilmoqda'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )
             })}

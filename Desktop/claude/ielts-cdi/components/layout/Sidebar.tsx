@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar,
-  BarChart2, LogOut, Menu, X, Crown, Zap, CheckCircle,
+  BarChart2, LogOut, Menu, X, Crown, Zap, CheckCircle, Camera,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -25,6 +25,7 @@ const nav = [
 
 interface Profile {
   full_name: string | null
+  avatar_url: string | null
   is_premium: boolean
   premium_since: string | null
   premium_until: string | null
@@ -38,10 +39,6 @@ function fmtDate(iso: string | null): string {
   })
 }
 
-/**
- * Derive premium_since for display when the DB column hasn't been added yet.
- * Falls back to premium_until − 30 days.
- */
 function displayPremiumSince(profile: Profile): string {
   if (profile.premium_since) return fmtDate(profile.premium_since)
   if (!profile.premium_until) return '—'
@@ -57,15 +54,18 @@ export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [mobileOpen,   setMobileOpen]   = useState(false)
-  const [upgradeOpen,  setUpgradeOpen]  = useState(false)
-  const [profileOpen,  setProfileOpen]  = useState(false)
-  const [profile,      setProfile]      = useState<Profile | null>(null)
-  const [toasts,       setToasts]       = useState<ToastData[]>([])
-  const profilePopupRef = useRef<HTMLDivElement>(null)
+  const [mobileOpen,      setMobileOpen]      = useState(false)
+  const [upgradeOpen,     setUpgradeOpen]      = useState(false)
+  const [profileOpen,     setProfileOpen]      = useState(false)
+  const [profile,         setProfile]          = useState<Profile | null>(null)
+  const [toasts,          setToasts]           = useState<ToastData[]>([])
+  const [nameInput,       setNameInput]        = useState('')
+  const [nameSaving,      setNameSaving]       = useState(false)
+  const [avatarUploading, setAvatarUploading]  = useState(false)
+  const [localAvatarUrl,  setLocalAvatarUrl]   = useState<string | null>(null)
 
-  // Ref so realtime callbacks always see the latest profile without stale closure
-  const profileRef = useRef<Profile | null>(null)
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const profileRef    = useRef<Profile | null>(null)
   useEffect(() => { profileRef.current = profile }, [profile])
 
   /* ── Initial profile fetch ─────────────────────────────────────────── */
@@ -73,26 +73,31 @@ export function Sidebar() {
     if (!user) return
     const supabase = createClient()
 
-    // Try fetching with premium_since (requires migration 009).
-    // If the column doesn't exist yet, fall back to the previous select.
+    // Try with premium_since first; fall back if column not yet migrated (pg 42703)
     supabase
       .from('profiles')
-      .select('full_name, is_premium, premium_since, premium_until')
+      .select('full_name, avatar_url, is_premium, premium_since, premium_until')
       .eq('id', user.id)
       .single()
       .then(({ data, error }) => {
-        if (data) { setProfile(data); return }
+        if (data) { setProfile(data as unknown as Profile); return }
         if (error?.code === '42703') {
-          // premium_since column not yet migrated — fetch without it
           supabase
             .from('profiles')
-            .select('full_name, is_premium, premium_until')
+            .select('full_name, avatar_url, is_premium, premium_until')
             .eq('id', user.id)
             .single()
-            .then(({ data: d2 }) => { if (d2) setProfile({ ...d2, premium_since: null }) })
+            .then(({ data: d2 }) => {
+              if (d2) setProfile({ ...(d2 as unknown as Profile), premium_since: null })
+            })
         }
       })
   }, [user?.id])
+
+  // Sync name input whenever popup opens
+  useEffect(() => {
+    if (profileOpen) setNameInput(profile?.full_name ?? '')
+  }, [profileOpen, profile?.full_name])
 
   /* ── Toast helpers ─────────────────────────────────────────────────── */
   const addToast = useCallback((message: string, type: ToastData['type']) => {
@@ -109,7 +114,6 @@ export function Sidebar() {
     if (!user?.id) return
     const supabase = createClient()
 
-    // Watch profiles table — fires when admin grants premium
     const profileChannel = supabase
       .channel(`profile-${user.id}`)
       .on(
@@ -117,7 +121,6 @@ export function Sidebar() {
         { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         (payload) => {
           const updated = payload.new as Profile
-          // Ensure premium_since is present (may be absent if column not yet migrated)
           const merged: Profile = {
             ...updated,
             premium_since: (payload.new as Profile).premium_since ?? null,
@@ -131,7 +134,6 @@ export function Sidebar() {
       )
       .subscribe()
 
-    // Watch mock_bookings — fires when admin confirms a booking (toast only)
     const bookingChannel = supabase
       .channel(`bookings-${user.id}`)
       .on(
@@ -152,9 +154,73 @@ export function Sidebar() {
     }
   }, [user?.id, addToast])
 
+  /* ── Avatar upload ─────────────────────────────────────────────────── */
+  const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+    if (file.size > 2 * 1024 * 1024) { addToast('Rasm 2 MB dan kichik bo\'lishi kerak', 'error' as ToastData['type']); return }
+
+    setAvatarUploading(true)
+    // Preview immediately
+    const objectUrl = URL.createObjectURL(file)
+    setLocalAvatarUrl(objectUrl)
+
+    try {
+      const supabase = createClient()
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${user.id}.${ext}`
+
+      const { error: uploadErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type })
+
+      if (uploadErr) throw uploadErr
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
+      const publicUrl = urlData.publicUrl + `?t=${Date.now()}` // cache-bust
+
+      // Persist to profile
+      await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatar_url: publicUrl }),
+      })
+
+      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
+      setLocalAvatarUrl(publicUrl)
+      addToast('✅ Rasm yangilandi', 'success' as ToastData['type'])
+    } catch {
+      setLocalAvatarUrl(null)
+      addToast('Rasm yuklashda xatolik', 'error' as ToastData['type'])
+    } finally {
+      setAvatarUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [user, addToast])
+
+  /* ── Save name ─────────────────────────────────────────────────────── */
+  const handleSaveName = useCallback(async () => {
+    if (!nameInput.trim()) return
+    setNameSaving(true)
+    const res = await fetch('/api/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name: nameInput.trim() }),
+    })
+    if (res.ok) {
+      setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
+      addToast('✅ Ism saqlandi', 'success' as ToastData['type'])
+    } else {
+      addToast('Saqlashda xatolik', 'error' as ToastData['type'])
+    }
+    setNameSaving(false)
+  }, [nameInput, addToast])
+
+  /* ── Derived values ────────────────────────────────────────────────── */
   const displayName  = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || 'User'
   const avatarLetter = displayName[0].toUpperCase()
   const isPremium    = isActivePremium(profile)
+  const avatarUrl    = localAvatarUrl ?? profile?.avatar_url ?? null
 
   /* ── Sidebar markup ────────────────────────────────────────────────── */
   const sidebarContent = (
@@ -226,21 +292,20 @@ export function Sidebar() {
 
       {/* User section */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-
-        {/* Clickable avatar row — opens profile popup */}
         {user && (
-          <div className="relative" ref={profilePopupRef}>
+          <div className="relative">
+            {/* Avatar row — click to open popup */}
             <button
               type="button"
               onClick={() => setProfileOpen(o => !o)}
               className="flex items-center gap-3 w-full mb-3 rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:opacity-80"
-              style={{ background: profileOpen ? 'var(--bg-secondary)' : 'transparent' }}
+              style={{ background: profileOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
             >
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
-                style={{ background: 'var(--accent)' }}
-              >
-                {avatarLetter}
+              <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 relative flex items-center justify-center text-sm font-bold text-white"
+                style={{ background: 'var(--accent)' }}>
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                  : avatarLetter}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
@@ -248,10 +313,8 @@ export function Sidebar() {
                 </div>
                 <div className="text-xs mt-0.5">
                   {isPremium ? (
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
-                      style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}
-                    >
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
                       <CheckCircle size={10} /> Premium
                     </span>
                   ) : (
@@ -263,56 +326,122 @@ export function Sidebar() {
               </div>
             </button>
 
-            {/* Profile popup — appears above avatar row */}
+            {/* Profile settings popup */}
             <AnimatePresence>
-              {profileOpen && profile && (
+              {profileOpen && (
                 <>
                   {/* Click-outside backdrop */}
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setProfileOpen(false)}
-                  />
+                  <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
+
                   <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-xl px-3 py-3 text-xs shadow-lg"
+                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-2xl overflow-hidden shadow-2xl"
                     style={{
                       background: 'var(--bg-card)',
-                      border: `1px solid ${isPremium ? 'rgba(245,158,11,0.35)' : 'var(--border)'}`,
-                      boxShadow: '0 -4px 24px rgba(0,0,0,0.25)',
+                      border: '1px solid var(--border)',
+                      boxShadow: '0 -8px 32px rgba(0,0,0,0.3)',
                     }}
+                    onClick={e => e.stopPropagation()}
                   >
-                    {isPremium ? (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5 font-semibold text-sm mb-2" style={{ color: 'var(--warning)' }}>
-                          <Crown size={13} /> Premium obuna
-                        </div>
-                        <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                          <span>Boshlangan:</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>{displayPremiumSince(profile)}</span>
-                        </div>
-                        <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                          <span>Tugaydi:</span>
-                          <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile.premium_until)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
-                          <Zap size={12} /> Oddiy foydalanuvchi
-                        </div>
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarUpload}
+                    />
+
+                    <div className="p-4 space-y-4">
+                      {/* Avatar upload */}
+                      <div className="flex justify-center pt-1">
                         <button
                           type="button"
-                          onClick={() => { setProfileOpen(false); setUpgradeOpen(true) }}
-                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
-                          style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={avatarUploading}
+                          className="relative group"
+                          title="Rasm o'zgartirish"
                         >
-                          <Crown size={12} /> Upgrade to Premium
+                          <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold text-white"
+                            style={{ background: 'var(--accent)' }}>
+                            {avatarUrl
+                              ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                              : avatarLetter}
+                          </div>
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            {avatarUploading
+                              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              : <Camera size={16} className="text-white" />}
+                          </div>
                         </button>
                       </div>
-                    )}
+
+                      {/* Name field */}
+                      <div>
+                        <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                          Ism
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={nameInput}
+                            onChange={e => setNameInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                            placeholder="Ismingiz"
+                            className="input-field text-sm flex-1 py-2"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleSaveName}
+                            disabled={nameSaving || !nameInput.trim()}
+                            className="btn-primary text-xs px-3 py-2 shrink-0 disabled:opacity-50"
+                          >
+                            {nameSaving ? '...' : 'Saqlash'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Subscription info */}
+                      <div className="rounded-xl px-3 py-2.5 text-xs"
+                        style={{
+                          background: isPremium ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
+                          border: `1px solid ${isPremium ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`,
+                        }}>
+                        {isPremium ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-1.5 font-semibold text-sm" style={{ color: 'var(--warning)' }}>
+                              <Crown size={13} /> Premium obuna aktiv
+                            </div>
+                            <div className="flex justify-between pt-0.5" style={{ color: 'var(--text-muted)' }}>
+                              <span>Boshlangan:</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : '—'}</span>
+                            </div>
+                            <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
+                              <span>Tugaydi:</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile?.premium_until ?? null)}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
+                              <Zap size={12} /> Oddiy foydalanuvchi
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { setProfileOpen(false); setUpgradeOpen(true) }}
+                              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 transition-opacity"
+                              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                            >
+                              <Crown size={12} /> Upgrade to Premium
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </motion.div>
                 </>
               )}
@@ -320,7 +449,7 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Upgrade button — only for non-premium, shown outside popup too */}
+        {/* Upgrade button — always visible for non-premium */}
         {!isPremium && (
           <button
             type="button"
@@ -328,8 +457,7 @@ export function Sidebar() {
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mb-3 transition-all hover:opacity-90 active:scale-95"
             style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}
           >
-            <Crown size={15} />
-            Upgrade to Premium
+            <Crown size={15} /> Upgrade to Premium
           </button>
         )}
 
