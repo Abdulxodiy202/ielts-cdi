@@ -618,19 +618,30 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
 
   const togglePremium = async (userId: string, currentPremium: boolean) => {
     setToggling(prev => ({ ...prev, [userId]: true }))
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_premium: !currentPremium }),
-    })
-    if (res.ok) {
-      setUsers(prev => prev.map(u =>
-        u.id === userId
-          ? { ...u, is_premium: !currentPremium, premium_until: !currentPremium ? null : null }
-          : u
-      ))
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_premium: !currentPremium }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        // Use the premium_until returned by the API so it matches the DB value
+        setUsers(prev => prev.map(u =>
+          u.id === userId
+            ? { ...u, is_premium: json.is_premium, premium_until: json.premium_until ?? null }
+            : u
+        ))
+      } else {
+        console.error('[togglePremium] API error:', json)
+        alert(`Xatolik: ${json.error ?? 'Noma\'lum xato'}`)
+      }
+    } catch (err) {
+      console.error('[togglePremium] fetch error:', err)
+      alert('Serverga ulanishda xatolik yuz berdi')
+    } finally {
+      setToggling(prev => ({ ...prev, [userId]: false }))
     }
-    setToggling(prev => ({ ...prev, [userId]: false }))
   }
 
   const initials = (name: string | null, email: string) => {
