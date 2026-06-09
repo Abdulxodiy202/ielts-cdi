@@ -617,27 +617,29 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   }
 
   const togglePremium = async (userId: string, currentPremium: boolean) => {
+    const newPremium = !currentPremium
+    console.log('[togglePremium] ▶ called — userId:', userId, '| currentPremium:', currentPremium, '→ setting:', newPremium)
     setToggling(prev => ({ ...prev, [userId]: true }))
     try {
       const res = await fetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_premium: !currentPremium }),
+        body: JSON.stringify({ is_premium: newPremium }),
       })
+      console.log('[togglePremium] response status:', res.status)
       const json = await res.json()
+      console.log('[togglePremium] response body:', json)
+
       if (res.ok) {
-        // Use the premium_until returned by the API so it matches the DB value
         setUsers(prev => prev.map(u =>
-          u.id === userId
-            ? { ...u, is_premium: json.is_premium, premium_until: json.premium_until ?? null }
-            : u
+          u.id === userId ? { ...u, is_premium: json.is_premium } : u
         ))
       } else {
-        console.error('[togglePremium] API error:', json)
+        console.error('[togglePremium] ✗ API error:', json)
         alert(`Xatolik: ${json.error ?? 'Noma\'lum xato'}`)
       }
     } catch (err) {
-      console.error('[togglePremium] fetch error:', err)
+      console.error('[togglePremium] ✗ fetch exception:', err)
       alert('Serverga ulanishda xatolik yuz berdi')
     } finally {
       setToggling(prev => ({ ...prev, [userId]: false }))
