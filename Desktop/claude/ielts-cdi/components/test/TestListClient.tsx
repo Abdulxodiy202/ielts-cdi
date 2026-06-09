@@ -113,13 +113,19 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                     )}
                   </div>
                   <div className="text-sm flex items-center gap-3 flex-wrap" style={{ color: 'var(--text-muted)' }}>
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} /> 60 min
-                    </span>
-                    <span>·</span>
-                    <span>3 passages</span>
-                    <span>·</span>
-                    <span>40 questions</span>
+                    {type === 'reading' ? (
+                      <>
+                        <span className="flex items-center gap-1"><Clock size={12} /> 60 min</span>
+                        <span>·</span><span>3 passages</span>
+                        <span>·</span><span>40 questions</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex items-center gap-1"><Clock size={12} /> 40 min</span>
+                        <span>·</span><span>4 sections</span>
+                        <span>·</span><span>40 questions</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
