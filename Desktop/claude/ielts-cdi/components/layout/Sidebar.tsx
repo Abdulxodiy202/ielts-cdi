@@ -158,40 +158,27 @@ export function Sidebar() {
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-    if (file.size > 2 * 1024 * 1024) { addToast('Rasm 2 MB dan kichik bo\'lishi kerak', 'error'); return }
 
+    // Instant local preview
     setAvatarUploading(true)
-    // Preview immediately
-    const objectUrl = URL.createObjectURL(file)
-    setLocalAvatarUrl(objectUrl)
+    setLocalAvatarUrl(URL.createObjectURL(file))
 
     try {
-      const supabase = createClient()
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${user.id}.${ext}`
+      const fd = new FormData()
+      fd.append('file', file)
 
-      const { error: uploadErr } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type })
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+      const json = await res.json()
 
-      if (uploadErr) throw uploadErr
+      if (!res.ok) throw new Error(json.error ?? 'Upload failed')
 
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl + `?t=${Date.now()}` // cache-bust
-
-      // Persist to profile
-      await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ avatar_url: publicUrl }),
-      })
-
-      setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
-      setLocalAvatarUrl(publicUrl)
+      setProfile(prev => prev ? { ...prev, avatar_url: json.publicUrl } : prev)
+      setLocalAvatarUrl(json.publicUrl)
       addToast('✅ Rasm yangilandi', 'success')
-    } catch {
+    } catch (err) {
+      console.error('[avatar upload]', err)
       setLocalAvatarUrl(null)
-      addToast('Rasm yuklashda xatolik', 'error')
+      addToast(err instanceof Error ? err.message : 'Rasm yuklashda xatolik', 'error')
     } finally {
       setAvatarUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''

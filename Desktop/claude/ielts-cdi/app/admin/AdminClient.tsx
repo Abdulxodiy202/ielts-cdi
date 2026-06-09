@@ -579,30 +579,34 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [search, setSearch] = useState('')
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null)
-  const [resetting, setResetting] = useState<Record<string, boolean>>({})
-  const [resetModal, setResetModal] = useState<{ email: string; link: string } | null>(null)
-  const [copied, setCopied] = useState(false)
+  const [setPassModal, setSetPassModal] = useState<{ userId: string; email: string } | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [savingPass, setSavingPass] = useState(false)
+  const [passSaved, setPassSaved] = useState(false)
 
-  const handleResetPassword = async (userId: string) => {
-    setResetting(prev => ({ ...prev, [userId]: true }))
+  const handleSetPassword = async () => {
+    if (!setPassModal || newPassword.length < 6) return
+    setSavingPass(true)
     try {
-      const res = await fetch(`/api/admin/users/${userId}/reset-password`, { method: 'POST' })
-      const json = await res.json()
+      const res = await fetch(`/api/admin/users/${setPassModal.userId}/set-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword }),
+      })
       if (res.ok) {
-        setResetModal({ email: json.email, link: json.link })
+        setPassSaved(true)
+        setTimeout(() => {
+          setSetPassModal(null)
+          setNewPassword('')
+          setPassSaved(false)
+        }, 1500)
       } else {
+        const json = await res.json()
         alert(json.error ?? 'Xatolik yuz berdi')
       }
     } finally {
-      setResetting(prev => ({ ...prev, [userId]: false }))
+      setSavingPass(false)
     }
-  }
-
-  const copyLink = () => {
-    if (!resetModal) return
-    navigator.clipboard.writeText(resetModal.link)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   const refresh = async () => {
@@ -850,13 +854,12 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         {isToggling ? '...' : u.is_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
                       </button>
                       <button
-                        onClick={() => handleResetPassword(u.id)}
-                        disabled={resetting[u.id]}
-                        title="Parol tiklash havolasi yaratish"
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80 disabled:opacity-40"
+                        onClick={() => { setSetPassModal({ userId: u.id, email: u.email }); setNewPassword(''); setPassSaved(false) }}
+                        title="Parol o'rnatish"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80"
                         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                       >
-                        {resetting[u.id] ? '…' : '🔑'}
+                        🔑
                       </button>
                     </div>
                   </div>
@@ -915,29 +918,27 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
         </div>
       )}
 
-      {/* Reset-password modal */}
+      {/* Set-password modal */}
       <AnimatePresence>
-        {resetModal && (
+        {setPassModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0"
               style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-              onClick={() => { setResetModal(null); setCopied(false) }}
+              onClick={() => { setSetPassModal(null); setNewPassword('') }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.92, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-              className="relative card p-6 w-full max-w-md"
+              className="relative card p-6 w-full max-w-sm"
               style={{ zIndex: 51 }}
             >
               <button
-                onClick={() => { setResetModal(null); setCopied(false) }}
-                className="absolute top-4 right-4 p-1.5 rounded-lg transition-colors"
+                onClick={() => { setSetPassModal(null); setNewPassword('') }}
+                className="absolute top-4 right-4 p-1.5 rounded-lg"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <XCircle size={18} />
@@ -945,25 +946,36 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
 
               <div className="text-2xl mb-3">🔑</div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                Parol tiklash havolasi
+                Parol o&apos;rnatish
               </h2>
               <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                {resetModal.email} uchun havola. 1 soat amal qiladi.
+                {setPassModal.email}
               </p>
 
-              <div
-                className="rounded-xl p-3 mb-4 text-xs font-mono break-all select-all"
-                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-              >
-                {resetModal.link}
-              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Yangi parol
+                  </label>
+                  <input
+                    type="text"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSetPassword()}
+                    placeholder="Kamida 6 ta belgi"
+                    className="input-field w-full font-mono"
+                    autoFocus
+                  />
+                </div>
 
-              <button
-                onClick={copyLink}
-                className="btn-primary w-full font-semibold"
-              >
-                {copied ? '✅ Nusxa olindi!' : '📋 Havolani nusxalash'}
-              </button>
+                <button
+                  onClick={handleSetPassword}
+                  disabled={savingPass || newPassword.length < 6}
+                  className="btn-primary w-full font-semibold disabled:opacity-50"
+                >
+                  {passSaved ? '✅ Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
