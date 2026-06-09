@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
@@ -20,7 +20,7 @@ export interface MockScheduleWithBooking {
   writing_task1_image_url: string | null
   writing_task1_topic: string | null
   writing_task2_topic: string | null
-  userBooking:      { status: string; payment_status: string } | null
+  userBooking:      { id: string; status: string; payment_status: string } | null
   isSubmitted:      boolean
   submissionStatus: string | null
 }
@@ -44,14 +44,23 @@ function formatTime(timeStr: string) {
   return `${String(display).padStart(2, '0')}:${m} ${ampm}`
 }
 
-/** ms remaining until test START time (negative means test has started). */
-function msUntilTest(s: MockScheduleWithBooking): number {
-  return new Date(`${s.date}T${s.time}`).getTime() - Date.now()
+/**
+ * Parse schedule date+time stored as Asia/Tashkent (UTC+5) → UTC ms.
+ * Without +05:00, new Date("2024-10-15T09:00") is local/UTC, not Tashkent.
+ */
+function tashkentMs(date: string, time: string): number {
+  const hhmm = time.slice(0, 5) // normalise "09:00:00" → "09:00"
+  return new Date(`${date}T${hhmm}:00+05:00`).getTime()
 }
 
-/** True from test start → 4 hours after. */
+/** ms remaining until test START time (Tashkent). Negative = test already started. */
+function msUntilTest(s: MockScheduleWithBooking): number {
+  return tashkentMs(s.date, s.time) - Date.now()
+}
+
+/** True from test start → 4 hours after (Tashkent). */
 function isTestLive(s: MockScheduleWithBooking): boolean {
-  const start = new Date(`${s.date}T${s.time}`).getTime()
+  const start = tashkentMs(s.date, s.time)
   const end   = start + 4 * 60 * 60 * 1000
   const now   = Date.now()
   return now >= start && now <= end
@@ -99,11 +108,46 @@ export function MockTestClient({ userId }: Props) {
   const [modalSchedule, setModalSchedule] = useState<MockScheduleWithBooking | null>(null)
 
   // 1-second tick to keep countdowns live
-  const [, setTick] = useState(0)
+  const [tick, setTick] = useState(0)
   useEffect(() => {
     const iv = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(iv)
   }, [])
+
+  // Track IDs we've already fired a resign request for (avoid duplicate calls)
+  const resignedIds = useRef<Set<string>>(new Set())
+
+  // Client-side auto-resign: fires when the 5-min cutoff passes while user is on page.
+  // Belt-and-suspenders with server-side auto-resign in /api/mock/schedules.
+  useEffect(() => {
+    schedules.forEach(s => {
+      if (!s.userBooking || s.userBooking.status !== 'confirmed') return
+      if (s.submissionStatus) return // has a submission (draft/submitted/disqualified)
+      if (resignedIds.current.has(s.id)) return
+
+      const startMs = tashkentMs(s.date, s.time)
+      if (Date.now() <= startMs + 5 * 60 * 1000) return
+
+      // Mark so we don't fire again on the next tick
+      resignedIds.current.add(s.id)
+
+      fetch('/api/mock/resign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: s.userBooking.id, reason: 'Vaqtida kirmadi' }),
+      }).then(() => {
+        // Update local state immediately so the UI reflects resigned status
+        setSchedules(prev =>
+          prev.map(sc =>
+            sc.id === s.id
+              ? { ...sc, userBooking: { ...sc.userBooking!, status: 'resigned' } }
+              : sc
+          )
+        )
+      }).catch(err => console.error('[auto-resign] fetch error:', err))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, schedules])
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true)
