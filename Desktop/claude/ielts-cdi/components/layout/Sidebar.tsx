@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar,
   BarChart2, LogOut, Menu, X, Crown, Zap, CheckCircle,
-  Clock, ArrowRight,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -30,113 +29,6 @@ interface Profile {
   premium_until: string | null
 }
 
-interface NextBooking {
-  schedule: { id: string; date: string; time: string }
-  booking:  { status: string }
-}
-
-/* ── Countdown helpers ───────────────────────────────────────────────── */
-function getTestDateTime(schedule: NextBooking['schedule']): Date {
-  return new Date(`${schedule.date}T${schedule.time}`)
-}
-
-function buildCountdown(schedule: NextBooking['schedule']): {
-  label: string
-  isLive: boolean   // HH:MM:SS ticking
-  isNow: boolean    // test time reached
-} {
-  const now    = Date.now()
-  const testMs = getTestDateTime(schedule).getTime()
-  const diff   = testMs - now          // ms remaining
-
-  if (diff <= 0) {
-    // Within 4-hour test window (or past it)
-    const endMs = testMs + 4 * 60 * 60 * 1000
-    if (now <= endMs) return { label: 'Mock Test boshlash', isLive: false, isNow: true }
-    return { label: '', isLive: false, isNow: false }   // expired
-  }
-
-  if (diff < 60 * 60 * 1000) {
-    // < 1 hour → live HH:MM:SS
-    const totalSec = Math.ceil(diff / 1000)
-    const h = Math.floor(totalSec / 3600)
-    const m = Math.floor((totalSec % 3600) / 60)
-    const s = totalSec % 60
-    const hh = String(h).padStart(2, '0')
-    const mm = String(m).padStart(2, '0')
-    const ss = String(s).padStart(2, '0')
-    return { label: `${hh}:${mm}:${ss}`, isLive: true, isNow: false }
-  }
-
-  if (diff < 24 * 60 * 60 * 1000) {
-    const hours = Math.ceil(diff / (60 * 60 * 1000))
-    return { label: `${hours} soat qoldi`, isLive: false, isNow: false }
-  }
-
-  const days = Math.ceil(diff / (24 * 60 * 60 * 1000))
-  return { label: `${days} kun qoldi`, isLive: false, isNow: false }
-}
-
-/* ── MockCountdownBadge ──────────────────────────────────────────────── */
-function MockCountdownBadge({ nb }: { nb: NextBooking }) {
-  const [tick, setTick] = useState(0)
-
-  // Force re-render every second when < 1h left or test is live
-  useEffect(() => {
-    const diff = getTestDateTime(nb.schedule).getTime() - Date.now()
-    if (diff > 60 * 60 * 1000) return   // no need to tick yet
-    const iv = setInterval(() => setTick(t => t + 1), 1000)
-    return () => clearInterval(iv)
-  }, [nb.schedule])
-
-  const { label, isLive, isNow } = buildCountdown(nb.schedule)
-  if (!label) return null   // test window passed
-
-  const scheduleDate = new Date(nb.schedule.date + 'T00:00')
-  const dateStr = scheduleDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-
-  if (isNow) {
-    return (
-      <Link
-        href={`/mock-test/${nb.schedule.id}`}
-        className="flex items-center justify-between gap-2 w-full px-3 py-2.5 rounded-xl font-bold text-sm text-white transition-all hover:opacity-90 active:scale-95"
-        style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)', boxShadow: '0 0 20px rgba(99,102,241,0.4)' }}
-      >
-        <span className="flex items-center gap-1.5">
-          <ArrowRight size={15} />
-          Mock Test boshlash
-        </span>
-        <span className="text-xs opacity-80">{dateStr}</span>
-      </Link>
-    )
-  }
-
-  return (
-    <div
-      className="rounded-xl px-3 py-2.5 text-sm"
-      style={{
-        background: isLive
-          ? 'rgba(239,68,68,0.1)'
-          : 'rgba(99,102,241,0.08)',
-        border: `1px solid ${isLive ? 'rgba(239,68,68,0.3)' : 'rgba(99,102,241,0.2)'}`,
-      }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <Clock size={11} />
-          Mock Test · {dateStr}
-        </span>
-      </div>
-      <div
-        className={`font-mono font-bold text-base mt-0.5 ${isLive ? 'animate-pulse' : ''}`}
-        style={{ color: isLive ? 'var(--error)' : 'var(--accent)' }}
-      >
-        {label}
-      </div>
-    </div>
-  )
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    Sidebar
    ══════════════════════════════════════════════════════════════════════ */
@@ -148,7 +40,6 @@ export function Sidebar() {
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   const [profile,     setProfile]     = useState<Profile | null>(null)
   const [toasts,      setToasts]      = useState<ToastData[]>([])
-  const [nextBooking, setNextBooking] = useState<NextBooking | null>(null)
 
   // Ref so realtime callbacks always see the latest profile without stale closure
   const profileRef = useRef<Profile | null>(null)
@@ -166,18 +57,15 @@ export function Sidebar() {
       .then(({ data }) => { if (data) setProfile(data) })
   }, [user?.id])
 
-  /* ── Fetch next confirmed mock booking ─────────────────────────────── */
-  const fetchNextBooking = useCallback(async () => {
-    try {
-      const res = await fetch('/api/mock/next-booking')
-      if (res.ok) setNextBooking(await res.json())
-    } catch { /* silent */ }
+  /* ── Toast helpers ─────────────────────────────────────────────────── */
+  const addToast = useCallback((message: string, type: ToastData['type']) => {
+    const id = `${Date.now()}-${Math.random()}`
+    setToasts(prev => [...prev, { id, message, type }])
   }, [])
 
-  useEffect(() => {
-    if (!user?.id) return
-    fetchNextBooking()
-  }, [user?.id, fetchNextBooking])
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }, [])
 
   /* ── Realtime subscriptions ────────────────────────────────────────── */
   useEffect(() => {
@@ -201,7 +89,7 @@ export function Sidebar() {
       )
       .subscribe()
 
-    // Watch mock_bookings — fires when admin confirms a booking
+    // Watch mock_bookings — fires when admin confirms a booking (toast only)
     const bookingChannel = supabase
       .channel(`bookings-${user.id}`)
       .on(
@@ -211,38 +99,16 @@ export function Sidebar() {
           const row = payload.new as { status: string; booking_date: string; time_slot: string }
           if (row.status === 'confirmed') {
             addToast(`✅ Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
-            fetchNextBooking()   // refresh countdown
           }
         }
-      )
-      .subscribe()
-
-    // Watch mock_test_submissions — fires when user submits the test.
-    // Re-fetches next-booking which returns null for submitted tests → hides the sidebar card.
-    const submissionChannel = supabase
-      .channel(`submissions-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'mock_test_submissions', filter: `user_id=eq.${user.id}` },
-        () => { fetchNextBooking() }
       )
       .subscribe()
 
     return () => {
       supabase.removeChannel(profileChannel)
       supabase.removeChannel(bookingChannel)
-      supabase.removeChannel(submissionChannel)
     }
-  }, [user?.id, fetchNextBooking])
-
-  /* ── Toast helpers ─────────────────────────────────────────────────── */
-  const addToast = (message: string, type: ToastData['type']) => {
-    const id = `${Date.now()}-${Math.random()}`
-    setToasts(prev => [...prev, { id, message, type }])
-  }
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id))
-  }, [])
+  }, [user?.id, addToast])
 
   const displayName  = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || 'User'
   const avatarLetter = displayName[0].toUpperCase()
@@ -270,7 +136,7 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Nav + countdown */}
+      {/* Nav */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {nav.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(href + '/')
@@ -290,13 +156,6 @@ export function Sidebar() {
             </Link>
           )
         })}
-
-        {/* ── Mock test countdown card ── */}
-        {nextBooking && (
-          <div className="pt-1">
-            <MockCountdownBadge nb={nextBooking} />
-          </div>
-        )}
       </nav>
 
       {/* Theme switcher */}

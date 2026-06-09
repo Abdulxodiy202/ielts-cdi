@@ -87,7 +87,7 @@ function BookingBadge({ booking }: { booking: MockScheduleWithBooking['userBooki
   if (booking.status === 'resigned') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
-      <XCircle size={11} /> Vaqtida kirmadi
+      <XCircle size={11} /> Resigned
     </span>
   )
   return (
@@ -308,13 +308,12 @@ export function MockTestClient({ userId }: Props) {
                       </div>
                     </div>
 
-                  /* ⑤ Confirmed + late (>5 min past start, no submission) */
+                  /* ⑤ Confirmed + late (>5 min past start, no submission) — auto-resign pending */
                   ) : confirmed && tooLateToBook && !live ? (
-                    <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
-                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <XCircle size={13} className="shrink-0 mt-0.5" />
-                      Vaqtida kirmagansiz. 5 daqiqadan ko&apos;p kech qoldingiz.
-                    </div>
+                    <p className="text-xs leading-snug max-w-[200px] text-right"
+                      style={{ color: 'var(--text-muted)' }}>
+                      Candidate belgilangan vaqtdan 5 daqiqadan ko&apos;proq kechikkan sababli ushbu seans avtomatik ravishda bekor qilindi.
+                    </p>
 
                   /* ⑥ Pending (awaiting admin approval) */
                   ) : pending ? (
@@ -323,12 +322,12 @@ export function MockTestClient({ userId }: Props) {
                       <AlertCircle size={12} /> Admin tasdiqlashini kuting
                     </div>
 
-                  /* ⑦ Resigned — did not show up */
+                  /* ⑦ Resigned — did not show up; BookingBadge already shows "Resigned" */
                   ) : resigned ? (
-                    <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
-                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      ❌ Vaqtida kirmadi
-                    </div>
+                    <p className="text-xs leading-snug max-w-[200px] text-right"
+                      style={{ color: 'var(--text-muted)' }}>
+                      Candidate belgilangan vaqtdan 5 daqiqadan ko&apos;proq kechikkan sababli ushbu seans avtomatik ravishda bekor qilindi.
+                    </p>
 
                   /* ⑧ No booking + too late → show message */
                   ) : !s.userBooking && tooLateToBook ? (
