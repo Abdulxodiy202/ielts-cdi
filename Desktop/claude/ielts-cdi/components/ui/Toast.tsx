@@ -7,7 +7,7 @@ import { X, CheckCircle, Crown } from 'lucide-react'
 export interface ToastData {
   id: string
   message: string
-  type: 'premium' | 'booking' | 'info'
+  type: 'premium' | 'booking' | 'info' | 'success' | 'error'
 }
 
 interface ToastItemProps {
@@ -21,7 +21,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
     return () => clearTimeout(t)
   }, [toast.id, onClose])
 
-  const config = {
+  const config: Record<string, { bg: string; shadow: string; Icon: typeof CheckCircle }> = {
     premium: {
       bg: 'linear-gradient(135deg, #f59e0b, #d97706)',
       shadow: '0 8px 32px rgba(245,158,11,0.4)',
@@ -32,14 +32,24 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
       shadow: '0 8px 32px rgba(34,197,94,0.4)',
       Icon: CheckCircle,
     },
+    success: {
+      bg: 'linear-gradient(135deg, #22c55e, #16a34a)',
+      shadow: '0 8px 32px rgba(34,197,94,0.4)',
+      Icon: CheckCircle,
+    },
+    error: {
+      bg: 'linear-gradient(135deg, #ef4444, #dc2626)',
+      shadow: '0 8px 32px rgba(239,68,68,0.4)',
+      Icon: X,
+    },
     info: {
       bg: 'linear-gradient(135deg, #6366f1, #4f46e5)',
       shadow: '0 8px 32px rgba(99,102,241,0.4)',
       Icon: CheckCircle,
     },
-  } as const
+  }
 
-  const { bg, shadow, Icon } = config[toast.type]
+  const { bg, shadow, Icon } = config[toast.type] ?? config.info
 
   return (
     <motion.div

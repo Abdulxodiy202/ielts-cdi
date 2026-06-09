@@ -158,7 +158,7 @@ export function Sidebar() {
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-    if (file.size > 2 * 1024 * 1024) { addToast('Rasm 2 MB dan kichik bo\'lishi kerak', 'error' as ToastData['type']); return }
+    if (file.size > 2 * 1024 * 1024) { addToast('Rasm 2 MB dan kichik bo\'lishi kerak', 'error'); return }
 
     setAvatarUploading(true)
     // Preview immediately
@@ -188,10 +188,10 @@ export function Sidebar() {
 
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
       setLocalAvatarUrl(publicUrl)
-      addToast('✅ Rasm yangilandi', 'success' as ToastData['type'])
+      addToast('✅ Rasm yangilandi', 'success')
     } catch {
       setLocalAvatarUrl(null)
-      addToast('Rasm yuklashda xatolik', 'error' as ToastData['type'])
+      addToast('Rasm yuklashda xatolik', 'error')
     } finally {
       setAvatarUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -209,9 +209,9 @@ export function Sidebar() {
     })
     if (res.ok) {
       setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
-      addToast('✅ Ism saqlandi', 'success' as ToastData['type'])
+      addToast('✅ Ism saqlandi', 'success')
     } else {
-      addToast('Saqlashda xatolik', 'error' as ToastData['type'])
+      addToast('Saqlashda xatolik', 'error')
     }
     setNameSaving(false)
   }, [nameInput, addToast])

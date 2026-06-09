@@ -579,6 +579,31 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [toggling, setToggling] = useState<Record<string, boolean>>({})
   const [search, setSearch] = useState('')
   const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null)
+  const [resetting, setResetting] = useState<Record<string, boolean>>({})
+  const [resetModal, setResetModal] = useState<{ email: string; link: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const handleResetPassword = async (userId: string) => {
+    setResetting(prev => ({ ...prev, [userId]: true }))
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/reset-password`, { method: 'POST' })
+      const json = await res.json()
+      if (res.ok) {
+        setResetModal({ email: json.email, link: json.link })
+      } else {
+        alert(json.error ?? 'Xatolik yuz berdi')
+      }
+    } finally {
+      setResetting(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  const copyLink = () => {
+    if (!resetModal) return
+    navigator.clipboard.writeText(resetModal.link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   const refresh = async () => {
     setRefreshing(true)
@@ -806,8 +831,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                       {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
                     </div>
 
-                    {/* Toggle premium */}
-                    <div className="shrink-0 flex justify-end">
+                    {/* Toggle premium + reset password */}
+                    <div className="shrink-0 flex items-center gap-2 justify-end">
                       <button
                         onClick={() => togglePremium(u.id, u.is_premium)}
                         disabled={isToggling}
@@ -823,6 +848,15 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         }}
                       >
                         {isToggling ? '...' : u.is_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
+                      </button>
+                      <button
+                        onClick={() => handleResetPassword(u.id)}
+                        disabled={resetting[u.id]}
+                        title="Parol tiklash havolasi yaratish"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80 disabled:opacity-40"
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                      >
+                        {resetting[u.id] ? '…' : '🔑'}
                       </button>
                     </div>
                   </div>
@@ -880,6 +914,60 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
           </div>
         </div>
       )}
+
+      {/* Reset-password modal */}
+      <AnimatePresence>
+        {resetModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setResetModal(null); setCopied(false) }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-md"
+              style={{ zIndex: 51 }}
+            >
+              <button
+                onClick={() => { setResetModal(null); setCopied(false) }}
+                className="absolute top-4 right-4 p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <XCircle size={18} />
+              </button>
+
+              <div className="text-2xl mb-3">🔑</div>
+              <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+                Parol tiklash havolasi
+              </h2>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+                {resetModal.email} uchun havola. 1 soat amal qiladi.
+              </p>
+
+              <div
+                className="rounded-xl p-3 mb-4 text-xs font-mono break-all select-all"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              >
+                {resetModal.link}
+              </div>
+
+              <button
+                onClick={copyLink}
+                className="btn-primary w-full font-semibold"
+              >
+                {copied ? '✅ Nusxa olindi!' : '📋 Havolani nusxalash'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
