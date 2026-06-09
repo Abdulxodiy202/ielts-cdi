@@ -523,6 +523,7 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
   const [form, setForm]                 = useState<FormState>(makeEmpty())
   const [saving, setSaving]             = useState(false)
   const [deleting, setDeleting]         = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [message, setMessage]           = useState<{ ok: boolean; text: string } | null>(null)
   const [uploading, setUploading]       = useState<Partial<Record<FileField, boolean>>>({})
   const [modalScheduleId, setModalScheduleId] = useState<string | null>(null)
@@ -621,14 +622,10 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
 
   /* ── Delete ── */
   const handleDelete = async (id: string) => {
-    if (!confirm('Bu jadvalni o\'chirishni tasdiqlaysizmi?')) return
     setDeleting(id)
+    setDeleteConfirmId(null)
     try {
-      const res = await fetch('/api/admin/mock-schedules', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
+      const res = await fetch(`/api/admin/mock-schedules/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setSchedules(prev => prev.filter(s => s.id !== id))
         if (editingId === id) closeForm()
@@ -794,7 +791,9 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
               {saving ? 'Saqlanmoqda…' : (editingId ? 'Saqlash' : 'Yaratish')}
             </button>
             {editingId && (
-              <button onClick={() => handleDelete(editingId)} disabled={deleting === editingId}
+              <button
+                onClick={() => { if (!confirm('Bu jadvalni o\'chirishni tasdiqlaysizmi?')) return; handleDelete(editingId) }}
+                disabled={deleting === editingId}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition-colors"
                 style={{ color: 'var(--error)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
                 {deleting === editingId ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
@@ -891,9 +890,51 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                     {isEditing ? <ChevronUp size={13} /> : <Edit2 size={13} />}
                     {isEditing ? 'Yopish' : 'Tahrirlash'}
                   </button>
+
+                  {/* Delete button */}
+                  <button
+                    onClick={() => setDeleteConfirmId(deleteConfirmId === s.id ? null : s.id)}
+                    disabled={deleting === s.id}
+                    className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg transition-colors"
+                    style={{
+                      background: deleteConfirmId === s.id ? 'rgba(239,68,68,0.12)' : 'var(--bg-secondary)',
+                      color:      deleteConfirmId === s.id ? 'var(--error)'          : 'var(--text-muted)',
+                      border: `1px solid ${deleteConfirmId === s.id ? 'rgba(239,68,68,0.3)' : 'var(--border)'}`,
+                    }}>
+                    {deleting === s.id
+                      ? <Loader2 size={13} className="animate-spin" />
+                      : <Trash2 size={13} />}
+                  </button>
                 </div>
               </div>
 
+              {/* ── Inline delete confirmation ── */}
+              {deleteConfirmId === s.id && (
+                <div className="flex items-center justify-between gap-3 pt-3 mt-3"
+                  style={{ borderTop: '1px solid var(--border)' }}>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    Bu seansni o&apos;chirishni tasdiqlaysizmi?
+                  </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => setDeleteConfirmId(null)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                      style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                      Yo&apos;q
+                    </button>
+                    <button
+                      onClick={() => handleDelete(s.id)}
+                      disabled={deleting === s.id}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+                      style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                      {deleting === s.id
+                        ? <Loader2 size={11} className="animate-spin" />
+                        : <Trash2 size={11} />}
+                      Ha, o&apos;chirish
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             )
           })}

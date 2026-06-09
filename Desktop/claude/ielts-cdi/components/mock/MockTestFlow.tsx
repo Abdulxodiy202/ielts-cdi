@@ -736,7 +736,7 @@ function ReadingSection({
             onClick={() => onNextRef.current()}
             className="w-full flex items-center justify-center gap-3 rounded-2xl font-bold text-white hover:opacity-90 active:scale-95 transition-all"
             style={{
-              background: reviewSecs < 15 ? 'var(--error)' : 'linear-gradient(135deg, #7c3aed, #4f46e5)',
+              background: reviewSecs < 15 ? 'var(--error)' : 'linear-gradient(135deg, #16a34a, #059669)',
               padding: '16px 24px',
               fontSize: 17,
               letterSpacing: '0.01em',
