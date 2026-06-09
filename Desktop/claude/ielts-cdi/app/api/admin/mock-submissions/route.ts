@@ -19,42 +19,59 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Fetch submissions for this schedule
-  const { data: submissions, error: subErr } = await admin
-    .from('mock_test_submissions')
-    .select('*')
-    .eq('schedule_id', scheduleId)
-    .order('submitted_at', { ascending: true })
+  // Fetch submissions AND resigned bookings in parallel
+  const [submissionsRes, resignedRes, scheduleRes] = await Promise.all([
+    admin
+      .from('mock_test_submissions')
+      .select('*')
+      .eq('schedule_id', scheduleId)
+      .order('submitted_at', { ascending: true, nullsFirst: false }),
+    admin
+      .from('mock_bookings')
+      .select('id, user_id, schedule_id, created_at')
+      .eq('schedule_id', scheduleId)
+      .eq('status', 'resigned'),
+    admin
+      .from('mock_schedules')
+      .select('date, time_slot')
+      .eq('id', scheduleId)
+      .single(),
+  ])
 
-  if (subErr) {
-    return NextResponse.json({ error: subErr.message }, { status: 500 })
+  const submissions = submissionsRes.data ?? []
+  const resignedBookings = resignedRes.data ?? []
+  const schedule = scheduleRes.data
+
+  if (submissionsRes.error) {
+    return NextResponse.json({ error: submissionsRes.error.message }, { status: 500 })
   }
 
-  if (!submissions || submissions.length === 0) {
+  // Collect all unique user IDs from both sources
+  const submissionUserIds = submissions.map((s: any) => s.user_id)
+  const resignedUserIds   = resignedBookings.map((b: any) => b.user_id)
+  // Exclude resigned users that already have a submission (e.g. disqualified)
+  const submissionUserSet = new Set(submissionUserIds)
+  const pureResignedBookings = resignedBookings.filter((b: any) => !submissionUserSet.has(b.user_id))
+
+  const allUserIds = [...new Set([...submissionUserIds, ...pureResignedBookings.map((b: any) => b.user_id)])]
+
+  if (allUserIds.length === 0) {
     return NextResponse.json([])
   }
 
-  // Fetch profiles for all user_ids
-  const userIds = [...new Set(submissions.map((s: any) => s.user_id))]
+  // Fetch profiles for all users
   const { data: profiles } = await admin
     .from('profiles')
     .select('id, full_name, email, phone, is_premium')
-    .in('id', userIds)
+    .in('id', allUserIds)
 
   const profileMap: Record<string, any> = {}
   for (const p of profiles ?? []) {
     profileMap[p.id] = p
   }
 
-  // Fetch schedule info
-  const { data: schedule } = await admin
-    .from('mock_schedules')
-    .select('date, time_slot')
-    .eq('id', scheduleId)
-    .single()
-
   // Enrich submissions
-  const enriched = submissions.map((s: any) => {
+  const enrichedSubmissions = submissions.map((s: any) => {
     const profile = profileMap[s.user_id] ?? {}
     return {
       id: s.id,
@@ -71,9 +88,31 @@ export async function GET(req: NextRequest) {
       writing_task1: s.writing_task1 ?? '',
       writing_task2: s.writing_task2 ?? '',
       status: s.status,
-      submitted_at: s.submitted_at,
+      submitted_at: s.submitted_at ?? null,
     }
   })
 
-  return NextResponse.json(enriched)
+  // Enrich resigned bookings (no submission → empty answers, status='resigned')
+  const enrichedResigned = pureResignedBookings.map((b: any) => {
+    const profile = profileMap[b.user_id] ?? {}
+    return {
+      id: `resigned-${b.id}`,
+      user_id: b.user_id,
+      booking_id: b.id,
+      user_name: profile.full_name ?? 'Noma\'lum',
+      user_email: profile.email ?? b.user_id,
+      user_phone: profile.phone ?? '',
+      is_premium: profile.is_premium ?? false,
+      schedule_date: schedule?.date ?? null,
+      schedule_time: schedule?.time_slot ?? null,
+      listening_answers: {},
+      reading_answers: {},
+      writing_task1: '',
+      writing_task2: '',
+      status: 'resigned',
+      submitted_at: null,
+    }
+  })
+
+  return NextResponse.json([...enrichedSubmissions, ...enrichedResigned])
 }

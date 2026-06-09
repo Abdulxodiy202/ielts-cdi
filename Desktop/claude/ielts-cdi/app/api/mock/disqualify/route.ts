@@ -52,12 +52,12 @@ export async function POST(request: Request) {
     console.error('[mock/disqualify] telegram error:', err)
   }
 
-  // Mark existing submission as 'submitted' so admin can see the answers
+  // Mark existing submission as 'disqualified' so admin can see it was cheating
   try {
     const admin = createAdminClient()
     await admin
       .from('mock_test_submissions')
-      .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+      .update({ status: 'disqualified', submitted_at: new Date().toISOString() })
       .eq('user_id', user.id)
       .eq('schedule_id', schedule_id)
   } catch (err) {

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Calendar, Clock, CheckCircle, CreditCard, BookOpen,
   Headphones, PenTool, AlertCircle, ArrowRight, Loader2,
-  RefreshCw, PartyPopper,
+  RefreshCw, PartyPopper, XCircle,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 
@@ -72,6 +72,12 @@ function BookingBadge({ booking }: { booking: MockScheduleWithBooking['userBooki
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
       <CheckCircle size={11} /> Tasdiqlangan
+    </span>
+  )
+  if (booking.status === 'resigned') return (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
+      style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
+      <XCircle size={11} /> Vaqtida kirmadi
     </span>
   )
   return (
@@ -150,8 +156,10 @@ export function MockTestClient({ userId }: Props) {
         {schedules.map((s, i) => {
           const confirmed   = s.userBooking?.status === 'confirmed'
           const pending     = s.userBooking?.status === 'pending'
+          const resigned    = s.userBooking?.status === 'resigned'
           const live        = isTestLive(s)
           const msLeft      = msUntilTest(s)         // ms to test start
+          const tooLateToBook = msLeft < 5 * 60 * 1000  // < 5 min until start (or already started)
           const hasReading  = !!s.reading_file_url
           const hasListening = !!s.listening_file_url
           const hasWriting  = !!(s.writing_task1_topic || s.writing_task2_topic)
@@ -247,7 +255,21 @@ export function MockTestClient({ userId }: Props) {
                       <AlertCircle size={12} /> Admin tasdiqlashini kuting
                     </div>
 
-                  /* ⑤ No booking → Book button */
+                  /* ⑤ Resigned — did not show up */
+                  ) : resigned ? (
+                    <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      ❌ Vaqtida kirmadi
+                    </div>
+
+                  /* ⑥ No booking + too late → show message */
+                  ) : !s.userBooking && tooLateToBook ? (
+                    <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-center"
+                      style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
+                      Vaqt o&apos;tib ketdi. Keyingi seansni tanlang
+                    </div>
+
+                  /* ⑦ No booking → Book button */
                   ) : !s.userBooking ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"

@@ -7,6 +7,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
  *  Returns upcoming mock_schedules enriched with:
  *  - userBooking: { status, payment_status } | null
  *  - isSubmitted: true if the user has a 'submitted' entry in mock_test_submissions
+ *
+ *  Side-effect: auto-resigns confirmed bookings where now > start + 5 min
+ *  and no submission (draft or submitted) exists for that schedule.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -29,7 +32,7 @@ export async function GET() {
 
   const ids = schedules.map(s => s.id)
 
-  // Fetch bookings and submissions in parallel
+  // Fetch bookings and ALL submissions (not just submitted) in parallel
   const [bookingsRes, submissionsRes] = await Promise.all([
     supabase
       .from('mock_bookings')
@@ -40,16 +43,48 @@ export async function GET() {
       .from('mock_test_submissions')
       .select('schedule_id, status')
       .eq('user_id', user.id)
-      .in('schedule_id', ids)
-      .eq('status', 'submitted'),
+      .in('schedule_id', ids),
   ])
 
   const bookingMap: Record<string, { status: string; payment_status: string }> =
     Object.fromEntries((bookingsRes.data ?? []).map(b => [b.schedule_id, b]))
 
-  const submittedSet = new Set(
+  // Any submission at all (draft or submitted) — used for auto-resign check
+  const anySubmissionSet = new Set(
     (submissionsRes.data ?? []).map(s => s.schedule_id)
   )
+
+  // Only 'submitted' ones — used for isSubmitted flag
+  const submittedSet = new Set(
+    (submissionsRes.data ?? []).filter(s => s.status === 'submitted').map(s => s.schedule_id)
+  )
+
+  // ── Auto-resign: confirmed bookings where now > start + 5 min + no submission ──
+  const now = Date.now()
+  const resignScheduleIds: string[] = []
+
+  for (const s of schedules) {
+    const booking = bookingMap[s.id]
+    if (!booking || booking.status !== 'confirmed') continue
+    const startMs = new Date(`${s.date}T${s.time}`).getTime()
+    if (now > startMs + 5 * 60 * 1000 && !anySubmissionSet.has(s.id)) {
+      resignScheduleIds.push(s.id)
+    }
+  }
+
+  if (resignScheduleIds.length > 0) {
+    // Fire-and-forget DB update (non-blocking for response)
+    await admin
+      .from('mock_bookings')
+      .update({ status: 'resigned' })
+      .eq('user_id', user.id)
+      .in('schedule_id', resignScheduleIds)
+
+    // Reflect in local map so returned data is immediately correct
+    for (const id of resignScheduleIds) {
+      if (bookingMap[id]) bookingMap[id] = { ...bookingMap[id], status: 'resigned' }
+    }
+  }
 
   return Response.json(
     schedules.map(s => ({

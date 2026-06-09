@@ -38,7 +38,7 @@ interface MockSubmission {
   writing_task1: string
   writing_task2: string
   status: string
-  submitted_at: string
+  submitted_at: string | null
 }
 
 interface FormState {
@@ -417,6 +417,18 @@ function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) 
                   <Crown size={10} /> Premium
                 </span>
               )}
+              {sub.status === 'disqualified' && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  🚫 Chetlatildi
+                </span>
+              )}
+              {sub.status === 'resigned' && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  ❌ Vaqtida kirmadi
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub.user_email}</span>
@@ -454,9 +466,15 @@ function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) 
       {/* Expanded details */}
       {open && (
         <div className="px-4 pb-4 pt-3 space-y-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-          {/* Submitted at */}
+          {/* Submitted at / status info */}
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Topshirildi: {new Date(sub.submitted_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            {sub.status === 'resigned'
+              ? '❌ Foydalanuvchi vaqtida kirmadi (test boshlanganidan 5 daqiqa o\'tdi)'
+              : sub.status === 'disqualified'
+                ? `🚫 Chetlatildi${sub.submitted_at ? ` · ${new Date(sub.submitted_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}`
+                : sub.submitted_at
+                  ? `Topshirildi: ${new Date(sub.submitted_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                  : 'Topshirilmagan (qoralama)'}
           </p>
 
           {/* Listening */}

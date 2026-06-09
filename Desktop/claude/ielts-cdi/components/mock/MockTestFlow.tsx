@@ -713,7 +713,7 @@ function ReadingSection({
           title="Reading test"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
         />
-        {/* Overlay button — only during active reading; click starts review */}
+        {/* Overlay button — active reading phase; click starts 2-min review */}
         {!inReview && (!isHtml || cdiDone) && (
           <button type="button" onClick={() => onReadingDoneRef.current()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
@@ -721,23 +721,18 @@ function ReadingSection({
             Writing ga o&apos;tish <ArrowRight size={15} />
           </button>
         )}
-      </div>
-
-      {/* Sticky footer — review button with timer ticking inside; click = go directly to Writing */}
-      {inReview && (
-        <div style={{
-          flexShrink: 0,
-          background: 'var(--bg-primary)',
-          borderTop: '1px solid var(--border)',
-          padding: '12px 16px 16px',
-        }}>
+        {/* Overlay button — review phase; timer ticking inside; click = go directly to Writing */}
+        {inReview && (
           <button
             type="button"
             onClick={() => onNextRef.current()}
-            className="w-full flex items-center justify-center gap-3 hover:opacity-90 active:scale-95"
+            className="flex items-center gap-2 hover:opacity-90 active:scale-95"
             style={{
+              position: 'absolute', bottom: 16, right: 16, zIndex: 10,
               padding: '16px 24px',
-              background: reviewSecs <= 15 ? 'linear-gradient(135deg, #dc2626, #b91c1c)' : 'linear-gradient(135deg, #16a34a, #059669)',
+              background: reviewSecs <= 15
+                ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                : 'linear-gradient(135deg, #16a34a, #059669)',
               color: 'white',
               border: 'none',
               borderRadius: '12px',
@@ -746,6 +741,7 @@ function ReadingSection({
               cursor: 'pointer',
               transition: 'all 0.3s ease',
               minWidth: '200px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
             }}
           >
             Writingga o&apos;tish
@@ -754,8 +750,8 @@ function ReadingSection({
             </span>
             <ArrowRight size={20} />
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
