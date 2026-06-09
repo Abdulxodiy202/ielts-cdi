@@ -310,9 +310,10 @@ export function MockTestClient({ userId }: Props) {
                                 </>
                               : <>
                                   <span className="font-bold block mb-0.5">⚠️ Diqqat!</span>
-                                  Siz test boshlanganidan beri{' '}
                                   <span className="font-bold">{minsElapsed} daqiqa</span>{' '}
-                                  o&apos;tdi. Agar 5 daqiqa ichida testga kirmasangiz, seans avtomatik ravishda bekor qilinadi.
+                                  o&apos;tdi. Agar{' '}
+                                  <span className="font-bold">{Math.max(1, 5 - minsElapsed)} daqiqa</span>{' '}
+                                  ichida testga kirmasangiz, seans avtomatik bekor qilinadi.
                                 </>
                             }
                           </div>
@@ -390,6 +391,7 @@ export function MockTestClient({ userId }: Props) {
           <li>Test vaqti kelganda &quot;Mock Test boshlash&quot; tugmasi paydo bo&apos;ladi</li>
           <li>Test: Listening (40 min) + Reading (60 min) + Writing (60 min)</li>
           <li>Narx: 20,000 UZS</li>
+          <li>Test boshlanganidan so&apos;ng kirish uchun 5 daqiqa vaqt beriladi. Ushbu muddat ichida testga kirilmasa, seans avtomatik bekor qilinadi va to&apos;lov qaytarib berilmaydi.</li>
         </ul>
       </div>
 
