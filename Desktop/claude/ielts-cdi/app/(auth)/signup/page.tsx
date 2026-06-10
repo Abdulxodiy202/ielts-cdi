@@ -43,12 +43,7 @@ export default function SignupPage() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl text-white mx-auto mb-4"
-            style={{ background: 'var(--accent)' }}
-          >
-            IC
-          </div>
+          <img src="/logo.png" alt="IELTS Pro" style={{ width: '160px', height: 'auto', margin: '0 auto 20px' }} />
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
             Create account
           </h1>

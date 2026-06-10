@@ -216,19 +216,8 @@ export function Sidebar() {
       className="flex flex-col h-full w-[260px]"
     >
       {/* Logo */}
-      <div className="p-6 border-b" style={{ borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-3">
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: 'var(--accent)' }}
-          >
-            IC
-          </div>
-          <div>
-            <div className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>IELTS CDI</div>
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Practice Platform</div>
-          </div>
-        </div>
+      <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+        <img src="/logo.png" alt="IELTS Pro" style={{ width: '140px', height: 'auto' }} />
       </div>
 
       {/* Nav */}

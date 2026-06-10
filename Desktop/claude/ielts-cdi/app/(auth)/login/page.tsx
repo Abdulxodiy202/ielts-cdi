@@ -39,17 +39,12 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl text-white mx-auto mb-4"
-            style={{ background: 'var(--accent)' }}
-          >
-            IC
-          </div>
+          <img src="/logo.png" alt="IELTS Pro" style={{ width: '160px', height: 'auto', margin: '0 auto 20px' }} />
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
             Welcome back
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Sign in to your IELTS CDI account
+            Sign in to your account
           </p>
         </div>
 
