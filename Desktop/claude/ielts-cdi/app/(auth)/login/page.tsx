@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -39,7 +40,7 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="IELTS Pro" style={{ width: '160px', height: 'auto', margin: '0 auto 20px' }} />
+          <Image src="/logo.svg" alt="IELTS Pro" width={160} height={44} style={{ height: 'auto', margin: '0 auto 20px' }} unoptimized />
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
             Welcome back
           </h1>

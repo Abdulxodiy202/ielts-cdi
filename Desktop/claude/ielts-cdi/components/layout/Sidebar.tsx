@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -217,7 +218,7 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-        <img src="/logo.png" alt="IELTS Pro" style={{ width: '140px', height: 'auto' }} />
+        <Image src="/logo.svg" alt="IELTS Pro" width={140} height={38} style={{ height: 'auto' }} unoptimized />
       </div>
 
       {/* Nav */}
