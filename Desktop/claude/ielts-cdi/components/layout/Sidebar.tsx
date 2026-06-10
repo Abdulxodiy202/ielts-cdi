@@ -452,27 +452,46 @@ export function Sidebar() {
         )}
 
         {/* Language switcher */}
-        <div className="flex items-center gap-1.5 mb-2 px-1">
-          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('common.language')}:</span>
+        <div style={{ display: 'flex', gap: '8px', padding: '8px 0' }}>
           <button
             onClick={() => setLang('en')}
-            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all font-medium"
             style={{
-              background: lang === 'en' ? 'var(--accent)' : 'transparent',
-              color: lang === 'en' ? 'white' : 'var(--text-muted)',
+              width: '48px',
+              height: '32px',
+              border: lang === 'en' ? '2px solid #6366f1' : '2px solid transparent',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              padding: 0,
+              opacity: lang === 'en' ? 1 : 0.5,
+              transition: 'all 0.2s',
             }}
           >
-            🇬🇧 EN
+            <img
+              src="https://flagcdn.com/w80/us.png"
+              alt="English"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </button>
           <button
             onClick={() => setLang('uz')}
-            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all font-medium"
             style={{
-              background: lang === 'uz' ? 'var(--accent)' : 'transparent',
-              color: lang === 'uz' ? 'white' : 'var(--text-muted)',
+              width: '48px',
+              height: '32px',
+              border: lang === 'uz' ? '2px solid #6366f1' : '2px solid transparent',
+              borderRadius: '6px',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              padding: 0,
+              opacity: lang === 'uz' ? 1 : 0.5,
+              transition: 'all 0.2s',
             }}
           >
-            🇺🇿 UZ
+            <img
+              src="https://flagcdn.com/w80/uz.png"
+              alt="Uzbek"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           </button>
         </div>
 
