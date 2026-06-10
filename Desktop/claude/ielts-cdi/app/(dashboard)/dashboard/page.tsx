@@ -22,8 +22,9 @@ async function getDashboardData(userId: string) {
     supabase.from('profiles').select('*').eq('id', userId).single(),
     supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'reading'),
     supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'reading').eq('is_premium', false),
-    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening'),
-    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening').eq('is_premium', false),
+    // Only count full listening tests (order_number < 1000), not section-training tests
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening').lt('order_number', 1000),
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening').lt('order_number', 1000).eq('is_premium', false),
   ])
 
   const results = resultsRes.data ?? []
