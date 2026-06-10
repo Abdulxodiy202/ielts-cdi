@@ -3,7 +3,6 @@
 export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
@@ -44,7 +43,22 @@ export default function SignupPage() {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <Image src="/logo.svg" alt="IELTS Pro" width={160} height={44} style={{ height: 'auto', margin: '0 auto 20px' }} unoptimized />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <svg width="40" height="44" viewBox="0 0 36 40" fill="none">
+                <path d="M18 0L0 7V20C0 30 8 38 18 40C28 38 36 30 36 20V7L18 0Z" fill="#1e40af"/>
+                <path d="M18 4L4 10V20C4 28 10 35 18 37C26 35 32 28 32 20V10L18 4Z" fill="#2563eb"/>
+                <path d="M13 20L16.5 23.5L23 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '800', fontSize: '22px', letterSpacing: '1px' }}>IELTS</span>
+                  <span style={{ color: '#60a5fa', fontWeight: '700', fontSize: '15px' }}>.PRO</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
+              </div>
+            </div>
+          </div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
             Create account
           </h1>

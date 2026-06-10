@@ -1,13 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar,
-  BarChart2, LogOut, Menu, X, Crown, Zap, CheckCircle, Camera,
+  LogOut, Menu, X, Crown, Zap, CheckCircle, Camera,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -21,7 +20,6 @@ const nav = [
   { href: '/reading',    label: 'Reading Tests',    icon: BookOpen },
   { href: '/listening',  label: 'Listening Tests',  icon: Headphones },
   { href: '/mock-test',  label: 'Mock Test',        icon: Calendar },
-  { href: '/results',    label: 'My Results',       icon: BarChart2 },
 ]
 
 interface Profile {
@@ -218,7 +216,20 @@ export function Sidebar() {
     >
       {/* Logo */}
       <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-        <Image src="/logo.svg" alt="IELTS Pro" width={140} height={38} style={{ height: 'auto' }} unoptimized />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0' }}>
+          <svg width="36" height="40" viewBox="0 0 36 40" fill="none">
+            <path d="M18 0L0 7V20C0 30 8 38 18 40C28 38 36 30 36 20V7L18 0Z" fill="#1e40af"/>
+            <path d="M18 4L4 10V20C4 28 10 35 18 37C26 35 32 28 32 20V10L18 4Z" fill="#2563eb"/>
+            <path d="M13 20L16.5 23.5L23 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+              <span style={{ color: 'white', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
+              <span style={{ color: '#60a5fa', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+            </div>
+            <div style={{ color: '#93c5fd', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
+          </div>
+        </div>
       </div>
 
       {/* Nav */}

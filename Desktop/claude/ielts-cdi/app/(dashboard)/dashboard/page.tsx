@@ -12,7 +12,7 @@ import { isActivePremium } from '@/lib/utils/premium'
 async function getDashboardData(userId: string) {
   const supabase = await createClient()
 
-  const [resultsRes, profileRes] = await Promise.all([
+  const [resultsRes, profileRes, readingAllRes, readingFreeRes, listeningAllRes, listeningFreeRes] = await Promise.all([
     supabase
       .from('test_results')
       .select('*, tests(type, title)')
@@ -20,10 +20,19 @@ async function getDashboardData(userId: string) {
       .order('completed_at', { ascending: false })
       .limit(50),
     supabase.from('profiles').select('*').eq('id', userId).single(),
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'reading'),
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'reading').eq('is_premium', false),
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening'),
+    supabase.from('tests').select('id', { count: 'exact', head: true }).eq('type', 'listening').eq('is_premium', false),
   ])
 
   const results = resultsRes.data ?? []
   const profile = profileRes.data
+
+  const readingTotal = readingAllRes.count ?? 0
+  const readingFree  = readingFreeRes.count ?? 0
+  const listeningTotal = listeningAllRes.count ?? 0
+  const listeningFree  = listeningFreeRes.count ?? 0
 
   const now = new Date()
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -42,6 +51,10 @@ async function getDashboardData(userId: string) {
       highestBand,
       testsThisWeek: thisWeek,
     },
+    readingTotal,
+    readingFree,
+    listeningTotal,
+    listeningFree,
   }
 }
 
@@ -50,7 +63,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { results, profile, stats } = await getDashboardData(user.id)
+  const { results, profile, stats, readingTotal, readingFree, listeningTotal, listeningFree } = await getDashboardData(user.id)
   const firstName = profile?.full_name?.split(' ')[0] ?? user.email?.split('@')[0] ?? 'there'
   const isPremium = isActivePremium(profile)
 
@@ -96,7 +109,7 @@ export default async function DashboardPage() {
             </div>
             <div>
               <div className="font-bold" style={{ color: 'var(--text-primary)' }}>Reading Tests</div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>9 tests · 4 free</div>
+              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{readingTotal} tests · {readingFree} free</div>
             </div>
           </div>
           <ArrowRight size={20} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
@@ -112,7 +125,7 @@ export default async function DashboardPage() {
             </div>
             <div>
               <div className="font-bold" style={{ color: 'var(--text-primary)' }}>Listening Tests</div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>9 tests · 4 free</div>
+              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{listeningTotal} tests · {listeningFree} free</div>
             </div>
           </div>
           <ArrowRight size={20} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
