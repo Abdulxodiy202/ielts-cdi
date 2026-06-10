@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toggleUserPremium } from '@/app/actions/admin'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
@@ -620,24 +620,12 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const togglePremium = async (userId: string, currentPremium: boolean) => {
     setToggling(prev => ({ ...prev, [userId]: true }))
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      )
-
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_premium: !currentPremium })
-        .eq('id', userId)
-
-      if (error) {
-        alert('Xatolik: ' + error.message)
-        return
-      }
-
+      await toggleUserPremium(userId, !currentPremium)
       setUsers(prev => prev.map(u =>
         u.id === userId ? { ...u, is_premium: !currentPremium } : u
       ))
+    } catch (e) {
+      alert('Xatolik: ' + e)
     } finally {
       setToggling(prev => ({ ...prev, [userId]: false }))
     }
