@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
@@ -617,30 +618,26 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   }
 
   const togglePremium = async (userId: string, currentPremium: boolean) => {
-    const newPremium = !currentPremium
-    console.log('[togglePremium] ▶ called — userId:', userId, '| currentPremium:', currentPremium, '→ setting:', newPremium)
     setToggling(prev => ({ ...prev, [userId]: true }))
     try {
-      const res = await fetch('/api/admin/set-premium', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, is_premium: newPremium }),
-      })
-      console.log('[togglePremium] response status:', res.status)
-      const json = await res.json()
-      console.log('[togglePremium] response body:', json)
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      )
 
-      if (res.ok) {
-        setUsers(prev => prev.map(u =>
-          u.id === userId ? { ...u, is_premium: json.is_premium } : u
-        ))
-      } else {
-        console.error('[togglePremium] ✗ API error:', json)
-        alert(`Xatolik: ${json.error ?? 'Noma\'lum xato'}`)
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_premium: !currentPremium })
+        .eq('id', userId)
+
+      if (error) {
+        alert('Xatolik: ' + error.message)
+        return
       }
-    } catch (err) {
-      console.error('[togglePremium] ✗ fetch exception:', err)
-      alert('Serverga ulanishda xatolik yuz berdi')
+
+      setUsers(prev => prev.map(u =>
+        u.id === userId ? { ...u, is_premium: !currentPremium } : u
+      ))
     } finally {
       setToggling(prev => ({ ...prev, [userId]: false }))
     }
