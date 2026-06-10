@@ -20,5 +20,7 @@ export async function GET() {
     .order('order_number')
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
-  return Response.json(data ?? [])
+  return Response.json(data ?? [], {
+    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+  })
 }
