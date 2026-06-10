@@ -59,24 +59,25 @@ export async function PATCH(
       const premiumUntil = new Date()
       premiumUntil.setMonth(premiumUntil.getMonth() + 1)
 
-      await admin
-        .from('profiles')
-        .update({
-          is_premium: true,
-          premium_until: premiumUntil.toISOString(),
-        })
-        .eq('id', pr.user_id)
-
-      // Also insert a subscription record
-      await admin.from('subscriptions').insert({
-        user_id: pr.user_id,
-        plan: 'premium',
-        price: pr.amount,
-        currency: 'UZS',
-        expires_at: premiumUntil.toISOString(),
-        payment_ref: `PR-${pr.id}`,
-        status: 'active',
-      })
+      // Update profile + insert subscription record in parallel (independent writes)
+      await Promise.all([
+        admin
+          .from('profiles')
+          .update({
+            is_premium: true,
+            premium_until: premiumUntil.toISOString(),
+          })
+          .eq('id', pr.user_id),
+        admin.from('subscriptions').insert({
+          user_id: pr.user_id,
+          plan: 'premium',
+          price: pr.amount,
+          currency: 'UZS',
+          expires_at: premiumUntil.toISOString(),
+          payment_ref: `PR-${pr.id}`,
+          status: 'active',
+        }),
+      ])
     } else if (pr.type === 'mock_booking' && pr.meta) {
       // Match by schedule_id if present (new flow), otherwise fall back to date+slot
       if (pr.meta.schedule_id) {
