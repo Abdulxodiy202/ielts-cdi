@@ -6,9 +6,15 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'IELTS Pro — Practice Tests',
-  description: 'Master IELTS with real practice tests, analytics, and expert preparation tools.',
-  keywords: 'IELTS, practice test, reading, listening, band score',
+  title: 'IELTS Pro — Band 9 Starts Here',
+  description: 'IELTS Pro — Uzbekistondagi eng yaxshi IELTS tayyorgarlik platformasi. Reading, Listening, Writing va Mock test.',
+  keywords: 'IELTS, IELTS Uzbekistan, IELTS test, IELTS preparation, band 9',
+  openGraph: {
+    title: 'IELTS Pro',
+    description: 'Uzbekistondagi eng yaxshi IELTS tayyorgarlik platformasi',
+    url: 'https://ielts-cdi.vercel.app',
+    siteName: 'IELTS Pro',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
