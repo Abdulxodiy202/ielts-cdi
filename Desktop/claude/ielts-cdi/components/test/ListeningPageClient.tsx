@@ -9,6 +9,7 @@ import {
   MessageSquare, Mic, GraduationCap, BookOpen,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Test {
   id: string
@@ -82,12 +83,13 @@ export function ListeningPageClient({
   isPremium,
   sessionMap,
 }: ListeningPageClientProps) {
+  const { t } = useLanguage()
   const [mode, setMode] = useState<Mode>('select')
   const [activePart, setActivePart] = useState<number | null>(null)
   const [showLockModal, setShowLockModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  const canAccess = (t: Test) => !t.is_premium || isPremium
+  const canAccess = (test: Test) => !test.is_premium || isPremium
 
   const handleLockedClick = () => setShowLockModal(true)
   const handleUpgradeFromLock = () => {
@@ -97,7 +99,7 @@ export function ListeningPageClient({
 
   const partTests =
     activePart !== null
-      ? sectionTests.filter((t) => parseMeta(t.description)?.part === activePart)
+      ? sectionTests.filter((test) => parseMeta(test.description)?.part === activePart)
       : []
 
   function renderTestRow(test: Test, index: number, sectionMode = false) {
@@ -158,17 +160,17 @@ export function ListeningPageClient({
               </span>
               {test.is_premium ? (
                 <span className="badge-premium flex items-center gap-1">
-                  <Crown size={10} /> Premium
+                  <Crown size={10} /> {t('test.premium')}
                 </span>
               ) : (
-                <span className="badge-free">Free</span>
+                <span className="badge-free">{t('test.free')}</span>
               )}
               {completed && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full"
                   style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                 >
-                  Completed
+                  {t('test.completed')}
                 </span>
               )}
               {inProgress && (
@@ -176,7 +178,7 @@ export function ListeningPageClient({
                   className="text-xs px-2 py-0.5 rounded-full"
                   style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--warning)' }}
                 >
-                  In Progress
+                  {t('test.inProgress')}
                 </span>
               )}
             </div>
@@ -186,15 +188,15 @@ export function ListeningPageClient({
             >
               {sectionMode ? (
                 <>
-                  <span className="flex items-center gap-1"><Clock size={12} /> 10 min</span>
-                  <span>·</span><span>1 section</span>
-                  <span>·</span><span>10 questions</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> 10 {t('test.minutes')}</span>
+                  <span>·</span><span>1 {t('test.sections')}</span>
+                  <span>·</span><span>10 {t('test.questions')}</span>
                 </>
               ) : (
                 <>
-                  <span className="flex items-center gap-1"><Clock size={12} /> 40 min</span>
-                  <span>·</span><span>4 sections</span>
-                  <span>·</span><span>40 questions</span>
+                  <span className="flex items-center gap-1"><Clock size={12} /> 40 {t('test.minutes')}</span>
+                  <span>·</span><span>4 {t('test.sections')}</span>
+                  <span>·</span><span>40 {t('test.questions')}</span>
                 </>
               )}
             </div>
@@ -214,19 +216,19 @@ export function ListeningPageClient({
                 border: '1px solid rgba(245,158,11,0.3)',
               }}
             >
-              <Lock size={14} /> Unlock
+              <Lock size={14} /> {t('test.unlock')}
             </button>
           ) : inProgress ? (
             <Link href={`/listening/${test.id}`} className="btn-primary text-sm flex items-center gap-1.5">
-              <RotateCcw size={14} /> Continue
+              <RotateCcw size={14} /> {t('test.continue')}
             </Link>
           ) : completed ? (
             <Link href={`/listening/${test.id}`} className="btn-outline text-sm">
-              Retake
+              {t('test.retake')}
             </Link>
           ) : (
             <Link href={`/listening/${test.id}`} className="btn-primary text-sm flex items-center gap-1.5">
-              <Play size={14} /> Start
+              <Play size={14} /> {t('test.start')}
             </Link>
           )}
         </div>
@@ -253,13 +255,13 @@ export function ListeningPageClient({
               <Headphones size={28} style={{ color: '#3b82f6' }} />
             </div>
             <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-              📋 Full Test
+              📋 {t('listening.fullTestTitle')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-              Complete IELTS Listening test with all 4 sections in one sitting
+              {t('listening.fullTestDesc')}
             </p>
             <div className="flex flex-wrap gap-2 mb-5">
-              {[`${fullTests.length} tests`, '40 min', '4 sections', '40 questions'].map((tag) => (
+              {[`${fullTests.length} tests`, `40 ${t('test.minutes')}`, `4 ${t('test.sections')}`, `40 ${t('test.questions')}`].map((tag) => (
                 <span
                   key={tag}
                   className="text-xs px-2 py-1 rounded-lg"
@@ -273,7 +275,7 @@ export function ListeningPageClient({
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
               style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}
             >
-              Choose Test <ChevronRight size={15} />
+              {t('test.chooseTest')} <ChevronRight size={15} />
             </div>
           </motion.button>
 
@@ -288,7 +290,7 @@ export function ListeningPageClient({
             {!isPremium && (
               <div className="absolute top-3 right-3">
                 <span className="badge-premium flex items-center gap-1 text-xs">
-                  <Crown size={10} /> Premium
+                  <Crown size={10} /> {t('test.premium')}
                 </span>
               </div>
             )}
@@ -299,13 +301,13 @@ export function ListeningPageClient({
               <Zap size={28} style={{ color: '#a855f7' }} />
             </div>
             <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-              🎯 Training with Sections
+              🎯 {t('listening.trainingTitle')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-              Practice one section at a time — focus on your weakest parts
+              {t('listening.trainingDesc')}
             </p>
             <div className="flex flex-wrap gap-2 mb-5">
-              {['4 parts', '10 tests each', '10 min', '10 questions'].map((tag) => (
+              {['4 parts', `10 tests each`, `10 ${t('test.minutes')}`, `10 ${t('test.questions')}`].map((tag) => (
                 <span
                   key={tag}
                   className="text-xs px-2 py-1 rounded-lg"
@@ -319,7 +321,7 @@ export function ListeningPageClient({
               className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
               style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
             >
-              Choose Part <ChevronRight size={15} />
+              {t('test.choosePart')} <ChevronRight size={15} />
             </div>
           </motion.button>
         </div>
@@ -333,10 +335,10 @@ export function ListeningPageClient({
             className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
             style={{ color: 'var(--text-muted)' }}
           >
-            <ChevronLeft size={16} /> Back to modes
+            <ChevronLeft size={16} /> {t('test.backToModes')}
           </button>
           <div className="grid gap-4">
-            {fullTests.map((t, i) => renderTestRow(t, i, false))}
+            {fullTests.map((test, i) => renderTestRow(test, i, false))}
           </div>
         </div>
       )}
@@ -349,16 +351,16 @@ export function ListeningPageClient({
             className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
             style={{ color: 'var(--text-muted)' }}
           >
-            <ChevronLeft size={16} /> Back to modes
+            <ChevronLeft size={16} /> {t('test.backToModes')}
           </button>
           <div className="grid gap-4 sm:grid-cols-2">
             {PART_INFO.map((info, i) => {
               const { Icon } = info
               const pts = sectionTests.filter(
-                (t) => parseMeta(t.description)?.part === info.part
+                (test) => parseMeta(test.description)?.part === info.part
               )
-              const freeCount = pts.filter((t) => !t.is_premium).length
-              const premiumCount = pts.filter((t) => t.is_premium).length
+              const freeCount = pts.filter((test) => !test.is_premium).length
+              const premiumCount = pts.filter((test) => test.is_premium).length
 
               return (
                 <motion.button
@@ -394,10 +396,10 @@ export function ListeningPageClient({
                           className="text-xs px-2 py-0.5 rounded-full"
                           style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                         >
-                          {freeCount} free
+                          {t('listening.freeBadge', { count: freeCount })}
                         </span>
                         <span className="badge-premium text-xs flex items-center gap-1">
-                          <Crown size={9} /> {premiumCount} premium
+                          <Crown size={9} /> {t('listening.premiumBadge', { count: premiumCount })}
                         </span>
                       </div>
                     </div>
@@ -418,7 +420,7 @@ export function ListeningPageClient({
             className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
             style={{ color: 'var(--text-muted)' }}
           >
-            <ChevronLeft size={16} /> Back to parts
+            <ChevronLeft size={16} /> {t('test.backToParts')}
           </button>
 
           {/* Part header banner */}
@@ -435,7 +437,7 @@ export function ListeningPageClient({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs mb-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Section Mode
+                    {t('test.sectionMode')}
                   </p>
                   <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
                     Part {activePart} — {info.name}
@@ -445,14 +447,14 @@ export function ListeningPageClient({
                   className="text-xs px-2.5 py-1 rounded-full font-medium shrink-0"
                   style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
                 >
-                  🎯 Training
+                  🎯 {t('test.training')}
                 </span>
               </div>
             )
           })()}
 
           <div className="grid gap-4">
-            {partTests.map((t, i) => renderTestRow(t, i, true))}
+            {partTests.map((test, i) => renderTestRow(test, i, true))}
           </div>
         </div>
       )}
@@ -494,10 +496,10 @@ export function ListeningPageClient({
                 <Lock size={28} style={{ color: 'var(--premium)' }} />
               </div>
               <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-                Premium Test
+                {t('test.premiumTestTitle')}
               </h2>
               <p className="text-sm mb-6 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Bu test premium foydalanuvchilar uchun. Premium oling va barcha testlarga kiring!
+                {t('test.premiumTestDesc')}
               </p>
               <div className="flex flex-col gap-3">
                 <button
@@ -509,14 +511,14 @@ export function ListeningPageClient({
                     boxShadow: '0 0 16px rgba(245,158,11,0.35)',
                   }}
                 >
-                  <Crown size={16} /> Upgrade to Premium
+                  <Crown size={16} /> {t('common.upgradeToPremium')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowLockModal(false)}
                   className="btn-outline w-full text-sm"
                 >
-                  Cancel
+                  {t('test.cancel')}
                 </button>
               </div>
             </motion.div>

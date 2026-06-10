@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ListeningPageClient } from '@/components/test/ListeningPageClient'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { isActivePremium } from '@/lib/utils/premium'
 
 export default async function ListeningListPage() {
@@ -46,14 +47,7 @@ export default async function ListeningListPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          Listening Tests
-        </h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Academic listening practice · Choose your mode below
-        </p>
-      </div>
+      <PageHeader titleKey="listening.title" subtitleKey="listening.subtitle" />
       <ListeningPageClient
         fullTests={fullTests}
         sectionTests={sectionTests}

@@ -4,9 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { StatsCards } from '@/components/dashboard/StatsCards'
 import { TestHistory } from '@/components/dashboard/TestHistory'
-import { BookOpen, Headphones, ArrowRight, Crown } from 'lucide-react'
-import Link from 'next/link'
-import { calculateBandScore } from '@/lib/utils/bandScore'
+import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
+import { QuickActions } from '@/components/dashboard/QuickActions'
 import { isActivePremium } from '@/lib/utils/premium'
 
 async function getDashboardData(userId: string) {
@@ -70,74 +69,28 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-            Hello, {firstName} 👋
-          </h1>
-          <p style={{ color: 'var(--text-muted)' }}>
-            {stats.totalTests === 0
-              ? 'Ready to start your IELTS journey?'
-              : `You've completed ${stats.totalTests} test${stats.totalTests !== 1 ? 's' : ''} so far.`}
-          </p>
-        </div>
-        {!isPremium && (
-          <Link
-            href="/premium"
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-            style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--premium)', border: '1px solid rgba(245,158,11,0.3)' }}
-          >
-            <Crown size={16} /> Upgrade to Premium
-          </Link>
-        )}
-      </div>
+      {/* Header — client component for i18n */}
+      <DashboardGreeting
+        firstName={firstName}
+        totalTests={stats.totalTests}
+        isPremium={isPremium}
+      />
 
       {/* Stats */}
       <div className="mb-8">
         <StatsCards stats={stats} />
       </div>
 
-      {/* Quick actions */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-8">
-        <Link
-          href="/reading"
-          className="card p-6 flex items-center justify-between group hover:border-[var(--accent)] transition-all"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <BookOpen size={24} style={{ color: 'var(--accent)' }} />
-            </div>
-            <div>
-              <div className="font-bold" style={{ color: 'var(--text-primary)' }}>Reading Tests</div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{readingTotal} tests · {readingFree} free</div>
-            </div>
-          </div>
-          <ArrowRight size={20} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
-        </Link>
+      {/* Quick actions — client component for i18n */}
+      <QuickActions
+        readingTotal={readingTotal}
+        readingFree={readingFree}
+        listeningTotal={listeningTotal}
+        listeningFree={listeningFree}
+      />
 
-        <Link
-          href="/listening"
-          className="card p-6 flex items-center justify-between group hover:border-[var(--accent)] transition-all"
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-              <Headphones size={24} style={{ color: 'var(--accent)' }} />
-            </div>
-            <div>
-              <div className="font-bold" style={{ color: 'var(--text-primary)' }}>Listening Tests</div>
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{listeningTotal} tests · {listeningFree} free</div>
-            </div>
-          </div>
-          <ArrowRight size={20} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-1 transition-transform" />
-        </Link>
-      </div>
-
-      {/* History */}
-      <div>
-        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Recent Tests</h2>
-        <TestHistory results={results.slice(0, 10) as any} />
-      </div>
+      {/* History with translated section title */}
+      <TestHistory results={results.slice(0, 10) as any} showTitle />
     </div>
   )
 }

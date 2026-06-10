@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -12,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function SignupPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { t } = useLanguage()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,10 +62,10 @@ export default function SignupPage() {
             </div>
           </div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Create account
+            {t('auth.createAccount')}
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Start your IELTS journey today
+            {t('auth.createSubtitle')}
           </p>
         </div>
 
@@ -80,7 +82,7 @@ export default function SignupPage() {
           <form onSubmit={handleSignup} className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                Full Name
+                {t('auth.fullName')}
               </label>
               <div className="relative">
                 <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
@@ -96,7 +98,7 @@ export default function SignupPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                Email
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
@@ -112,14 +114,14 @@ export default function SignupPage() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                Password
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                 <input
                   className="input-field pl-10 pr-10"
                   type={showPw ? 'text' : 'password'}
-                  placeholder="Min 6 characters"
+                  placeholder={t('auth.minChars')}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
@@ -136,14 +138,14 @@ export default function SignupPage() {
               </div>
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
-              {loading ? <Loader2 size={18} className="animate-spin" /> : 'Create Account'}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : t('auth.createAccountBtn')}
             </button>
           </form>
 
           <p className="text-center text-sm mt-6" style={{ color: 'var(--text-muted)' }}>
-            Already have an account?{' '}
+            {t('auth.haveAccount')}{' '}
             <Link href="/login" style={{ color: 'var(--accent)' }} className="font-medium hover:underline">
-              Sign in
+              {t('auth.signInLink')}
             </Link>
           </p>
         </div>

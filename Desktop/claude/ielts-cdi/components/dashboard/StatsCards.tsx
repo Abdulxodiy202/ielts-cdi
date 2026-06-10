@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion'
 import { BookOpen, TrendingUp, Award, Calendar } from 'lucide-react'
 import { getBandColor } from '@/lib/utils/bandScore'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Stats {
   totalTests: number
@@ -16,35 +17,13 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ stats }: StatsCardsProps) {
+  const { t } = useLanguage()
+
   const cards = [
-    {
-      label: 'Tests Taken',
-      value: stats.totalTests,
-      icon: BookOpen,
-      color: 'var(--accent)',
-      suffix: '',
-    },
-    {
-      label: 'Average Band',
-      value: stats.averageBand.toFixed(1),
-      icon: TrendingUp,
-      color: getBandColor(stats.averageBand),
-      suffix: '',
-    },
-    {
-      label: 'Highest Band',
-      value: stats.highestBand.toFixed(1),
-      icon: Award,
-      color: getBandColor(stats.highestBand),
-      suffix: '',
-    },
-    {
-      label: 'This Week',
-      value: stats.testsThisWeek,
-      icon: Calendar,
-      color: 'var(--success)',
-      suffix: '',
-    },
+    { label: t('stats.testsTaken'),  value: stats.totalTests,             icon: BookOpen,    color: 'var(--accent)'   },
+    { label: t('stats.averageBand'), value: stats.averageBand.toFixed(1), icon: TrendingUp,  color: getBandColor(stats.averageBand) },
+    { label: t('stats.highestBand'), value: stats.highestBand.toFixed(1), icon: Award,       color: getBandColor(stats.highestBand) },
+    { label: t('stats.thisWeek'),    value: stats.testsThisWeek,          icon: Calendar,    color: 'var(--success)'  },
   ]
 
   return (
@@ -66,7 +45,7 @@ export function StatsCards({ stats }: StatsCardsProps) {
             </div>
           </div>
           <div className="text-3xl font-black mb-1" style={{ color: card.color }}>
-            {card.value}{card.suffix}
+            {card.value}
           </div>
           <div className="text-sm" style={{ color: 'var(--text-muted)' }}>{card.label}</div>
         </motion.div>

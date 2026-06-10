@@ -2,10 +2,8 @@ export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { BookOpen, Clock, CheckCircle, Lock, Play, RotateCcw } from 'lucide-react'
 import { TestListClient } from '@/components/test/TestListClient'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { isActivePremium } from '@/lib/utils/premium'
 
 export default async function ReadingListPage() {
@@ -27,14 +25,7 @@ export default async function ReadingListPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          Reading Tests
-        </h1>
-        <p style={{ color: 'var(--text-muted)' }}>
-          Academic reading practice · 3 passages · 40 questions · 60 minutes
-        </p>
-      </div>
+      <PageHeader titleKey="reading.title" subtitleKey="reading.subtitle" />
 
       <TestListClient tests={tests} isPremium={isPremium} sessionMap={sessionMap} type="reading" />
     </div>

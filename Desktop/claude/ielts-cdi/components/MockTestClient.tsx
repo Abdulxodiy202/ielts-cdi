@@ -9,6 +9,7 @@ import {
   RefreshCw, PartyPopper, XCircle, Ban,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export interface MockScheduleWithBooking {
   id: string
@@ -77,23 +78,24 @@ function fmtHms(ms: number): string {
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
 function BookingBadge({ booking }: { booking: MockScheduleWithBooking['userBooking'] }) {
+  const { t } = useLanguage()
   if (!booking) return null
   if (booking.status === 'confirmed') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-      <CheckCircle size={11} /> Tasdiqlangan
+      <CheckCircle size={11} /> {t('mock.confirmed')}
     </span>
   )
   if (booking.status === 'resigned') return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
-      <XCircle size={11} /> Resigned
+      <XCircle size={11} /> {t('mock.resignedBadge')}
     </span>
   )
   return (
     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.3)' }}>
-      <Clock size={11} /> Kutilmoqda
+      <Clock size={11} /> {t('mock.pendingBadge')}
     </span>
   )
 }
@@ -102,6 +104,7 @@ function BookingBadge({ booking }: { booking: MockScheduleWithBooking['userBooki
    MockTestClient
    ══════════════════════════════════════════════════════════════════════ */
 export function MockTestClient({ userId }: Props) {
+  const { t } = useLanguage()
   const [schedules,     setSchedules]     = useState<MockScheduleWithBooking[]>([])
   const [loading,       setLoading]       = useState(true)
   const [refreshing,    setRefreshing]    = useState(false)
@@ -110,7 +113,7 @@ export function MockTestClient({ userId }: Props) {
   // 1-second tick to keep countdowns live
   const [tick, setTick] = useState(0)
   useEffect(() => {
-    const iv = setInterval(() => setTick(t => t + 1), 1000)
+    const iv = setInterval(() => setTick(tick => tick + 1), 1000)
     return () => clearInterval(iv)
   }, [])
 
@@ -174,12 +177,12 @@ export function MockTestClient({ userId }: Props) {
       {/* Refresh row */}
       <div className="flex items-center justify-between">
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          {schedules.length} ta kelgusi seans
+          {t('mock.upcomingSessions', { count: schedules.length })}
         </p>
         <button type="button" onClick={() => load(true)} disabled={refreshing}
           className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg transition-colors"
           style={{ color: 'var(--text-muted)', border: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> {t('mock.refresh')}
         </button>
       </div>
 
@@ -188,10 +191,10 @@ export function MockTestClient({ userId }: Props) {
         <div className="card p-16 text-center">
           <Calendar size={48} className="mx-auto mb-4 opacity-20" style={{ color: 'var(--text-muted)' }} />
           <p className="font-semibold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>
-            Hozircha mavjud seanslar yo&apos;q
+            {t('mock.noSessionsTitle')}
           </p>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Admin yangi seans qo&apos;shganda bu yerda ko&apos;rsatiladi.
+            {t('mock.noSessionsDesc')}
           </p>
         </div>
       )}
@@ -278,14 +281,14 @@ export function MockTestClient({ userId }: Props) {
                     <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
                       style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
                       <Ban size={13} className="shrink-0 mt-0.5" />
-                      Chetlatilgansiz. Sabab: Qoidabuzarlik (3x ogohlantirish)
+                      {t('mock.disqualified')}
                     </div>
 
                   /* ② Submitted — test successfully done */
                   ) : s.isSubmitted ? (
                     <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-                      <PartyPopper size={14} /> Test topshirildi ✅
+                      <PartyPopper size={14} /> {t('mock.submitted')}
                     </div>
 
                   /* ③ Confirmed + test is live → warning banner + Start button */
@@ -305,15 +308,12 @@ export function MockTestClient({ userId }: Props) {
                           >
                             {minsElapsed === 0
                               ? <>
-                                  <span className="font-bold block mb-0.5">Test boshlandi!</span>
-                                  5 daqiqa ichida kirmasangiz, seans bekor qilinadi.
+                                  <span className="font-bold block mb-0.5">{t('mock.testStarted')}</span>
+                                  {t('mock.fiveMinWarning')}
                                 </>
                               : <>
-                                  <span className="font-bold block mb-0.5">⚠️ Diqqat!</span>
-                                  <span className="font-bold">{minsElapsed} daqiqa</span>{' '}
-                                  o&apos;tdi. Agar{' '}
-                                  <span className="font-bold">{Math.max(1, 5 - minsElapsed)} daqiqa</span>{' '}
-                                  ichida testga kirmasangiz, seans avtomatik bekor qilinadi.
+                                  <span className="font-bold block mb-0.5">{t('mock.minutesWarning')}</span>
+                                  {t('mock.minutesElapsed', { n: minsElapsed, remaining: Math.max(1, 5 - minsElapsed) })}
                                 </>
                             }
                           </div>
@@ -322,7 +322,7 @@ export function MockTestClient({ userId }: Props) {
                       <Link href={`/mock-test/${s.id}`}
                         className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                         style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
-                        <ArrowRight size={14} /> Mock Test boshlash
+                        <ArrowRight size={14} /> {t('mock.startMockTest')}
                       </Link>
                     </>
 
@@ -330,7 +330,7 @@ export function MockTestClient({ userId }: Props) {
                   ) : confirmed && msLeft > 0 ? (
                     <div className="flex flex-col items-end gap-0.5">
                       <div className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        Testgacha:
+                        {t('mock.timeUntilTest')}
                       </div>
                       <div className="font-mono font-bold text-lg tabular-nums"
                         style={{ color: 'var(--accent)' }}>
@@ -342,28 +342,28 @@ export function MockTestClient({ userId }: Props) {
                   ) : confirmed && tooLateToBook && !live ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
-                      Candidate belgilangan vaqtdan 5 daqiqadan ko&apos;proq kechikkan sababli ushbu seans avtomatik ravishda bekor qilindi.
+                      {t('mock.autoResigned')}
                     </p>
 
                   /* ⑥ Pending (awaiting admin approval) */
                   ) : pending ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
                       style={{ background: 'rgba(245,158,11,0.08)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <AlertCircle size={12} /> Admin tasdiqlashini kuting
+                      <AlertCircle size={12} /> {t('mock.waitingAdmin')}
                     </div>
 
                   /* ⑦ Resigned — did not show up; BookingBadge already shows "Resigned" */
                   ) : resigned ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
-                      Candidate belgilangan vaqtdan 5 daqiqadan ko&apos;proq kechikkan sababli ushbu seans avtomatik ravishda bekor qilindi.
+                      {t('mock.autoResigned')}
                     </p>
 
                   /* ⑧ No booking + too late → show message */
                   ) : !s.userBooking && tooLateToBook ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-center"
                       style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
-                      Vaqt o&apos;tib ketdi. Keyingi seansni tanlang
+                      {t('mock.timePassed')}
                     </div>
 
                   /* ⑨ No booking → Book button */
@@ -371,7 +371,7 @@ export function MockTestClient({ userId }: Props) {
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                       style={{ background: 'var(--accent)' }}>
-                      <CreditCard size={14} /> Bron qilish — 20,000 UZS
+                      <CreditCard size={14} /> {t('mock.bookSession')}
                     </button>
 
                   ) : null}
@@ -385,13 +385,13 @@ export function MockTestClient({ userId }: Props) {
       {/* Info box */}
       <div className="rounded-2xl p-4 text-sm"
         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-        <p className="font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>ℹ️ Mock Test haqida</p>
+        <p className="font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>ℹ️ {t('mock.infoTitle')}</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li>Bron qilgach, 24 soat ichida admin tasdiqlaydi</li>
-          <li>Test vaqti kelganda &quot;Mock Test boshlash&quot; tugmasi paydo bo&apos;ladi</li>
-          <li>Test: Listening (40 min) + Reading (60 min) + Writing (60 min)</li>
-          <li>Narx: 20,000 UZS</li>
-          <li>Test boshlanganidan so&apos;ng kirish uchun 5 daqiqa vaqt beriladi. Ushbu muddat ichida testga kirilmasa, seans avtomatik bekor qilinadi va to&apos;lov qaytarib berilmaydi.</li>
+          <li>{t('mock.infoItem1')}</li>
+          <li>{t('mock.infoItem2')}</li>
+          <li>{t('mock.infoItem3')}</li>
+          <li>{t('mock.infoItem4')}</li>
+          <li>{t('mock.infoItem5')}</li>
         </ul>
       </div>
 

@@ -10,17 +10,11 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import { ToastContainer, type ToastData } from '@/components/ui/Toast'
 import { isActivePremium } from '@/lib/utils/premium'
-
-const nav = [
-  { href: '/dashboard',  label: 'Dashboard',       icon: LayoutDashboard },
-  { href: '/reading',    label: 'Reading Tests',    icon: BookOpen },
-  { href: '/listening',  label: 'Listening Tests',  icon: Headphones },
-  { href: '/mock-test',  label: 'Mock Test',        icon: Calendar },
-]
 
 interface Profile {
   full_name: string | null
@@ -53,6 +47,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
+  const { t, lang, setLang } = useLanguage()
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [upgradeOpen,     setUpgradeOpen]      = useState(false)
   const [profileOpen,     setProfileOpen]      = useState(false)
@@ -66,6 +61,13 @@ export function Sidebar() {
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const profileRef    = useRef<Profile | null>(null)
   useEffect(() => { profileRef.current = profile }, [profile])
+
+  const nav = [
+    { href: '/dashboard',  label: t('nav.dashboard'),  icon: LayoutDashboard },
+    { href: '/reading',    label: t('nav.reading'),     icon: BookOpen },
+    { href: '/listening',  label: t('nav.listening'),   icon: Headphones },
+    { href: '/mock-test',  label: t('nav.mockTest'),    icon: Calendar },
+  ]
 
   /* ── Initial profile fetch ─────────────────────────────────────────── */
   useEffect(() => {
@@ -105,7 +107,7 @@ export function Sidebar() {
   }, [])
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id))
+    setToasts(prev => prev.filter(toast => toast.id !== id))
   }, [])
 
   /* ── Realtime subscriptions ────────────────────────────────────────── */
@@ -256,22 +258,22 @@ export function Sidebar() {
 
       {/* Theme switcher */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-        <div className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>Theme</div>
+        <div className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>{t('common.theme')}</div>
         <div className="flex gap-2">
           {([
-            { id: 'dark',  color: '#6366f1', label: 'Dark' },
-            { id: 'light', color: '#94a3b8', label: 'Light' },
-            { id: 'cyber', color: '#10b981', label: 'Cyber' },
-          ] as const).map(t => (
+            { id: 'dark'  as const, color: '#6366f1', label: t('common.dark')  },
+            { id: 'light' as const, color: '#94a3b8', label: t('common.light') },
+            { id: 'cyber' as const, color: '#10b981', label: t('common.cyber') },
+          ]).map(thm => (
             <button
-              key={t.id}
-              onClick={() => setTheme(t.id)}
-              title={t.label}
+              key={thm.id}
+              onClick={() => setTheme(thm.id)}
+              title={thm.label}
               className="w-7 h-7 rounded-full border-2 transition-all"
               style={{
-                background: t.color,
-                borderColor: theme === t.id ? 'white' : 'transparent',
-                transform: theme === t.id ? 'scale(1.15)' : 'scale(1)',
+                background: thm.color,
+                borderColor: theme === thm.id ? 'white' : 'transparent',
+                transform: theme === thm.id ? 'scale(1.15)' : 'scale(1)',
               }}
             />
           ))}
@@ -303,11 +305,11 @@ export function Sidebar() {
                   {isPremium ? (
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
                       style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-                      <CheckCircle size={10} /> Premium
+                      <CheckCircle size={10} /> {t('nav.premiumBadge')}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <Zap size={10} /> Free Plan
+                      <Zap size={10} /> {t('nav.freePlan')}
                     </span>
                   )}
                 </div>
@@ -351,7 +353,7 @@ export function Sidebar() {
                           onClick={() => fileInputRef.current?.click()}
                           disabled={avatarUploading}
                           className="relative group"
-                          title="Rasm o'zgartirish"
+                          title={lang === 'uz' ? "Rasm o'zgartirish" : 'Change photo'}
                         >
                           <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold text-white"
                             style={{ background: 'var(--accent)' }}>
@@ -371,7 +373,7 @@ export function Sidebar() {
                       {/* Name field */}
                       <div>
                         <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                          Ism
+                          {t('common.name')}
                         </label>
                         <div className="flex gap-2">
                           <input
@@ -379,7 +381,7 @@ export function Sidebar() {
                             value={nameInput}
                             onChange={e => setNameInput(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-                            placeholder="Ismingiz"
+                            placeholder={lang === 'uz' ? 'Ismingiz' : 'Your name'}
                             className="input-field text-sm flex-1 py-2"
                           />
                           <button
@@ -388,7 +390,7 @@ export function Sidebar() {
                             disabled={nameSaving || !nameInput.trim()}
                             className="btn-primary text-xs px-3 py-2 shrink-0 disabled:opacity-50"
                           >
-                            {nameSaving ? '...' : 'Saqlash'}
+                            {nameSaving ? '...' : t('common.save')}
                           </button>
                         </div>
                       </div>
@@ -402,21 +404,21 @@ export function Sidebar() {
                         {isPremium ? (
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5 font-semibold text-sm" style={{ color: 'var(--warning)' }}>
-                              <Crown size={13} /> Premium obuna aktiv
+                              <Crown size={13} /> {t('common.premiumActive')}
                             </div>
                             <div className="flex justify-between pt-0.5" style={{ color: 'var(--text-muted)' }}>
-                              <span>Boshlangan:</span>
+                              <span>{t('common.premiumSince')}</span>
                               <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : '—'}</span>
                             </div>
                             <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                              <span>Tugaydi:</span>
+                              <span>{t('common.premiumUntil')}</span>
                               <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile?.premium_until ?? null)}</span>
                             </div>
                           </div>
                         ) : (
                           <div className="space-y-2">
                             <div className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
-                              <Zap size={12} /> Oddiy foydalanuvchi
+                              <Zap size={12} /> {t('common.normalUser')}
                             </div>
                             <button
                               type="button"
@@ -424,7 +426,7 @@ export function Sidebar() {
                               className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 transition-opacity"
                               style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
                             >
-                              <Crown size={12} /> Upgrade to Premium
+                              <Crown size={12} /> {t('common.upgradeToPremium')}
                             </button>
                           </div>
                         )}
@@ -445,16 +447,41 @@ export function Sidebar() {
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mb-3 transition-all hover:opacity-90 active:scale-95"
             style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}
           >
-            <Crown size={15} /> Upgrade to Premium
+            <Crown size={15} /> {t('common.upgradeToPremium')}
           </button>
         )}
+
+        {/* Language switcher */}
+        <div className="flex items-center gap-1.5 mb-2 px-1">
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('common.language')}:</span>
+          <button
+            onClick={() => setLang('en')}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all font-medium"
+            style={{
+              background: lang === 'en' ? 'var(--accent)' : 'transparent',
+              color: lang === 'en' ? 'white' : 'var(--text-muted)',
+            }}
+          >
+            🇬🇧 EN
+          </button>
+          <button
+            onClick={() => setLang('uz')}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all font-medium"
+            style={{
+              background: lang === 'uz' ? 'var(--accent)' : 'transparent',
+              color: lang === 'uz' ? 'white' : 'var(--text-muted)',
+            }}
+          >
+            🇺🇿 UZ
+          </button>
+        </div>
 
         <button
           onClick={signOut}
           className="flex items-center gap-2 w-full text-sm px-3 py-2 rounded-lg transition-all"
           style={{ color: 'var(--error)' }}
         >
-          <LogOut size={16} /> Sign Out
+          <LogOut size={16} /> {t('nav.signOut')}
         </button>
       </div>
     </div>

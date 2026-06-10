@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
@@ -12,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function LoginPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { t } = useLanguage()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -56,10 +58,10 @@ export default function LoginPage() {
             </div>
           </div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Welcome back
+            {t('auth.welcomeBack')}
           </h1>
           <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
-            Sign in to your account
+            {t('auth.signInSubtitle')}
           </p>
         </div>
 
@@ -76,7 +78,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="text-sm font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                Email
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
@@ -93,7 +95,7 @@ export default function LoginPage() {
 
             <div>
               <label className="text-sm font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                Password
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
@@ -117,14 +119,14 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" disabled={loading} className="btn-primary w-full mt-2">
-              {loading ? <Loader2 size={18} className="animate-spin" /> : 'Sign In'}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : t('auth.signIn')}
             </button>
           </form>
 
           <p className="text-center text-sm mt-6" style={{ color: 'var(--text-muted)' }}>
-            Don&apos;t have an account?{' '}
+            {t('auth.noAccount')}{' '}
             <Link href="/signup" style={{ color: 'var(--accent)' }} className="font-medium hover:underline">
-              Sign up
+              {t('auth.signUp')}
             </Link>
           </p>
         </div>

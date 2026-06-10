@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { BookOpen, Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Test {
   id: string
@@ -22,10 +23,11 @@ interface TestListClientProps {
 }
 
 export function TestListClient({ tests, isPremium, sessionMap, type }: TestListClientProps) {
+  const { t } = useLanguage()
   const [showLockModal, setShowLockModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
 
-  const canAccess = (t: Test) => !t.is_premium || isPremium
+  const canAccess = (test: Test) => !test.is_premium || isPremium
 
   const handleLockedClick = () => {
     setShowLockModal(true)
@@ -90,17 +92,17 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                     </span>
                     {test.is_premium ? (
                       <span className="badge-premium flex items-center gap-1">
-                        <Crown size={10} /> Premium
+                        <Crown size={10} /> {t('test.premium')}
                       </span>
                     ) : (
-                      <span className="badge-free">Free</span>
+                      <span className="badge-free">{t('test.free')}</span>
                     )}
                     {completed && (
                       <span
                         className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                       >
-                        Completed
+                        {t('test.completed')}
                       </span>
                     )}
                     {inProgress && (
@@ -108,22 +110,22 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                         className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--warning)' }}
                       >
-                        In Progress
+                        {t('test.inProgress')}
                       </span>
                     )}
                   </div>
                   <div className="text-sm flex items-center gap-3 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                     {type === 'reading' ? (
                       <>
-                        <span className="flex items-center gap-1"><Clock size={12} /> 60 min</span>
-                        <span>·</span><span>3 passages</span>
-                        <span>·</span><span>40 questions</span>
+                        <span className="flex items-center gap-1"><Clock size={12} /> 60 {t('test.minutes')}</span>
+                        <span>·</span><span>3 {t('test.passages')}</span>
+                        <span>·</span><span>40 {t('test.questions')}</span>
                       </>
                     ) : (
                       <>
-                        <span className="flex items-center gap-1"><Clock size={12} /> 40 min</span>
-                        <span>·</span><span>4 sections</span>
-                        <span>·</span><span>40 questions</span>
+                        <span className="flex items-center gap-1"><Clock size={12} /> 40 {t('test.minutes')}</span>
+                        <span>·</span><span>4 {t('test.sections')}</span>
+                        <span>·</span><span>40 {t('test.questions')}</span>
                       </>
                     )}
                   </div>
@@ -142,19 +144,19 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                       border: '1px solid rgba(245,158,11,0.3)',
                     }}
                   >
-                    <Lock size={14} /> Unlock
+                    <Lock size={14} /> {t('test.unlock')}
                   </button>
                 ) : inProgress ? (
                   <Link href={`/${type}/${test.id}`} className="btn-primary text-sm">
-                    <RotateCcw size={14} /> Continue
+                    <RotateCcw size={14} /> {t('test.continue')}
                   </Link>
                 ) : completed ? (
                   <Link href={`/${type}/${test.id}`} className="btn-outline text-sm">
-                    Retake
+                    {t('test.retake')}
                   </Link>
                 ) : (
                   <Link href={`/${type}/${test.id}`} className="btn-primary text-sm">
-                    <Play size={14} /> Start
+                    <Play size={14} /> {t('test.start')}
                   </Link>
                 )}
               </div>
@@ -204,10 +206,10 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
               </div>
 
               <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-                Premium Test
+                {t('test.premiumTestTitle')}
               </h2>
               <p className="text-sm mb-6 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Bu test premium foydalanuvchilar uchun. Premium oling va barcha testlarga kiring!
+                {t('test.premiumTestDesc')}
               </p>
 
               <div className="flex flex-col gap-3">
@@ -220,14 +222,14 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                     boxShadow: '0 0 16px rgba(245,158,11,0.35)',
                   }}
                 >
-                  <Crown size={16} /> Upgrade to Premium
+                  <Crown size={16} /> {t('common.upgradeToPremium')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowLockModal(false)}
                   className="btn-outline w-full text-sm"
                 >
-                  Cancel
+                  {t('test.cancel')}
                 </button>
               </div>
             </motion.div>
