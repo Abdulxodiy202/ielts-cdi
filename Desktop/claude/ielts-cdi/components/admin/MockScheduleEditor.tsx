@@ -370,7 +370,13 @@ function AnswersTable({ answers: rawAnswers, label, color }: {
       ? (() => { try { return JSON.parse(rawAnswers) } catch { return {} } })()
       : (rawAnswers ?? {})
 
-  const entries = Object.entries(answers).sort(([a], [b]) => Number(a) - Number(b))
+  // Sort: numeric keys ('1','2',...,'40') numerically; 'q1','q2',... by stripping 'q'
+  const entries = Object.entries(answers).sort(([a], [b]) => {
+    const na = Number(a.replace(/^q/, ''))
+    const nb = Number(b.replace(/^q/, ''))
+    return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb
+  })
+
   if (entries.length === 0) {
     return (
       <div>
@@ -382,14 +388,23 @@ function AnswersTable({ answers: rawAnswers, label, color }: {
       </div>
     )
   }
-  const answeredCount = entries.filter(([, val]) => Boolean(val && val.trim())).length
+
+  // Count non-empty answers (exclude 'No Answer' / 'Not Answered' placeholders from HTML)
+  const answeredCount = entries.filter(([, val]) => {
+    const s = (val || '').trim()
+    return s !== '' && s !== 'No Answer' && s !== 'Not Answered'
+  }).length
+
+  // IELTS sections always have 40 questions total
+  const SECTION_TOTAL = 40
+
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-bold" style={{ color }}>{label}</p>
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
           style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
-          {answeredCount} / {entries.length} savolga javob berildi
+          {answeredCount} / {SECTION_TOTAL} savolga javob berildi
         </span>
       </div>
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>

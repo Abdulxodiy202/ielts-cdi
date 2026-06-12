@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import {
   BookOpen, Headphones, PenTool, ArrowLeft, CheckCircle,
-  Loader2, Clock, AlertTriangle, Image as ImageIcon, Send,
+  Loader2, Clock, AlertTriangle, Image as ImageIcon, Send, X,
 } from 'lucide-react'
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -109,9 +109,11 @@ function wordCount(text: string) {
 function CdiSection({
   fileUrl,
   onDone,
+  onCDISubmit,
 }: {
   fileUrl: string | null
   onDone?: () => void
+  onCDISubmit?: (answers: Record<string, string>) => void
 }) {
   const ext = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase()
   const isHtml = ext === 'html' || ext === 'htm'
@@ -119,15 +121,31 @@ function CdiSection({
   const htmlBlobUrl = useHtmlBlobUrl(isHtml ? fileUrl : null)
   const [showDone, setShowDone] = useState(false)
 
-  // Listen for CDI_CHECK_ANSWERS from iframe
+  // Listen for CDI_CHECK_ANSWERS and CDI_SUBMIT from iframe
   useEffect(() => {
     if (!isHtml) return
     const handler = (e: MessageEvent) => {
-      if (e.data?.type === 'CDI_CHECK_ANSWERS') setShowDone(true)
+      if (e.data?.type === 'CDI_CHECK_ANSWERS') {
+        setShowDone(true)
+      }
+      if (e.data?.type === 'CDI_SUBMIT' && onCDISubmit) {
+        // Convert resultsData array → Record<string, string>
+        // e.g. [{ question: 'q1', userAnswer: 'advertising' }, ...]
+        //   or [{ question: 1,    userAnswer: 'NOT GIVEN' }, ...]
+        const record: Record<string, string> = {}
+        for (const item of (e.data.answers ?? [])) {
+          const key = String(item.question ?? '')
+          const val = String(item.userAnswer ?? '').trim()
+          // 'No Answer' / 'Not Answered' → treat as empty
+          record[key] = (val === 'No Answer' || val === 'Not Answered') ? '' : val
+        }
+        onCDISubmit(record)
+        setShowDone(true)
+      }
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [isHtml])
+  }, [isHtml, onCDISubmit])
 
   if (!fileUrl) {
     return (
@@ -215,6 +233,7 @@ function WritingSection({
   const [task2, setTask2] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   // Timer starts when this component mounts (tab first opened)
   const { secsLeft, expired, timeTaken } = useWritingTimer(true)
@@ -296,16 +315,23 @@ function WritingSection({
           <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 1</h3>
         </div>
 
-        {/* Task 1 image */}
+        {/* Task 1 image — click to open fullscreen */}
         {schedule.writing_task1_image_url && (
-          <div className="rounded-xl overflow-hidden">
+          <div className="group relative rounded-xl overflow-hidden" style={{ cursor: 'zoom-in' }}
+            onClick={() => setLightboxUrl(schedule.writing_task1_image_url)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={schedule.writing_task1_image_url}
               alt="Task 1 chart/graph"
-              className="w-full max-h-72 object-contain"
+              className="w-full max-h-72 object-contain transition-transform duration-200 group-hover:scale-[1.02]"
               style={{ background: 'var(--bg-secondary)' }}
             />
+            <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <span className="text-xs px-2 py-1 rounded-lg font-medium"
+                style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>
+                Kattalashtirish uchun bosing
+              </span>
+            </div>
           </div>
         )}
         {!schedule.writing_task1_image_url && (
@@ -387,6 +413,30 @@ function WritingSection({
           ? <><Loader2 size={18} className="animate-spin" /> Topshirilmoqda…</>
           : <><Send size={18} /> Topshirish</>}
       </button>
+
+      {/* Fullscreen lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full"
+            style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)' }}
+            onClick={e => { e.stopPropagation(); setLightboxUrl(null) }}
+          >
+            <X size={20} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightboxUrl}
+            alt="Task rasm (katta)"
+            style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain', borderRadius: 12 }}
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -398,6 +448,33 @@ export function MockTakeClient({ schedule }: { schedule: MockSchedule }) {
   const [activeTab, setActiveTab] = useState<Tab>('reading')
   const [writingStarted, setWritingStarted] = useState(false)
   const [submitDone, setSubmitDone] = useState(false)
+
+  // Track listening/reading answers captured from CDI_SUBMIT postMessages
+  const listeningAnswersRef = useRef<Record<string, string>>({})
+  const readingAnswersRef   = useRef<Record<string, string>>({})
+
+  // Save listening/reading answers to the DB (upsert draft)
+  const saveHtmlAnswers = useCallback(async (
+    testType: 'listening' | 'reading',
+    answers: Record<string, string>,
+  ) => {
+    if (testType === 'listening') listeningAnswersRef.current = answers
+    if (testType === 'reading')   readingAnswersRef.current   = answers
+    try {
+      await fetch('/api/mock/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schedule_id: schedule.id,
+          listening_answers: listeningAnswersRef.current,
+          reading_answers:   readingAnswersRef.current,
+          status: 'draft',
+        }),
+      })
+    } catch {
+      // Non-critical — best-effort save
+    }
+  }, [schedule.id])
 
   const tabs = [
     { id: 'reading'   as Tab, label: 'Reading',   Icon: BookOpen,    available: !!schedule.reading_file_url },
@@ -470,12 +547,14 @@ export function MockTakeClient({ schedule }: { schedule: MockSchedule }) {
           <CdiSection
             fileUrl={schedule.reading_file_url}
             onDone={() => setActiveTab('listening')}
+            onCDISubmit={answers => saveHtmlAnswers('reading', answers)}
           />
         )}
         {activeTab === 'listening' && (
           <CdiSection
             fileUrl={schedule.listening_file_url}
             onDone={() => { setActiveTab('writing'); setWritingStarted(true) }}
+            onCDISubmit={answers => saveHtmlAnswers('listening', answers)}
           />
         )}
         {activeTab === 'writing' && (writingStarted || submitDone) && (
