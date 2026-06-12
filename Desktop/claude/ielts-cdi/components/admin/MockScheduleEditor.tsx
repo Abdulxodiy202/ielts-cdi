@@ -357,12 +357,231 @@ function FileUploadField({ label, icon, accept, currentUrl, uploading, onFile, o
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   IELTS answer keys (admin-only) — used to compute scores and show ✓/✗
+   Keys match what CDI_SUBMIT sends:
+     Listening → numeric strings '1'-'40', multi-select as '21-23'
+     Reading   → numeric strings '1'-'40'
+   ══════════════════════════════════════════════════════════════════════ */
+const LISTENING_CORRECT: Record<string, string | string[]> = {
+  '1':  ['advertising'],
+  '2':  ['regional manager'],
+  '3':  ['station'],
+  '4':  ['10,000', '10000'],
+  '5':  ['security'],
+  '6':  ['reception'],
+  '7':  ['kitchen'],
+  '8':  ['basement'],
+  '9':  ['gym'],
+  '10': ['furniture'],
+  '11': 'C',
+  '12': 'C',
+  '13': 'A',
+  '14': 'B',
+  '15': ['first year'],
+  '16': ['balance', 'right balance'],
+  '17': ['international', 'foreign', 'international students', 'foreign students'],
+  '18': ['relaxation'],
+  '19': ['motivation'],
+  '20': ['research', 'advanced'],
+  // Multi-select group: q21=B, q22=D, q23=F (stored as one '21-23' key)
+  '21-23': ['B', 'D', 'F'],
+  '24': 'A',
+  '25': 'B',
+  '26': 'C',
+  '27': 'A',
+  '28': ['march'],
+  '29': ['secretary'],
+  '30': ['computer office'],
+  '31': ['law', 'law offices'],
+  '32': ['cigar'],
+  '33': ['footprints'],
+  '34': ['light'],
+  '35': ['grass'],
+  '36': ['nature'],
+  '37': ['air-conditioning'],
+  '38': ['lungs'],
+  '39': ['clubroom'],
+  '40': ['city'],
+}
+
+const READING_CORRECT: Record<string, string | string[]> = {
+  '1':  'NOT GIVEN',
+  '2':  'FALSE',
+  '3':  'NOT GIVEN',
+  '4':  'TRUE',
+  '5':  'evergreen',
+  '6':  'natural pesticides',
+  '7':  'powder',
+  '8':  'overnight',
+  '9':  'neem cake',
+  '10': 'doubles',
+  '11': 'nitrogen',
+  '12': ['In 2000', '2000'],
+  '13': 'Neem seeds',
+  '14': 'hunting',
+  '15': 'overkill model',
+  '16': ['disease ', 'hyper disease'],
+  '17': 'empirical evidence',
+  '18': 'climatic instability',
+  '19': 'geographical ranges',
+  '20': 'Younger Dryas event',
+  '21': 'A',
+  '22': 'B',
+  '23': 'A',
+  '24': 'B',
+  '25': 'B',
+  '26': 'C',
+  '27': 'B',
+  '28': 'F',
+  '29': 'A',
+  '30': 'C',
+  '31': 'L',
+  '32': 'D',
+  '33': ['personnel development'],
+  '34': ['the first luxury', 'first luxury', 'luxury'],
+  '35': ['a model', 'model'],
+  '36': ['strategic solution'],
+  '37': ['6 stages', 'six stages', 'six', '6'],
+  '38': ['90 hours', 'ninety hours'],
+  '39': ['three years', '3 years'],
+  '40': 'C',
+}
+
+/** Check if a single user answer matches one of the acceptable correct values */
+function isAnswerCorrect(userAns: string, correct: string | string[]): boolean {
+  const u = (userAns ?? '').trim().toLowerCase()
+  if (!u || u === 'not answered' || u === 'no answer') return false
+  const arr = Array.isArray(correct) ? correct : [correct]
+  return arr.some(c => u === String(c).trim().toLowerCase())
+}
+
+/** Convert a raw score (0-40) to IELTS Listening band */
+function listeningBand(score: number): string {
+  if (score >= 39) return '9.0'
+  if (score >= 37) return '8.5'
+  if (score >= 35) return '8.0'
+  if (score >= 32) return '7.5'
+  if (score >= 30) return '7.0'
+  if (score >= 26) return '6.5'
+  if (score >= 23) return '6.0'
+  if (score >= 18) return '5.5'
+  if (score >= 16) return '5.0'
+  if (score >= 13) return '4.5'
+  if (score >= 10) return '4.0'
+  if (score >= 8)  return '3.5'
+  if (score >= 6)  return '3.0'
+  if (score >= 4)  return '2.5'
+  return '2.0'
+}
+
+/** Convert a raw score (0-40) to IELTS Academic Reading band */
+function readingBand(score: number): string {
+  if (score >= 39) return '9.0'
+  if (score >= 37) return '8.5'
+  if (score >= 35) return '8.0'
+  if (score >= 33) return '7.5'
+  if (score >= 30) return '7.0'
+  if (score >= 27) return '6.5'
+  if (score >= 23) return '6.0'
+  if (score >= 19) return '5.5'
+  if (score >= 15) return '5.0'
+  if (score >= 13) return '4.5'
+  if (score >= 10) return '4.0'
+  if (score >= 8)  return '3.5'
+  if (score >= 6)  return '3.0'
+  if (score >= 4)  return '2.5'
+  return '2.0'
+}
+
+/**
+ * Expand a raw answers map into flat rows for display + scoring.
+ * The '21-23' listening group is expanded into three individual rows.
+ */
+type AnswerRow = {
+  key: string         // display key (e.g. '1', '21-23', '21', '22', '23')
+  userAns: string     // what the user answered
+  correct: string | string[] | null  // null → no key in correctMap
+  isCorrect: boolean | null          // null → not scored
+}
+
+function buildRows(
+  answers: Record<string, string>,
+  correctMap: Record<string, string | string[]> | null,
+  section: 'listening' | 'reading',
+): AnswerRow[] {
+  if (!correctMap) {
+    // No scoring: just sort user answers
+    return Object.entries(answers)
+      .sort(([a], [b]) => {
+        const na = Number(a.replace(/^[^\d]*/, ''))
+        const nb = Number(b.replace(/^[^\d]*/, ''))
+        return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb
+      })
+      .map(([k, v]) => ({ key: k, userAns: v, correct: null, isCorrect: null }))
+  }
+
+  const rows: AnswerRow[] = []
+
+  if (section === 'listening') {
+    // Iterate all 40 questions in order; expand '21-23' into individual rows
+    for (let i = 1; i <= 40; i++) {
+      if (i >= 21 && i <= 23) {
+        if (i === 21) {
+          // Expand the '21-23' group into 3 rows
+          const groupCorrect = LISTENING_CORRECT['21-23'] as string[]
+          const groupUserRaw = answers['21-23'] || ''
+          const userParts = groupUserRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+          for (let g = 0; g < 3; g++) {
+            const qNum = String(21 + g)
+            const expLetter = (groupCorrect[g] ?? '').toLowerCase()
+            const got = userParts.includes(expLetter)
+            rows.push({
+              key: qNum,
+              userAns: groupUserRaw || '—',
+              correct: groupCorrect[g] ?? null,
+              isCorrect: got,
+            })
+          }
+        }
+        // i === 22 and 23 already handled above
+        continue
+      }
+      const k = String(i)
+      const c = correctMap[k] ?? null
+      const u = answers[k] ?? ''
+      rows.push({
+        key: k,
+        userAns: u,
+        correct: c,
+        isCorrect: c !== null ? isAnswerCorrect(u, c) : null,
+      })
+    }
+  } else {
+    // Reading: keys '1'-'40'
+    for (let i = 1; i <= 40; i++) {
+      const k = String(i)
+      const c = correctMap[k] ?? null
+      const u = answers[k] ?? ''
+      rows.push({
+        key: k,
+        userAns: u,
+        correct: c,
+        isCorrect: c !== null ? isAnswerCorrect(u, c) : null,
+      })
+    }
+  }
+
+  return rows
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    SubmissionCard — one candidate's full submission details
    ══════════════════════════════════════════════════════════════════════ */
-function AnswersTable({ answers: rawAnswers, label, color }: {
+function AnswersTable({ answers: rawAnswers, label, color, section }: {
   answers: Record<string, string> | string | null | undefined
   label: string
   color: string
+  section?: 'listening' | 'reading'
 }) {
   // Defensive: JSONB might arrive as a JSON string in some edge cases
   const answers: Record<string, string> =
@@ -370,14 +589,7 @@ function AnswersTable({ answers: rawAnswers, label, color }: {
       ? (() => { try { return JSON.parse(rawAnswers) } catch { return {} } })()
       : (rawAnswers ?? {})
 
-  // Sort: numeric keys ('1','2',...,'40') numerically; 'q1','q2',... by stripping 'q'
-  const entries = Object.entries(answers).sort(([a], [b]) => {
-    const na = Number(a.replace(/^q/, ''))
-    const nb = Number(b.replace(/^q/, ''))
-    return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb
-  })
-
-  if (entries.length === 0) {
+  if (Object.keys(answers).length === 0) {
     return (
       <div>
         <p className="text-xs font-bold mb-2" style={{ color }}>{label}</p>
@@ -390,33 +602,69 @@ function AnswersTable({ answers: rawAnswers, label, color }: {
   }
 
   // Count non-empty answers (exclude 'No Answer' / 'Not Answered' placeholders from HTML)
-  const answeredCount = entries.filter(([, val]) => {
+  const answeredCount = Object.values(answers).filter(val => {
     const s = (val || '').trim()
     return s !== '' && s !== 'No Answer' && s !== 'Not Answered'
   }).length
-
-  // IELTS sections always have 40 questions total
   const SECTION_TOTAL = 40
+
+  // Build rows (with optional scoring)
+  const correctMap = section === 'listening' ? LISTENING_CORRECT
+                   : section === 'reading'   ? READING_CORRECT
+                   : null
+  const rows = buildRows(answers, correctMap, section ?? 'reading')
+  const scoredRows = correctMap ? rows.filter(r => r.isCorrect !== null) : []
+  const correctCount = scoredRows.filter(r => r.isCorrect).length
+  const bandFn = section === 'listening' ? listeningBand : readingBand
+  const bandStr = correctMap ? bandFn(correctCount) : null
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-2">
+      {/* Header row: label + answered count */}
+      <div className="flex items-center justify-between mb-1">
         <p className="text-xs font-bold" style={{ color }}>{label}</p>
         <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
           style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
-          {answeredCount} / {SECTION_TOTAL} savolga javob berildi
+          {answeredCount} / {SECTION_TOTAL} javob berildi
         </span>
       </div>
+
+      {/* Score + Band (admin-only, shown only when correctMap is available) */}
+      {bandStr && (
+        <div className="flex items-center gap-3 mb-2 px-3 py-2 rounded-xl"
+          style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
+          <span className="text-xs font-bold" style={{ color: 'var(--success)' }}>
+            ✅ To&apos;g&apos;ri: {correctCount} / 40
+          </span>
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+            style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
+            Band {bandStr}
+          </span>
+        </div>
+      )}
+
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
         <div className="grid text-xs font-semibold px-3 py-1.5"
-          style={{ gridTemplateColumns: '48px 1fr', background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
-          <span>#</span><span>Javob</span>
+          style={{
+            gridTemplateColumns: correctMap ? '40px 1fr 20px' : '48px 1fr',
+            background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)',
+          }}>
+          <span>#</span><span>Javob</span>{correctMap && <span />}
         </div>
-        {entries.map(([q, ans]) => (
-          <div key={q} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
-            style={{ gridTemplateColumns: '48px 1fr', borderColor: 'var(--border)' }}>
-            <span style={{ color: 'var(--text-muted)' }}>{q}</span>
-            <span style={{ color: 'var(--text-primary)' }}>{ans || '—'}</span>
+        {rows.map((row, idx) => (
+          <div key={`${row.key}-${idx}`} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
+            style={{
+              gridTemplateColumns: correctMap ? '40px 1fr 20px' : '48px 1fr',
+              borderColor: 'var(--border)',
+              background: row.isCorrect === false ? 'rgba(239,68,68,0.04)' : 'transparent',
+            }}>
+            <span style={{ color: 'var(--text-muted)' }}>{row.key}</span>
+            <span style={{ color: 'var(--text-primary)' }}>{row.userAns || '—'}</span>
+            {correctMap && (
+              <span style={{ color: row.isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: 700 }}>
+                {row.isCorrect ? '✓' : '✗'}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -535,6 +783,7 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
             answers={sub.listening_answers ?? {}}
             label="🎧 Listening javoblari"
             color="var(--success)"
+            section="listening"
           />
 
           {/* Reading */}
@@ -542,6 +791,7 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
             answers={sub.reading_answers ?? {}}
             label="📖 Reading javoblari"
             color="var(--accent)"
+            section="reading"
           />
 
           {/* Writing */}

@@ -55,6 +55,10 @@ function fmtMmSs(secs: number) {
 
 function buildInjectScript(): string {
   return `<script>(function(){
+    // Safety: some HTML tests reference 'dropZone' in a scope where it is not declared.
+    // Defining it as null on window prevents a ReferenceError that would otherwise abort
+    // the checkAnswers() function before window.parent.postMessage (CDI_SUBMIT) fires.
+    if(typeof window.dropZone==='undefined')window.dropZone=null;
     var sel='button,input[type="submit"],input[type="button"]';
     document.querySelectorAll(sel).forEach(function(el){
       var txt=(el.textContent||el.value||'').toLowerCase();
