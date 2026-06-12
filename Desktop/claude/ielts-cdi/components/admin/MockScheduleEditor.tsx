@@ -359,11 +359,17 @@ function FileUploadField({ label, icon, accept, currentUrl, uploading, onFile, o
 /* ═══════════════════════════════════════════════════════════════════════
    SubmissionCard — one candidate's full submission details
    ══════════════════════════════════════════════════════════════════════ */
-function AnswersTable({ answers, label, color }: {
-  answers: Record<string, string>
+function AnswersTable({ answers: rawAnswers, label, color }: {
+  answers: Record<string, string> | string | null | undefined
   label: string
   color: string
 }) {
+  // Defensive: JSONB might arrive as a JSON string in some edge cases
+  const answers: Record<string, string> =
+    typeof rawAnswers === 'string'
+      ? (() => { try { return JSON.parse(rawAnswers) } catch { return {} } })()
+      : (rawAnswers ?? {})
+
   const entries = Object.entries(answers).sort(([a], [b]) => Number(a) - Number(b))
   if (entries.length === 0) {
     return (
@@ -403,8 +409,13 @@ function AnswersTable({ answers, label, color }: {
   )
 }
 
-function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) {
+function SubmissionCard({ sub, index, task1ImageUrl }: {
+  sub: MockSubmission
+  index: number
+  task1ImageUrl?: string | null
+}) {
   const [open, setOpen] = useState(false)
+  const [lightbox, setLightbox] = useState(false)
 
   const hasListening = Object.keys(sub.listening_answers ?? {}).length > 0
   const hasReading   = Object.keys(sub.reading_answers ?? {}).length > 0
@@ -516,6 +527,23 @@ function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) 
             <div className="space-y-3">
               <div>
                 <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Task 1</p>
+                {task1ImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setLightbox(true)}
+                    className="block w-full mb-2 rounded-xl overflow-hidden transition-opacity hover:opacity-90"
+                    style={{ border: '1px solid var(--border)', cursor: 'zoom-in', maxHeight: 200 }}
+                    title="Kattalashtirish uchun bosing"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={task1ImageUrl}
+                      alt="Task 1 rasm"
+                      className="w-full object-contain"
+                      style={{ maxHeight: 200, background: 'var(--bg-card)' }}
+                    />
+                  </button>
+                )}
                 <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-xl"
                   style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)', minHeight: 48 }}>
                   {sub.writing_task1 || '(bo\'sh)'}
@@ -530,6 +558,32 @@ function SubmissionCard({ sub, index }: { sub: MockSubmission; index: number }) 
               </div>
             </div>
           </div>
+
+          {/* Lightbox */}
+          {lightbox && task1ImageUrl && (
+            <div
+              className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+              style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
+              onClick={() => setLightbox(false)}
+            >
+              <button
+                type="button"
+                className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center rounded-full"
+                style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)' }}
+                onClick={e => { e.stopPropagation(); setLightbox(false) }}
+              >
+                <X size={18} />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={task1ImageUrl}
+                alt="Task 1 rasm (katta)"
+                className="max-w-full max-h-full rounded-2xl shadow-2xl"
+                style={{ objectFit: 'contain', userSelect: 'none' }}
+                onClick={e => e.stopPropagation()}
+              />
+            </div>
+          )}
 
           {/* Natijani yuborish button */}
           <button
@@ -584,7 +638,21 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
     setModalLoading(true)
     try {
       const res = await fetch(`/api/admin/mock-submissions?scheduleId=${s.id}`)
-      if (res.ok) setModalSubmissions(await res.json())
+      if (res.ok) {
+        const data = await res.json()
+        // Debug: log raw answer key counts so we can inspect what's actually in the DB
+        console.log('[MockScheduleEditor] submissions raw:', data.map((sub: any) => ({
+          id: sub.id,
+          user: sub.user_name,
+          listening_type: typeof sub.listening_answers,
+          reading_type: typeof sub.reading_answers,
+          listening_keys: sub.listening_answers ? Object.keys(typeof sub.listening_answers === 'string' ? JSON.parse(sub.listening_answers) : sub.listening_answers).length : 0,
+          reading_keys: sub.reading_answers ? Object.keys(typeof sub.reading_answers === 'string' ? JSON.parse(sub.reading_answers) : sub.reading_answers).length : 0,
+          listening_raw: sub.listening_answers,
+          reading_raw: sub.reading_answers,
+        })))
+        setModalSubmissions(data)
+      }
     } finally {
       setModalLoading(false)
     }
@@ -1113,8 +1181,8 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                               <Phone size={10} /> {b.user_phone}
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                              <Phone size={10} /> —
+                            <span className="flex items-center gap-1 text-xs italic" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
+                              <Phone size={10} /> Telefon kiritilmagan
                             </span>
                           )}
                         </div>
@@ -1182,7 +1250,12 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                 </div>
               ) : (
                 modalSubmissions.map((sub, idx) => (
-                  <SubmissionCard key={sub.id} sub={sub} index={idx + 1} />
+                  <SubmissionCard
+                    key={sub.id}
+                    sub={sub}
+                    index={idx + 1}
+                    task1ImageUrl={modalSchedule?.writing_task1_image_url}
+                  />
                 ))
               )}
             </div>
