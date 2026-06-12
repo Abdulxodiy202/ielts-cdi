@@ -476,9 +476,17 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
               )}
             </div>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub.user_email}</span>
-              {sub.user_phone && (
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{sub.user_phone}</span>
+              <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <Mail size={10} /> {sub.user_email || '—'}
+              </span>
+              {sub.user_phone ? (
+                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <Phone size={10} /> {sub.user_phone}
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs italic" style={{ color: 'var(--text-muted)', opacity: 0.6 }}>
+                  <Phone size={10} /> Telefon kiritilmagan
+                </span>
               )}
             </div>
           </div>

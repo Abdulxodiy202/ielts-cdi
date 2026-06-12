@@ -59,27 +59,62 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([])
   }
 
-  // Fetch profiles for all users
-  const { data: profiles } = await admin
-    .from('profiles')
-    .select('id, full_name, email, phone, is_premium')
-    .in('id', allUserIds)
+  // Collect booking IDs so we can look up payment_requests for phone numbers
+  const bookingIdsFromSubmissions = submissions.map((s: any) => s.booking_id).filter(Boolean)
+  const bookingIdsFromResigned    = pureResignedBookings.map((b: any) => b.id)
+  const allBookingIds = [...new Set([...bookingIdsFromSubmissions, ...bookingIdsFromResigned])]
+
+  // Fetch profiles + bookings (for payment_ref → phone) in parallel
+  const [profilesRes, bookingsForPhoneRes] = await Promise.all([
+    admin
+      .from('profiles')
+      .select('id, full_name, email, phone, is_premium')
+      .in('id', allUserIds),
+    allBookingIds.length > 0
+      ? admin
+          .from('mock_bookings')
+          .select('id, user_id, payment_ref')
+          .in('id', allBookingIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
 
   const profileMap: Record<string, any> = {}
-  for (const p of profiles ?? []) {
+  for (const p of profilesRes.data ?? []) {
     profileMap[p.id] = p
+  }
+
+  // Build payment_requests phone lookup: user_id → phone
+  // mock_bookings.payment_ref format: "PR-<uuid>"
+  const paymentReqIds: string[] = []
+  for (const b of bookingsForPhoneRes.data ?? []) {
+    if (b.payment_ref && typeof b.payment_ref === 'string' && b.payment_ref.startsWith('PR-')) {
+      paymentReqIds.push(b.payment_ref.slice(3))
+    }
+  }
+
+  const paymentPhoneMap: Record<string, string> = {}
+  if (paymentReqIds.length > 0) {
+    const { data: prs } = await admin
+      .from('payment_requests')
+      .select('id, user_id, user_phone')
+      .in('id', paymentReqIds)
+    for (const pr of prs ?? []) {
+      if (pr.user_phone) paymentPhoneMap[pr.user_id] = pr.user_phone
+    }
   }
 
   // Enrich submissions
   const enrichedSubmissions = submissions.map((s: any) => {
     const profile = profileMap[s.user_id] ?? {}
+    // Phone priority: payment_requests → profiles.phone → ''
+    const userPhone = paymentPhoneMap[s.user_id] || profile.phone || ''
     return {
       id: s.id,
       user_id: s.user_id,
       booking_id: s.booking_id,
       user_name: profile.full_name ?? 'Noma\'lum',
       user_email: profile.email ?? s.user_id,
-      user_phone: profile.phone ?? '',
+      user_phone: userPhone,
       is_premium: profile.is_premium ?? false,
       schedule_date: schedule?.date ?? null,
       schedule_time: schedule?.time_slot ?? null,
@@ -95,13 +130,14 @@ export async function GET(req: NextRequest) {
   // Enrich resigned bookings (no submission → empty answers, status='resigned')
   const enrichedResigned = pureResignedBookings.map((b: any) => {
     const profile = profileMap[b.user_id] ?? {}
+    const userPhone = paymentPhoneMap[b.user_id] || profile.phone || ''
     return {
       id: `resigned-${b.id}`,
       user_id: b.user_id,
       booking_id: b.id,
       user_name: profile.full_name ?? 'Noma\'lum',
       user_email: profile.email ?? b.user_id,
-      user_phone: profile.phone ?? '',
+      user_phone: userPhone,
       is_premium: profile.is_premium ?? false,
       schedule_date: schedule?.date ?? null,
       schedule_time: schedule?.time_slot ?? null,

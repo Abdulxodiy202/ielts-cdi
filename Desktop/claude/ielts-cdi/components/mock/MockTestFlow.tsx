@@ -8,7 +8,7 @@ import {
   Headphones, BookOpen, PenTool, CheckCircle,
   ArrowRight, Loader2, Clock, AlertTriangle, Send,
   ChevronRight, Play, Pause, Info, Volume2, Maximize,
-  XCircle,
+  XCircle, X,
 } from 'lucide-react'
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
@@ -468,6 +468,9 @@ function ListeningSection({
   const onAudioEndRef = useRef(onAudioEnd)
   onAudioEndRef.current = onAudioEnd
 
+  const onChangeRef = useRef(onChange)
+  onChangeRef.current = onChange
+
   /* ── CDI HTML: when student clicks "Check answers", start the 2-min review timer ── */
   useEffect(() => {
     if (cdiDone) onAudioEndRef.current()
@@ -476,7 +479,21 @@ function ListeningSection({
 
   useEffect(() => {
     if (!isHtml) return
-    const h = (e: MessageEvent) => { if (e.data?.type === 'CDI_CHECK_ANSWERS') setCdiDone(true) }
+    const h = (e: MessageEvent) => {
+      if (e.data?.type === 'CDI_CHECK_ANSWERS') setCdiDone(true)
+      // CDI_SUBMIT: capture user answers from the HTML test and save them
+      if (e.data?.type === 'CDI_SUBMIT') {
+        const record: Record<string, string> = {}
+        for (const item of (e.data.answers ?? [])) {
+          const key = String(item.question ?? '')
+          const val = String(item.userAnswer ?? '').trim()
+          // 'No Answer' / 'Not Answered' → store as empty string
+          record[key] = (val === 'No Answer' || val === 'Not Answered') ? '' : val
+        }
+        onChangeRef.current(record)
+        setCdiDone(true)
+      }
+    }
     window.addEventListener('message', h)
     return () => window.removeEventListener('message', h)
   }, [isHtml])
@@ -645,12 +662,14 @@ function ReadingSection({
   fileUrl,
   onNext,
   onReadingDone,
+  onReadingAnswers,
   secsLeft,
   reviewSecsLeft,
 }: {
   fileUrl: string | null
   onNext: () => void
   onReadingDone: () => void
+  onReadingAnswers: (answers: Record<string, string>) => void
   secsLeft: number
   reviewSecsLeft: number | null
 }) {
@@ -659,10 +678,12 @@ function ReadingSection({
   const { blobUrl, loading } = useHtmlBlobUrl(isHtml ? fileUrl : null)
   const [cdiDone, setCdiDone] = useState(false)
 
-  const onNextRef       = useRef(onNext)
-  onNextRef.current     = onNext
-  const onReadingDoneRef      = useRef(onReadingDone)
-  onReadingDoneRef.current    = onReadingDone
+  const onNextRef          = useRef(onNext)
+  onNextRef.current        = onNext
+  const onReadingDoneRef   = useRef(onReadingDone)
+  onReadingDoneRef.current = onReadingDone
+  const onReadingAnswersRef = useRef(onReadingAnswers)
+  onReadingAnswersRef.current = onReadingAnswers
 
   /* ── CDI HTML: trigger 2-min review timer when reading is submitted ── */
   useEffect(() => {
@@ -672,7 +693,20 @@ function ReadingSection({
 
   useEffect(() => {
     if (!isHtml) return
-    const h = (e: MessageEvent) => { if (e.data?.type === 'CDI_CHECK_ANSWERS') setCdiDone(true) }
+    const h = (e: MessageEvent) => {
+      if (e.data?.type === 'CDI_CHECK_ANSWERS') setCdiDone(true)
+      // CDI_SUBMIT: capture reading answers from the HTML test
+      if (e.data?.type === 'CDI_SUBMIT') {
+        const record: Record<string, string> = {}
+        for (const item of (e.data.answers ?? [])) {
+          const key = String(item.question ?? '')
+          const val = String(item.userAnswer ?? '').trim()
+          record[key] = (val === 'No Answer' || val === 'Not Answered') ? '' : val
+        }
+        onReadingAnswersRef.current(record)
+        setCdiDone(true)
+      }
+    }
     window.addEventListener('message', h)
     return () => window.removeEventListener('message', h)
   }, [isHtml])
@@ -778,6 +812,7 @@ function WritingSection({
 }) {
   const timerWarn   = secsLeft < 10 * 60
   const timerDanger = secsLeft < 5 * 60
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
@@ -812,10 +847,60 @@ function WritingSection({
             <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 1</h3>
           </div>
           {schedule.writing_task1_image_url && (
-            <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+            <div
+              className="group relative rounded-xl overflow-hidden border"
+              style={{ borderColor: 'var(--border)', cursor: 'zoom-in' }}
+              onClick={() => setLightboxUrl(schedule.writing_task1_image_url)}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={schedule.writing_task1_image_url} alt="Task 1 chart/graph"
-                className="w-full max-h-72 object-contain" style={{ background: 'var(--bg-secondary)' }} />
+                className="w-full max-h-72 object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+                style={{ background: 'var(--bg-secondary)' }} />
+              <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                <span className="text-xs px-2 py-1 rounded-lg font-medium"
+                  style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>
+                  Kattalashtirish uchun bosing
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Fullscreen image lightbox — z-[250] so it sits above the WarningModal (z-200) */}
+          {lightboxUrl && (
+            <div
+              style={{
+                position: 'fixed', inset: 0, zIndex: 250,
+                background: 'rgba(0,0,0,0.90)',
+                backdropFilter: 'blur(6px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 16,
+              }}
+              onClick={() => setLightboxUrl(null)}
+            >
+              <button
+                type="button"
+                style={{
+                  position: 'absolute', top: 16, right: 16,
+                  width: 40, height: 40, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.15)', color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                onClick={e => { e.stopPropagation(); setLightboxUrl(null) }}
+              >
+                <X size={20} />
+              </button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={lightboxUrl}
+                alt="Task rasm (katta)"
+                style={{
+                  maxWidth: '95vw', maxHeight: '95vh',
+                  objectFit: 'contain', borderRadius: 12,
+                }}
+                onClick={e => e.stopPropagation()}
+              />
             </div>
           )}
           {schedule.writing_task1_topic && (
@@ -889,6 +974,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   const [readingStartedAt,   setReadingStartedAt]   = useState<Date | null>(null)
   const [writingStartedAt,   setWritingStartedAt]  = useState<Date | null>(null)
   const [listeningAnswers,   setListeningAnswers]  = useState<Record<string, string>>({})
+  const [readingAnswers,     setReadingAnswers]    = useState<Record<string, string>>({})
   const [task1,              setTask1]             = useState('')
   const [task2,              setTask2]             = useState('')
   const [submitting,         setSubmitting]        = useState(false)
@@ -1192,7 +1278,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   /* ── Auto-save draft every 30 s ── */
   const saveDraft = useCallback((
     s: Step, st: Date | null, lr: number | null, rr: number | null,
-    rs: Date | null, ws: Date | null, la: Record<string, string>, t1: string, t2: string,
+    rs: Date | null, ws: Date | null,
+    la: Record<string, string>, ra: Record<string, string>,
+    t1: string, t2: string,
   ) => {
     if (s === 'done' || s === 'pre-start') return
     try {
@@ -1204,6 +1292,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         readingStartedAt:   rs?.toISOString() ?? null,
         writingStartedAt:   ws?.toISOString() ?? null,
         listeningAnswers:   la,
+        readingAnswers:     ra,
         task1: t1, task2: t2,
         savedAt: new Date().toISOString(),
       }))
@@ -1213,32 +1302,33 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        schedule_id: schedule.id,
+        schedule_id:       schedule.id,
         listening_answers: la,
-        writing_task1: t1,
-        writing_task2: t2,
-        status: 'draft',
+        reading_answers:   ra,
+        writing_task1:     t1,
+        writing_task2:     t2,
+        status:            'draft',
       }),
     }).catch(() => {})
   }, [storageKey, schedule.id])
 
   const stateRef = useRef({
     step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt,
-    writingStartedAt, listeningAnswers, task1, task2,
+    writingStartedAt, listeningAnswers, readingAnswers, task1, task2,
   })
   useEffect(() => {
     stateRef.current = {
       step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt,
-      writingStartedAt, listeningAnswers, task1, task2,
+      writingStartedAt, listeningAnswers, readingAnswers, task1, task2,
     }
-  }, [step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt, writingStartedAt, listeningAnswers, task1, task2])
+  }, [step, startTime, listenReviewEndMs, readingReviewEndMs, readingStartedAt, writingStartedAt, listeningAnswers, readingAnswers, task1, task2])
 
   useEffect(() => {
     const iv = setInterval(() => {
       const { step: s, startTime: st, listenReviewEndMs: lr, readingReviewEndMs: rr,
               readingStartedAt: rs, writingStartedAt: ws,
-              listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
-      saveDraft(s, st, lr, rr, rs, ws, la, t1, t2)
+              listeningAnswers: la, readingAnswers: ra, task1: t1, task2: t2 } = stateRef.current
+      saveDraft(s, st, lr, rr, rs, ws, la, ra, t1, t2)
     }, AUTOSAVE_MS)
     return () => clearInterval(iv)
   }, [saveDraft])
@@ -1267,16 +1357,17 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     if (submitting) return
     setSubmitting(true)
     try {
-      const { listeningAnswers: la, task1: t1, task2: t2 } = stateRef.current
+      const { listeningAnswers: la, readingAnswers: ra, task1: t1, task2: t2 } = stateRef.current
       const res = await fetch('/api/mock/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          schedule_id: schedule.id,
+          schedule_id:       schedule.id,
           listening_answers: la,
-          writing_task1: t1,
-          writing_task2: t2,
-          status: 'submitted',
+          reading_answers:   ra,
+          writing_task1:     t1,
+          writing_task2:     t2,
+          status:            'submitted',
         }),
       })
       if (res.ok) {
@@ -1473,6 +1564,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
               setSkippedNotice(null)
             }}
             onReadingDone={handleReadingDone}
+            onReadingAnswers={setReadingAnswers}
             secsLeft={secsLeft}
             reviewSecsLeft={readingReviewEndMs !== null ? secsLeft : null}
           />
