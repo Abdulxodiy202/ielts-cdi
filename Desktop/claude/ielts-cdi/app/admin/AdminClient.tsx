@@ -620,12 +620,16 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const togglePremium = async (userId: string, currentPremium: boolean) => {
     setToggling(prev => ({ ...prev, [userId]: true }))
     try {
-      await toggleUserPremium(userId, !currentPremium)
+      const result = await toggleUserPremium(userId, !currentPremium)
+      if (!result.ok) {
+        alert('Xatolik: ' + result.error)
+        return
+      }
       setUsers(prev => prev.map(u =>
         u.id === userId ? { ...u, is_premium: !currentPremium } : u
       ))
     } catch (e) {
-      alert('Xatolik: ' + e)
+      alert('Kutilmagan xatolik: ' + (e instanceof Error ? e.message : String(e)))
     } finally {
       setToggling(prev => ({ ...prev, [userId]: false }))
     }
