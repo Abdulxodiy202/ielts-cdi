@@ -5,7 +5,7 @@ import {
   Plus, Calendar, Clock, Upload, Trash2,
   Image as ImageIcon, Edit2, Loader2, X, CheckCircle,
   BookOpen, Headphones, PenTool, ChevronDown, ChevronUp,
-  ChevronLeft, ChevronRight, FileText, Crown,
+  ChevronLeft, ChevronRight, FileText, Crown, Users, Phone, Mail, User,
 } from 'lucide-react'
 
 /* ─────────────────────────── Types ──────────────────────────────────── */
@@ -39,6 +39,18 @@ interface MockSubmission {
   writing_task2: string
   status: string
   submitted_at: string | null
+}
+
+interface MockBooking {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  user_phone: string
+  is_premium: boolean
+  status: string
+  payment_status: string
+  created_at: string
 }
 
 interface FormState {
@@ -364,9 +376,16 @@ function AnswersTable({ answers, label, color }: {
       </div>
     )
   }
+  const answeredCount = entries.filter(([, val]) => Boolean(val && val.trim())).length
   return (
     <div>
-      <p className="text-xs font-bold mb-2" style={{ color }}>{label}</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-bold" style={{ color }}>{label}</p>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+          style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+          {answeredCount} / {entries.length} savolga javob berildi
+        </span>
+      </div>
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
         <div className="grid text-xs font-semibold px-3 py-1.5"
           style={{ gridTemplateColumns: '48px 1fr', background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
@@ -549,6 +568,11 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
   const [modalSubmissions, setModalSubmissions] = useState<MockSubmission[]>([])
   const [modalLoading, setModalLoading]       = useState(false)
 
+  const [bookingsModalId, setBookingsModalId]             = useState<string | null>(null)
+  const [bookingsModalSchedule, setBookingsModalSchedule] = useState<MockSchedule | null>(null)
+  const [bookingsData, setBookingsData]                   = useState<MockBooking[]>([])
+  const [bookingsLoading, setBookingsLoading]             = useState(false)
+
   // All dates that have an existing schedule — used by CalendarPicker to show dots
   const scheduledDates = new Set(schedules.map(s => s.date))
 
@@ -566,6 +590,21 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
     }
   }
   const closeModal = () => { setModalScheduleId(null); setModalSchedule(null); setModalSubmissions([]) }
+
+  /* ── Open bookings modal for a schedule ── */
+  const openBookingsModal = async (s: MockSchedule) => {
+    setBookingsModalSchedule(s)
+    setBookingsModalId(s.id)
+    setBookingsData([])
+    setBookingsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/mock-bookings?scheduleId=${s.id}`)
+      if (res.ok) setBookingsData(await res.json())
+    } finally {
+      setBookingsLoading(false)
+    }
+  }
+  const closeBookingsModal = () => { setBookingsModalId(null); setBookingsModalSchedule(null); setBookingsData([]) }
 
   /* ── Form open / close ── */
   const openNew = () => {
@@ -898,6 +937,19 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                     Javoblar
                   </button>
 
+                  {/* Bookings modal button */}
+                  <button
+                    onClick={() => openBookingsModal(s)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      color: 'var(--text-muted)',
+                      border: '1px solid var(--border)',
+                    }}>
+                    <Users size={11} />
+                    Bookinglar
+                  </button>
+
                   <button onClick={() => isEditing ? closeForm() : openEdit(s)}
                     className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
                     style={{
@@ -956,6 +1008,131 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
             </div>
             )
           })}
+        </div>
+      )}
+
+      {/* ══ BOOKINGS MODAL ══════════════════════════════════════════════ */}
+      {bookingsModalId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={e => { if (e.target === e.currentTarget) closeBookingsModal() }}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl overflow-hidden"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}
+          >
+            {/* Modal header */}
+            <div
+              className="flex items-center justify-between px-6 py-4 shrink-0"
+              style={{ borderBottom: '1px solid var(--border)' }}
+            >
+              <div>
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                  Bookinglar
+                </h3>
+                {bookingsModalSchedule && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {bookingsModalSchedule.date} · {bookingsModalSchedule.time}
+                    {!bookingsLoading && ` · ${bookingsData.length} ta foydalanuvchi`}
+                  </p>
+                )}
+              </div>
+              <button onClick={closeBookingsModal} className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+              {bookingsLoading ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 size={28} className="animate-spin" style={{ color: 'var(--accent)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda…</p>
+                </div>
+              ) : bookingsData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-2">
+                  <Users size={36} className="opacity-20" style={{ color: 'var(--text-muted)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Hali booking qilganlar yo&apos;q</p>
+                </div>
+              ) : (
+                bookingsData.map((b, idx) => {
+                  const nameParts = b.user_name.trim().split(/\s+/)
+                  const av = nameParts.length >= 2
+                    ? (nameParts[0][0] + nameParts[1][0]).toUpperCase()
+                    : b.user_name.slice(0, 2).toUpperCase()
+                  const bsCfg = ({
+                    pending:   { label: 'Kutilmoqda',    bg: 'rgba(245,158,11,0.12)', color: 'var(--warning)', border: 'rgba(245,158,11,0.3)' },
+                    confirmed: { label: 'Tasdiqlangan',  bg: 'rgba(34,197,94,0.12)',  color: 'var(--success)', border: 'rgba(34,197,94,0.3)' },
+                    cancelled: { label: 'Bekor qilindi', bg: 'rgba(239,68,68,0.12)',  color: 'var(--error)',   border: 'rgba(239,68,68,0.3)' },
+                    resigned:  { label: 'Kelmadi',       bg: 'rgba(239,68,68,0.08)',  color: 'var(--error)',   border: 'rgba(239,68,68,0.2)' },
+                  } as Record<string, { label: string; bg: string; color: string; border: string }>)[b.status]
+                    ?? { label: b.status, bg: 'var(--bg-secondary)', color: 'var(--text-muted)', border: 'var(--border)' }
+
+                  return (
+                    <div key={b.id} className="rounded-xl px-4 py-3 flex items-center gap-3"
+                      style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+                      {/* Avatar */}
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{
+                          background: b.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                          color: b.is_premium ? 'var(--warning)' : 'var(--accent)',
+                        }}>
+                        {av}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {idx + 1}. {b.user_name}
+                          </span>
+                          {b.is_premium ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                              style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                              <Crown size={10} /> Premium
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                              style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                              <User size={10} /> Oddiy
+                            </span>
+                          )}
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold shrink-0"
+                            style={{ background: bsCfg.bg, color: bsCfg.color, border: `1px solid ${bsCfg.border}` }}>
+                            {bsCfg.label}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                            <Mail size={10} /> {b.user_email || '—'}
+                          </span>
+                          {b.user_phone ? (
+                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                              <Phone size={10} /> {b.user_phone}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                              <Phone size={10} /> —
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Booking timestamp */}
+                      <div className="text-xs shrink-0 text-right" style={{ color: 'var(--text-muted)' }}>
+                        {new Date(b.created_at).toLocaleString('en-GB', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
 
