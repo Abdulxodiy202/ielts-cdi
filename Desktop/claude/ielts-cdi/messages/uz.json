@@ -118,6 +118,26 @@
     "signInLink": "Kirish",
     "minChars": "Kamida 6 ta belgi"
   },
+  "pricing": {
+    "title": "Narxlar",
+    "freePlanName": "Bepul",
+    "freePlanSub": "Doimo bepul",
+    "premiumPlanSub": "oyiga",
+    "popularBadge": "MASHHUR",
+    "ctaFree": "Bepul boshlash",
+    "ctaPremium": "Premium olish",
+    "freeFeature1": "4 ta Reading Testi",
+    "freeFeature2": "4 ta Listening Testi",
+    "freeFeature3": "To'liq Analitika",
+    "freeFeature4": "Band Score Hisoblash",
+    "freeFeature5": "Mock Test Jadvalini Ko'rish",
+    "freeFeature6": "Natijalar Tarixi",
+    "premiumFeature1": "Bepuldagi hamma narsalar",
+    "premiumFeature2": "5 ta Premium Reading Testi",
+    "premiumFeature3": "5 ta Premium Listening Testi",
+    "premiumFeature4": "Mock Test Bronlash",
+    "premiumFeature5": "Ustuvor Qo'llab-quvvatlash"
+  },
   "common": {
     "save": "Saqlash",
     "cancel": "Bekor qilish",

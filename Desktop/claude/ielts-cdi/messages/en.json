@@ -118,6 +118,26 @@
     "signInLink": "Sign in",
     "minChars": "Min 6 characters"
   },
+  "pricing": {
+    "title": "Pricing",
+    "freePlanName": "Free",
+    "freePlanSub": "Forever free",
+    "premiumPlanSub": "per month",
+    "popularBadge": "POPULAR",
+    "ctaFree": "Get Started Free",
+    "ctaPremium": "Get Premium",
+    "freeFeature1": "4 Reading Tests",
+    "freeFeature2": "4 Listening Tests",
+    "freeFeature3": "Full Analytics",
+    "freeFeature4": "Band Score Calculation",
+    "freeFeature5": "Mock Test Schedule View",
+    "freeFeature6": "Result History",
+    "premiumFeature1": "Everything in Free",
+    "premiumFeature2": "5 Premium Reading Tests",
+    "premiumFeature3": "5 Premium Listening Tests",
+    "premiumFeature4": "Mock Test Booking",
+    "premiumFeature5": "Priority Support"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

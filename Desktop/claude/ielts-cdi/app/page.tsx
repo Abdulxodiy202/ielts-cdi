@@ -1,8 +1,9 @@
 ﻿export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { BookOpen, Headphones, BarChart2, Calendar, Crown, CheckCircle, ArrowRight, Zap } from 'lucide-react'
+import { BookOpen, Headphones, BarChart2, Calendar, ArrowRight, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
+import { PricingSection } from '@/components/landing/PricingSection'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -143,42 +144,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section className="max-w-4xl mx-auto px-6 py-16">
-        <h2 className="text-3xl font-bold text-center mb-12">Simple Pricing</h2>
-        <div className="grid sm:grid-cols-2 gap-6">
-          <div className="card p-8">
-            <h3 className="text-xl font-bold mb-1">Free</h3>
-            <div className="text-4xl font-black mb-1">0 UZS</div>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>Forever free</p>
-            {['4 Reading Tests', '4 Listening Tests', 'Full Analytics', 'Band Score Calculation'].map(f => (
-              <div key={f} className="flex items-center gap-2 mb-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                <CheckCircle size={15} style={{ color: '#22c55e' }} /> {f}
-              </div>
-            ))}
-            <Link href={ctaHref} className="btn-outline w-full mt-6 text-sm flex justify-center">
-              Get Started Free
-            </Link>
-          </div>
-
-          <div className="card p-8 relative overflow-hidden" style={{ border: '2px solid var(--accent)' }}>
-            <div className="absolute top-0 right-0 px-3 py-1 text-xs font-bold" style={{ background: 'var(--accent)', color: 'white', borderBottomLeftRadius: 8 }}>POPULAR</div>
-            <div className="flex items-center gap-2 mb-1">
-              <Crown size={20} style={{ color: '#f59e0b' }} />
-              <h3 className="text-xl font-bold">Premium</h3>
-            </div>
-            <div className="text-4xl font-black mb-1" style={{ color: 'var(--accent)' }}>50,000 UZS</div>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>per month</p>
-            {['Everything in Free', '5 Premium Reading Tests', '5 Premium Listening Tests', 'Mock Test Booking', 'Priority Support'].map(f => (
-              <div key={f} className="flex items-center gap-2 mb-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                <CheckCircle size={15} style={{ color: 'var(--accent)' }} /> {f}
-              </div>
-            ))}
-            <Link href={ctaHref} className="btn-primary w-full mt-6 text-sm flex justify-center gap-2">
-              <Crown size={14} /> Get Premium
-            </Link>
-          </div>
-        </div>
-      </section>
+      <PricingSection ctaHref={ctaHref} />
 
       {/* Footer */}
       <footer className="border-t text-center py-8 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
