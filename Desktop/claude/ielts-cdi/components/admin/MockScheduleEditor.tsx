@@ -466,6 +466,7 @@ type AnswerRow = {
   userAns: string                    // raw stored value
   isBlank: boolean                   // user left this unanswered
   isCorrect: boolean | null          // null → no correct answer known
+  correctAns: string | null          // human-readable correct answer (shown for wrong/blank rows)
   // For '21-23' multi-select group: partial score display
   groupScore?: { got: number; total: number }
 }
@@ -475,6 +476,9 @@ function buildRows(
   correctMap: Record<string, string | string[]> | null,
   section: 'listening' | 'reading',
 ): AnswerRow[] {
+  const fmtCorrect = (c: string | string[]): string =>
+    Array.isArray(c) ? c.join(' / ') : c
+
   if (!correctMap) {
     return Object.entries(answers)
       .sort(([a], [b]) => {
@@ -482,7 +486,7 @@ function buildRows(
         const nb = Number(b.replace(/^\D*/, ''))
         return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb
       })
-      .map(([k, v]) => ({ key: k, userAns: v, isBlank: isBlankAnswer(v), isCorrect: null }))
+      .map(([k, v]) => ({ key: k, userAns: v, isBlank: isBlankAnswer(v), isCorrect: null, correctAns: null }))
   }
 
   const rows: AnswerRow[] = []
@@ -494,15 +498,19 @@ function buildRows(
         const groupCorrect = (LISTENING_CORRECT['21-23'] as string[])
         const raw = answers['21-23'] ?? ''
         const blank = isBlankAnswer(raw)
+        const groupCorrectStr = groupCorrect.join(', ')
         if (blank) {
           rows.push({ key: '21-23', userAns: '', isBlank: true, isCorrect: false,
+            correctAns: groupCorrectStr,
             groupScore: { got: 0, total: groupCorrect.length } })
         } else {
           const userParts = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
           const got = groupCorrect.filter(exp => userParts.includes(exp.toLowerCase())).length
+          const allCorrect = got === groupCorrect.length
           rows.push({
             key: '21-23', userAns: raw, isBlank: false,
-            isCorrect: got === groupCorrect.length,
+            isCorrect: allCorrect,
+            correctAns: allCorrect ? null : groupCorrectStr,
             groupScore: { got, total: groupCorrect.length },
           })
         }
@@ -514,9 +522,10 @@ function buildRows(
       const c = correctMap[k] ?? null
       const u = answers[k] ?? ''
       const blank = isBlankAnswer(u)
+      const correct = c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null
       rows.push({
-        key: k, userAns: u, isBlank: blank,
-        isCorrect: c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null,
+        key: k, userAns: u, isBlank: blank, isCorrect: correct,
+        correctAns: (c !== null && correct !== true) ? fmtCorrect(c) : null,
       })
     }
   } else {
@@ -525,9 +534,10 @@ function buildRows(
       const c = correctMap[k] ?? null
       const u = answers[k] ?? ''
       const blank = isBlankAnswer(u)
+      const correct = c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null
       rows.push({
-        key: k, userAns: u, isBlank: blank,
-        isCorrect: c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null,
+        key: k, userAns: u, isBlank: blank, isCorrect: correct,
+        correctAns: (c !== null && correct !== true) ? fmtCorrect(c) : null,
       })
     }
   }
@@ -613,12 +623,13 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
         <div className="grid text-xs font-semibold px-3 py-1.5"
           style={{
-            gridTemplateColumns: correctMap ? '44px 1fr 32px' : '48px 1fr',
+            gridTemplateColumns: correctMap ? '44px 1fr 32px 1fr' : '48px 1fr',
             background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)',
           }}>
           <span>#</span>
           <span>Javob</span>
-          {correctMap && <span style={{ textAlign: 'right' }}>✓/✗</span>}
+          {correctMap && <span style={{ textAlign: 'center' }}>✓/✗</span>}
+          {correctMap && <span style={{ paddingLeft: 8 }}>To&apos;g&apos;ri javob</span>}
         </div>
         {rows.map((row, idx) => {
           // Determine correctness indicator cell
@@ -653,7 +664,7 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
           return (
             <div key={`${row.key}-${idx}`} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
               style={{
-                gridTemplateColumns: correctMap ? '44px 1fr 32px' : '48px 1fr',
+                gridTemplateColumns: correctMap ? '44px 1fr 32px 1fr' : '48px 1fr',
                 borderColor: 'var(--border)',
                 // Only highlight red for non-blank wrong answers
                 background: (!row.isBlank && row.isCorrect === false && !row.groupScore)
@@ -667,7 +678,12 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
                 {row.isBlank ? '—' : row.userAns}
               </span>
               {correctMap && (
-                <span style={{ textAlign: 'right' }}>{indicator}</span>
+                <span style={{ textAlign: 'center' }}>{indicator}</span>
+              )}
+              {correctMap && (
+                <span style={{ paddingLeft: 8, color: 'var(--success)', opacity: row.correctAns ? 1 : 0 }}>
+                  {row.correctAns ?? ''}
+                </span>
               )}
             </div>
           )
