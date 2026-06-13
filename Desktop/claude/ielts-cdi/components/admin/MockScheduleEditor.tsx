@@ -681,7 +681,7 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
                 <span style={{ textAlign: 'center' }}>{indicator}</span>
               )}
               {correctMap && (
-                <span style={{ paddingLeft: 8, color: 'var(--success)', opacity: row.correctAns ? 1 : 0 }}>
+                <span style={{ paddingLeft: 8, color: 'var(--text-muted)', fontStyle: 'italic' }}>
                   {row.correctAns ?? ''}
                 </span>
               )}
