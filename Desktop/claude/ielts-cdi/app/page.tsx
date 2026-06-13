@@ -50,12 +50,7 @@ export default async function LandingPage() {
 
       {/* Hero */}
       <section className="text-center px-6 pt-24 pb-20 max-w-4xl mx-auto">
-        <div
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
-          style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
-        >
-          <Zap size={12} /> Trusted by 10,000+ IELTS students
-        </div>
+
         <h1 className="text-5xl sm:text-6xl font-black leading-tight mb-6">
           Ace IELTS with{' '}
           <span
