@@ -259,15 +259,6 @@ export function PaymentModal({
                     </span>
                   </div>
 
-                  {meta && (
-                    <div
-                      className="mt-2 text-xs"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      📅 {meta.booking_date} · ⏰{' '}
-                      {meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
-                    </div>
-                  )}
                 </div>
 
                 {/* Inputs */}
