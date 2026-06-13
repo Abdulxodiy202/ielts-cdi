@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [results, setResults] = useState<object[]>([])
   const [users, setUsers] = useState<object[]>([])
   const [promoCodes, setPromoCodes] = useState<object[]>([])
+  const [promoDbMissing, setPromoDbMissing] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -65,7 +66,12 @@ export default function AdminPage() {
       setSchedules(schedulesRes.ok ? await schedulesRes.json() : [])
       setResults(resultsRes.ok ? await resultsRes.json() : [])
       setUsers(usersRes.ok ? await usersRes.json() : [])
-      setPromoCodes(promoRes.ok ? await promoRes.json() : [])
+      if (promoRes.status === 503) {
+        setPromoDbMissing(true)
+        setPromoCodes([])
+      } else {
+        setPromoCodes(promoRes.ok ? await promoRes.json() : [])
+      }
       setStatus('ready')
     }
 
@@ -97,6 +103,7 @@ export default function AdminPage() {
       initialResults={results as any}
       initialUsers={users as any}
       initialPromoCodes={promoCodes as any}
+      promoDbMissing={promoDbMissing}
     />
   )
 }

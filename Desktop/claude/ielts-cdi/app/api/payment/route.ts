@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTelegramNotification, sendTelegramPhoto } from '@/lib/telegram'
 
 export async function POST(request: NextRequest) {
@@ -68,6 +69,26 @@ export async function POST(request: NextRequest) {
 
   if (insertError) {
     return Response.json({ error: insertError.message }, { status: 500 })
+  }
+
+  // Track promo code usage
+  if (promoCode && type === 'premium') {
+    const admin = createAdminClient()
+    const { data: promoRow } = await admin
+      .from('promo_codes')
+      .select('id')
+      .ilike('code', promoCode)
+      .single()
+    if (promoRow) {
+      await admin.from('promo_code_usage').insert({
+        promo_code_id: promoRow.id,
+        user_id: user.id,
+        user_name: userName,
+        user_email: user.email,
+        original_amount: originalAmount ?? amount,
+        discounted_amount: amount,
+      })
+    }
   }
 
   // For mock_booking: also create a pending booking record.

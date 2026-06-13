@@ -80,6 +80,7 @@ interface Props {
   initialResults: TestResult[]
   initialUsers: AdminUser[]
   initialPromoCodes: PromoCode[]
+  promoDbMissing?: boolean
 }
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
@@ -989,6 +990,15 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
 }
 
 /* ── Promo Codes tab ─────────────────────────────────────────────────── */
+interface PromoUsage {
+  id: string
+  user_name: string | null
+  user_email: string | null
+  original_amount: number | null
+  discounted_amount: number | null
+  used_at: string
+}
+
 interface PromoCode {
   id: string
   code: string
@@ -997,14 +1007,51 @@ interface PromoCode {
   valid_until: string
   is_active: boolean
   created_at: string
+  usage?: PromoUsage[]
 }
 
-function PromoCodesTab({ initialPromoCodes }: { initialPromoCodes: PromoCode[] }) {
+const SETUP_SQL = `-- Run in Supabase SQL Editor → New query → Run
+create table if not exists public.promo_codes (
+  id uuid default gen_random_uuid() primary key,
+  code text not null unique,
+  discount_percent integer not null check (discount_percent between 1 and 100),
+  valid_from timestamptz not null,
+  valid_until timestamptz not null,
+  is_active boolean default true not null,
+  created_at timestamptz default now()
+);
+alter table public.promo_codes enable row level security;
+create policy "Auth users can read active promo codes" on public.promo_codes
+  for select using (auth.role() = 'authenticated');
+
+create table if not exists public.promo_code_usage (
+  id uuid default gen_random_uuid() primary key,
+  promo_code_id uuid references public.promo_codes(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete cascade,
+  user_name text,
+  user_email text,
+  original_amount integer,
+  discounted_amount integer,
+  used_at timestamptz default now()
+);
+alter table public.promo_code_usage enable row level security;
+create policy "Admin can view all usage" on public.promo_code_usage
+  for select using (true);
+create policy "Auth users can insert own usage" on public.promo_code_usage
+  for insert with check (auth.uid() = user_id);
+
+alter table public.payment_requests
+  add column if not exists promo_code text,
+  add column if not exists original_amount integer;`
+
+function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: PromoCode[]; dbMissing?: boolean }) {
   const [codes, setCodes] = useState<PromoCode[]>(initialPromoCodes)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ code: '', discount_percent: 10, valid_from: '', valid_until: '' })
+  const [expandedUsage, setExpandedUsage] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const today = new Date().toISOString()
 
@@ -1059,8 +1106,43 @@ function PromoCodesTab({ initialPromoCodes }: { initialPromoCodes: PromoCode[] }
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('uz-UZ')
 
+  const copySQL = () => {
+    navigator.clipboard.writeText(SETUP_SQL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+
   return (
     <div className="space-y-6">
+
+      {/* DB setup banner */}
+      {dbMissing && (
+        <div className="card p-5" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="text-2xl">⚠️</div>
+            <div>
+              <p className="font-bold text-sm mb-1" style={{ color: 'var(--warning)' }}>Jadval topilmadi</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                <code>promo_codes</code> jadvali Supabase bazasida mavjud emas.
+                Quyidagi SQL ni bir marta Supabase SQL Editor ga nusxalang va ishga tushiring.
+              </p>
+              <a
+                href="https://supabase.com/dashboard/project/_/sql/new"
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs underline mt-1 inline-block"
+                style={{ color: 'var(--accent)' }}
+              >
+                Supabase SQL Editor →
+              </a>
+            </div>
+          </div>
+          <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', maxHeight: 260 }}>
+            {SETUP_SQL}
+          </pre>
+          <button onClick={copySQL} className="btn-outline text-sm mt-3 flex items-center gap-2">
+            {copied ? '✅ Nusxalandi!' : '📋 SQL ni nusxalash'}
+          </button>
+        </div>
+      )}
+
       {/* Create / Edit form */}
       <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
@@ -1121,51 +1203,88 @@ function PromoCodesTab({ initialPromoCodes }: { initialPromoCodes: PromoCode[] }
       </div>
 
       {/* List */}
-      {codes.length === 0 ? (
+      {codes.length === 0 && !dbMissing ? (
         <div className="card p-12 text-center">
           <Tag size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
           <p style={{ color: 'var(--text-muted)' }}>Hali promokodlar yo&apos;q</p>
         </div>
-      ) : (
+      ) : codes.length > 0 ? (
         <div className="card overflow-hidden">
           <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-            <span>Kod</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Holat</span><span className="text-right">Amal</span>
+            style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 80px 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Kod</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Ishlatildi</span><span>Holat</span><span className="text-right">Amal</span>
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {codes.map(c => {
               const st = statusOf(c)
+              const usageList = c.usage ?? []
+              const isUsageOpen = expandedUsage === c.id
               return (
-                <div key={c.id} className="grid items-center px-4 py-3 text-sm"
-                  style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 100px 90px', gap: 8 }}>
-                  <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
-                  <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
-                  <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_until)}</span>
-                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
-                  <div className="flex items-center gap-1.5 justify-end">
-                    <button onClick={() => startEdit(c)} title="Tahrirlash"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                      <Edit3 size={12} />
+                <div key={c.id}>
+                  <div className="grid items-center px-4 py-3 text-sm"
+                    style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 80px 100px 90px', gap: 8 }}>
+                    <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
+                    <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_until)}</span>
+                    <button
+                      onClick={() => setExpandedUsage(isUsageOpen ? null : c.id)}
+                      className="text-xs font-semibold flex items-center gap-1"
+                      style={{ color: usageList.length > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      {usageList.length}x {usageList.length > 0 && (isUsageOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
                     </button>
-                    <button onClick={() => handleToggle(c)} title={c.is_active ? 'O\'chirish' : 'Yoqish'}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                      style={{ background: c.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: c.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
-                      {c.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
-                    </button>
-                    <button onClick={() => handleDelete(c.id)} title="O'chirish"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
-                      <Trash2 size={12} />
-                    </button>
+                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <button onClick={() => startEdit(c)} title="Tahrirlash"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                        <Edit3 size={12} />
+                      </button>
+                      <button onClick={() => handleToggle(c)} title={c.is_active ? 'O\'chirish' : 'Yoqish'}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: c.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: c.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                        {c.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                      </button>
+                      <button onClick={() => handleDelete(c.id)} title="O'chirish"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Usage expand */}
+                  {isUsageOpen && usageList.length > 0 && (
+                    <div className="px-4 pb-3" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide py-2" style={{ color: 'var(--text-muted)' }}>Ishlatgan foydalanuvchilar</p>
+                      <div className="space-y-1">
+                        {usageList.map(u => (
+                          <div key={u.id} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                            <div>
+                              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{u.user_name || 'Noma\'lum'}</span>
+                              {u.user_email && <span className="ml-2" style={{ color: 'var(--text-muted)' }}>{u.user_email}</span>}
+                            </div>
+                            <div className="flex items-center gap-4 text-right">
+                              {u.original_amount != null && (
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  <s>{formatPrice(u.original_amount)}</s> → <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
+                                </span>
+                              )}
+                              <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -1183,7 +1302,7 @@ const TABS = [
 type TabId = typeof TABS[number]['id']
 
 /* ── Main AdminClient ────────────────────────────────────────────────── */
-export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes }: Props) {
+export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
@@ -1253,7 +1372,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
         <UsersTab initialUsers={initialUsers} />
       )}
       {activeTab === 'promo' && (
-        <PromoCodesTab initialPromoCodes={initialPromoCodes} />
+        <PromoCodesTab initialPromoCodes={initialPromoCodes} dbMissing={promoDbMissing} />
       )}
     </div>
   )

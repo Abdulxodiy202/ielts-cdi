@@ -16,11 +16,21 @@ async function guardAdmin() {
 export async function GET() {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const admin = createAdminClient()
+
+  // Fetch codes + usage count in one go
   const { data, error } = await admin
     .from('promo_codes')
-    .select('*')
+    .select('*, usage:promo_code_usage(id, user_name, user_email, original_amount, discounted_amount, used_at)')
     .order('created_at', { ascending: false })
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+
+  if (error) {
+    // 42P01 = undefined_table; surface as TABLE_NOT_FOUND so admin UI can show setup banner
+    const code = (error as any).code
+    if (code === '42P01' || error.message?.includes('does not exist')) {
+      return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    }
+    return Response.json({ error: error.message }, { status: 500 })
+  }
   return Response.json(data ?? [])
 }
 
