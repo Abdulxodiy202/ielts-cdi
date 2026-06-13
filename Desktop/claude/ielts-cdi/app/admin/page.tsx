@@ -40,6 +40,7 @@ export default function AdminPage() {
   const [schedules, setSchedules] = useState<MockSchedule[]>([])
   const [results, setResults] = useState<object[]>([])
   const [users, setUsers] = useState<object[]>([])
+  const [promoCodes, setPromoCodes] = useState<object[]>([])
 
   useEffect(() => {
     async function init() {
@@ -50,12 +51,13 @@ export default function AdminPage() {
       if (user.email !== ADMIN_EMAIL) { router.replace('/dashboard'); return }
 
       // Fetch all admin data in parallel from API routes
-      const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes] = await Promise.all([
+      const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes, promoRes] = await Promise.all([
         fetch('/api/admin/payments'),
         fetch('/api/admin/tests'),
         fetch('/api/admin/mock-schedules'),
         fetch('/api/admin/results'),
         fetch('/api/admin/users'),
+        fetch('/api/admin/promo-codes'),
       ])
 
       setPayments(paymentsRes.ok ? await paymentsRes.json() : [])
@@ -63,6 +65,7 @@ export default function AdminPage() {
       setSchedules(schedulesRes.ok ? await schedulesRes.json() : [])
       setResults(resultsRes.ok ? await resultsRes.json() : [])
       setUsers(usersRes.ok ? await usersRes.json() : [])
+      setPromoCodes(promoRes.ok ? await promoRes.json() : [])
       setStatus('ready')
     }
 
@@ -93,6 +96,7 @@ export default function AdminPage() {
       initialSchedules={schedules}
       initialResults={results as any}
       initialUsers={users as any}
+      initialPromoCodes={promoCodes as any}
     />
   )
 }

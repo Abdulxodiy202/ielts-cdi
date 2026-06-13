@@ -12,6 +12,8 @@ import {
   User,
   Phone,
   ImageIcon,
+  Tag,
+  ChevronDown,
 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils/formatters'
 
@@ -49,10 +51,45 @@ export function PaymentModal({
   const [done, setDone] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Promo code state
+  const [promoOpen, setPromoOpen] = useState(false)
+  const [promoInput, setPromoInput] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoError, setPromoError] = useState('')
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discountPercent: number } | null>(null)
+
+  const effectiveAmount = appliedPromo
+    ? Math.round((amount * (1 - appliedPromo.discountPercent / 100)) / 1000) * 1000
+    : amount
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(CARD_NUMBER.replace(/\s/g, ''))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return
+    setPromoLoading(true)
+    setPromoError('')
+    try {
+      const res = await fetch('/api/promo/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoInput.trim() }),
+      })
+      const json = await res.json()
+      if (json.valid) {
+        setAppliedPromo({ code: promoInput.trim().toUpperCase(), discountPercent: json.discount_percent })
+        setPromoError('')
+      } else {
+        setPromoError(json.error || 'Promokod yaroqsiz yoki muddati o\'tgan')
+        setAppliedPromo(null)
+      }
+    } catch {
+      setPromoError('Tarmoq xatosi')
+    }
+    setPromoLoading(false)
   }
 
   const handleFile = (file: File) => {
@@ -88,8 +125,12 @@ export function PaymentModal({
     formData.append('user_name', fullName.trim())
     formData.append('user_phone', phone.trim())
     formData.append('type', type)
-    formData.append('amount', String(amount))
+    formData.append('amount', String(effectiveAmount))
     if (meta) formData.append('meta', JSON.stringify(meta))
+    if (appliedPromo) {
+      formData.append('promo_code', appliedPromo.code)
+      formData.append('original_amount', String(amount))
+    }
 
     try {
       const res = await fetch('/api/payment', { method: 'POST', body: formData })
@@ -117,6 +158,10 @@ export function PaymentModal({
     setPreviewUrl(null)
     setError('')
     setDone(false)
+    setPromoOpen(false)
+    setPromoInput('')
+    setPromoError('')
+    setAppliedPromo(null)
     onClose()
   }
 
@@ -251,15 +296,81 @@ export function PaymentModal({
                     <span style={{ color: 'var(--text-muted)' }}>
                       O&apos;tkazma summasi
                     </span>
-                    <span
-                      className="font-bold text-base"
-                      style={{ color: 'var(--accent)' }}
-                    >
-                      {formatPrice(amount)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {appliedPromo && (
+                        <span className="text-sm line-through" style={{ color: 'var(--text-muted)' }}>
+                          {formatPrice(amount)}
+                        </span>
+                      )}
+                      <span className="font-bold text-base" style={{ color: appliedPromo ? 'var(--success)' : 'var(--accent)' }}>
+                        {formatPrice(effectiveAmount)}
+                      </span>
+                    </div>
                   </div>
 
                 </div>
+
+                {/* Promo code — only for premium */}
+                {type === 'premium' && (
+                  <div className="mb-4">
+                    {!appliedPromo ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setPromoOpen(o => !o)}
+                          className="flex items-center gap-1.5 text-xs font-medium mb-2 transition-opacity hover:opacity-70"
+                          style={{ color: 'var(--accent)' }}
+                        >
+                          <Tag size={12} />
+                          Promokod bormi?
+                          <ChevronDown size={12} style={{ transform: promoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                        </button>
+                        {promoOpen && (
+                          <div className="flex gap-2">
+                            <input
+                              className="input-field text-sm flex-1 uppercase"
+                              placeholder="PROMO2025"
+                              value={promoInput}
+                              onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError('') }}
+                              onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
+                              style={{ letterSpacing: '0.05em' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyPromo}
+                              disabled={promoLoading || !promoInput.trim()}
+                              className="btn-primary text-sm px-4 shrink-0 disabled:opacity-50"
+                            >
+                              {promoLoading ? <Loader2 size={13} className="animate-spin" /> : "Qo'llash"}
+                            </button>
+                          </div>
+                        )}
+                        {promoError && (
+                          <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: 'var(--error)' }}>
+                            ❌ {promoError}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div
+                        className="flex items-center justify-between rounded-lg px-3 py-2 text-sm"
+                        style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}
+                      >
+                        <span style={{ color: 'var(--success)' }}>
+                          ✅ <strong>{appliedPromo.code}</strong> — {appliedPromo.discountPercent}% chegirma qo&apos;llandi
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => { setAppliedPromo(null); setPromoInput(''); setPromoOpen(false) }}
+                          className="ml-2 opacity-60 hover:opacity-100"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Inputs */}
                 <div className="space-y-3 mb-4">

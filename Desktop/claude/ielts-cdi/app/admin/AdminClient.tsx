@@ -7,6 +7,7 @@ import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -78,6 +79,7 @@ interface Props {
   initialSchedules: MockSchedule[]
   initialResults: TestResult[]
   initialUsers: AdminUser[]
+  initialPromoCodes: PromoCode[]
 }
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
@@ -986,19 +988,202 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   )
 }
 
+/* ── Promo Codes tab ─────────────────────────────────────────────────── */
+interface PromoCode {
+  id: string
+  code: string
+  discount_percent: number
+  valid_from: string
+  valid_until: string
+  is_active: boolean
+  created_at: string
+}
+
+function PromoCodesTab({ initialPromoCodes }: { initialPromoCodes: PromoCode[] }) {
+  const [codes, setCodes] = useState<PromoCode[]>(initialPromoCodes)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({ code: '', discount_percent: 10, valid_from: '', valid_until: '' })
+
+  const today = new Date().toISOString()
+
+  const statusOf = (c: PromoCode) => {
+    if (!c.is_active) return { label: 'O\'chirilgan', color: 'var(--text-muted)', bg: 'var(--bg-secondary)' }
+    if (today > c.valid_until) return { label: 'Muddati o\'tgan', color: 'var(--error)', bg: 'rgba(239,68,68,0.1)' }
+    if (today < c.valid_from) return { label: 'Hali boshlanmagan', color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' }
+    return { label: 'Faol', color: 'var(--success)', bg: 'rgba(34,197,94,0.1)' }
+  }
+
+  const resetForm = () => { setForm({ code: '', discount_percent: 10, valid_from: '', valid_until: '' }); setFormError(''); setEditingId(null) }
+
+  const handleSave = async () => {
+    setSaving(true); setFormError('')
+    const method = editingId ? 'PATCH' : 'POST'
+    const url = editingId ? `/api/admin/promo-codes/${editingId}` : '/api/admin/promo-codes'
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    const json = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    if (editingId) {
+      setCodes(prev => prev.map(c => c.id === editingId ? json : c))
+    } else {
+      setCodes(prev => [json, ...prev])
+    }
+    resetForm()
+    setSaving(false)
+  }
+
+  const handleToggle = async (c: PromoCode) => {
+    const res = await fetch(`/api/admin/promo-codes/${c.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !c.is_active }),
+    })
+    if (res.ok) setCodes(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Promokodni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/admin/promo-codes/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setCodes(prev => prev.filter(c => c.id !== id))
+  }
+
+  const startEdit = (c: PromoCode) => {
+    setEditingId(c.id)
+    setForm({
+      code: c.code,
+      discount_percent: c.discount_percent,
+      valid_from: c.valid_from.slice(0, 10),
+      valid_until: c.valid_until.slice(0, 10),
+    })
+  }
+
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('uz-UZ')
+
+  return (
+    <div className="space-y-6">
+      {/* Create / Edit form */}
+      <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+        <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+          {editingId ? '✏️ Promokodni tahrirlash' : '➕ Yangi promokod'}
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kod</label>
+            <input
+              className="input-field text-sm uppercase"
+              placeholder="SUMMER20"
+              value={form.code}
+              onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+              style={{ letterSpacing: '0.05em' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Chegirma (%)</label>
+            <input
+              className="input-field text-sm"
+              type="number"
+              min={1}
+              max={100}
+              value={form.discount_percent}
+              onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Boshlanish sanasi</label>
+            <input
+              className="input-field text-sm"
+              type="date"
+              value={form.valid_from}
+              onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tugash sanasi</label>
+            <input
+              className="input-field text-sm"
+              type="date"
+              value={form.valid_until}
+              onChange={e => setForm(f => ({ ...f, valid_until: e.target.value }))}
+            />
+          </div>
+        </div>
+        {formError && (
+          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>
+        )}
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+            <Plus size={14} /> {saving ? 'Saqlanmoqda...' : editingId ? 'Saqlash' : 'Qo\'shish'}
+          </button>
+          {editingId && (
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          )}
+        </div>
+      </div>
+
+      {/* List */}
+      {codes.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Tag size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali promokodlar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Kod</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {codes.map(c => {
+              const st = statusOf(c)
+              return (
+                <div key={c.id} className="grid items-center px-4 py-3 text-sm"
+                  style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 100px 90px', gap: 8 }}>
+                  <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
+                  <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_until)}</span>
+                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button onClick={() => startEdit(c)} title="Tahrirlash"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <Edit3 size={12} />
+                    </button>
+                    <button onClick={() => handleToggle(c)} title={c.is_active ? 'O\'chirish' : 'Yoqish'}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                      style={{ background: c.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: c.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                      {c.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                    </button>
+                    <button onClick={() => handleDelete(c.id)} title="O'chirish"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
-  { id: 'payments',  label: 'To\'lovlar',     Icon: CreditCard },
-  { id: 'reading',   label: 'Reading Tests',  Icon: BookOpen },
-  { id: 'listening', label: 'Listening Tests', Icon: Headphones },
-  { id: 'mock',      label: 'Mock Test',       Icon: Calendar },
-  { id: 'results',   label: 'Natijalar',       Icon: BarChart2 },
+  { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
+  { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
+  { id: 'listening', label: 'Listening Tests',  Icon: Headphones },
+  { id: 'mock',      label: 'Mock Test',        Icon: Calendar },
+  { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
+  { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
 ] as const
 type TabId = typeof TABS[number]['id']
 
 /* ── Main AdminClient ────────────────────────────────────────────────── */
-export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers }: Props) {
+export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
@@ -1066,6 +1251,9 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       )}
       {activeTab === 'users' && (
         <UsersTab initialUsers={initialUsers} />
+      )}
+      {activeTab === 'promo' && (
+        <PromoCodesTab initialPromoCodes={initialPromoCodes} />
       )}
     </div>
   )
