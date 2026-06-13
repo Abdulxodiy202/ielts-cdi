@@ -455,53 +455,19 @@ function isAnswerCorrect(userAns: string, correct: string | string[]): boolean {
   return arr.some(c => u === String(c).trim().toLowerCase())
 }
 
-/** Convert a raw score (0-40) to IELTS Listening band */
-function listeningBand(score: number): string {
-  if (score >= 39) return '9.0'
-  if (score >= 37) return '8.5'
-  if (score >= 35) return '8.0'
-  if (score >= 32) return '7.5'
-  if (score >= 30) return '7.0'
-  if (score >= 26) return '6.5'
-  if (score >= 23) return '6.0'
-  if (score >= 18) return '5.5'
-  if (score >= 16) return '5.0'
-  if (score >= 13) return '4.5'
-  if (score >= 10) return '4.0'
-  if (score >= 8)  return '3.5'
-  if (score >= 6)  return '3.0'
-  if (score >= 4)  return '2.5'
-  return '2.0'
+/** True when the stored value is effectively blank (empty / CDI placeholder) */
+function isBlankAnswer(v: string): boolean {
+  const s = (v ?? '').trim().toLowerCase()
+  return !s || s === 'not answered' || s === 'no answer'
 }
 
-/** Convert a raw score (0-40) to IELTS Academic Reading band */
-function readingBand(score: number): string {
-  if (score >= 39) return '9.0'
-  if (score >= 37) return '8.5'
-  if (score >= 35) return '8.0'
-  if (score >= 33) return '7.5'
-  if (score >= 30) return '7.0'
-  if (score >= 27) return '6.5'
-  if (score >= 23) return '6.0'
-  if (score >= 19) return '5.5'
-  if (score >= 15) return '5.0'
-  if (score >= 13) return '4.5'
-  if (score >= 10) return '4.0'
-  if (score >= 8)  return '3.5'
-  if (score >= 6)  return '3.0'
-  if (score >= 4)  return '2.5'
-  return '2.0'
-}
-
-/**
- * Expand a raw answers map into flat rows for display + scoring.
- * The '21-23' listening group is expanded into three individual rows.
- */
 type AnswerRow = {
-  key: string         // display key (e.g. '1', '21-23', '21', '22', '23')
-  userAns: string     // what the user answered
-  correct: string | string[] | null  // null → no key in correctMap
-  isCorrect: boolean | null          // null → not scored
+  key: string                        // display key e.g. '1', '21-23'
+  userAns: string                    // raw stored value
+  isBlank: boolean                   // user left this unanswered
+  isCorrect: boolean | null          // null → no correct answer known
+  // For '21-23' multi-select group: partial score display
+  groupScore?: { got: number; total: number }
 }
 
 function buildRows(
@@ -510,68 +476,79 @@ function buildRows(
   section: 'listening' | 'reading',
 ): AnswerRow[] {
   if (!correctMap) {
-    // No scoring: just sort user answers
     return Object.entries(answers)
       .sort(([a], [b]) => {
-        const na = Number(a.replace(/^[^\d]*/, ''))
-        const nb = Number(b.replace(/^[^\d]*/, ''))
+        const na = Number(a.replace(/^\D*/, ''))
+        const nb = Number(b.replace(/^\D*/, ''))
         return (isNaN(na) || isNaN(nb)) ? a.localeCompare(b) : na - nb
       })
-      .map(([k, v]) => ({ key: k, userAns: v, correct: null, isCorrect: null }))
+      .map(([k, v]) => ({ key: k, userAns: v, isBlank: isBlankAnswer(v), isCorrect: null }))
   }
 
   const rows: AnswerRow[] = []
 
   if (section === 'listening') {
-    // Iterate all 40 questions in order; expand '21-23' into individual rows
     for (let i = 1; i <= 40; i++) {
-      if (i >= 21 && i <= 23) {
-        if (i === 21) {
-          // Expand the '21-23' group into 3 rows
-          const groupCorrect = LISTENING_CORRECT['21-23'] as string[]
-          const groupUserRaw = answers['21-23'] || ''
-          const userParts = groupUserRaw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
-          for (let g = 0; g < 3; g++) {
-            const qNum = String(21 + g)
-            const expLetter = (groupCorrect[g] ?? '').toLowerCase()
-            const got = userParts.includes(expLetter)
-            rows.push({
-              key: qNum,
-              userAns: groupUserRaw || '—',
-              correct: groupCorrect[g] ?? null,
-              isCorrect: got,
-            })
-          }
+      // '21-23' group: one row, partial scoring
+      if (i === 21) {
+        const groupCorrect = (LISTENING_CORRECT['21-23'] as string[])
+        const raw = answers['21-23'] ?? ''
+        const blank = isBlankAnswer(raw)
+        if (blank) {
+          rows.push({ key: '21-23', userAns: '', isBlank: true, isCorrect: false,
+            groupScore: { got: 0, total: groupCorrect.length } })
+        } else {
+          const userParts = raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+          const got = groupCorrect.filter(exp => userParts.includes(exp.toLowerCase())).length
+          rows.push({
+            key: '21-23', userAns: raw, isBlank: false,
+            isCorrect: got === groupCorrect.length,
+            groupScore: { got, total: groupCorrect.length },
+          })
         }
-        // i === 22 and 23 already handled above
         continue
       }
+      if (i === 22 || i === 23) continue  // covered by '21-23' row
+
       const k = String(i)
       const c = correctMap[k] ?? null
       const u = answers[k] ?? ''
+      const blank = isBlankAnswer(u)
       rows.push({
-        key: k,
-        userAns: u,
-        correct: c,
-        isCorrect: c !== null ? isAnswerCorrect(u, c) : null,
+        key: k, userAns: u, isBlank: blank,
+        isCorrect: c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null,
       })
     }
   } else {
-    // Reading: keys '1'-'40'
     for (let i = 1; i <= 40; i++) {
       const k = String(i)
       const c = correctMap[k] ?? null
       const u = answers[k] ?? ''
+      const blank = isBlankAnswer(u)
       rows.push({
-        key: k,
-        userAns: u,
-        correct: c,
-        isCorrect: c !== null ? isAnswerCorrect(u, c) : null,
+        key: k, userAns: u, isBlank: blank,
+        isCorrect: c !== null ? (blank ? false : isAnswerCorrect(u, c)) : null,
       })
     }
   }
 
   return rows
+}
+
+/**
+ * Compute total correct points, counting the '21-23' group as up to 3 points.
+ * Total is always 40 (IELTS standard).
+ */
+function computeCorrectCount(rows: AnswerRow[]): number {
+  let n = 0
+  for (const r of rows) {
+    if (r.groupScore) {
+      n += r.groupScore.got
+    } else if (r.isCorrect) {
+      n += 1
+    }
+  }
+  return n
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -583,7 +560,7 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
   color: string
   section?: 'listening' | 'reading'
 }) {
-  // Defensive: JSONB might arrive as a JSON string in some edge cases
+  // Defensive: JSONB might arrive as a JSON string in edge cases
   const answers: Record<string, string> =
     typeof rawAnswers === 'string'
       ? (() => { try { return JSON.parse(rawAnswers) } catch { return {} } })()
@@ -601,72 +578,100 @@ function AnswersTable({ answers: rawAnswers, label, color, section }: {
     )
   }
 
-  // Count non-empty answers (exclude 'No Answer' / 'Not Answered' placeholders from HTML)
-  const answeredCount = Object.values(answers).filter(val => {
-    const s = (val || '').trim()
-    return s !== '' && s !== 'No Answer' && s !== 'Not Answered'
-  }).length
-  const SECTION_TOTAL = 40
-
-  // Build rows (with optional scoring)
   const correctMap = section === 'listening' ? LISTENING_CORRECT
                    : section === 'reading'   ? READING_CORRECT
                    : null
   const rows = buildRows(answers, correctMap, section ?? 'reading')
-  const scoredRows = correctMap ? rows.filter(r => r.isCorrect !== null) : []
-  const correctCount = scoredRows.filter(r => r.isCorrect).length
-  const bandFn = section === 'listening' ? listeningBand : readingBand
-  const bandStr = correctMap ? bandFn(correctCount) : null
+
+  // Correct count: group '21-23' can contribute 0-3 points, others 0 or 1
+  const correctCount = correctMap ? computeCorrectCount(rows) : null
+
+  // Answered count: non-blank entries (flattened: '21-23' counts as 1 entry)
+  const answeredCount = rows.filter(r => !r.isBlank).length
 
   return (
     <div>
-      {/* Header row: label + answered count */}
-      <div className="flex items-center justify-between mb-1">
+      {/* Header: label on left, badges on right */}
+      <div className="flex items-start justify-between gap-2 mb-2">
         <p className="text-xs font-bold" style={{ color }}>{label}</p>
-        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-          style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
-          {answeredCount} / {SECTION_TOTAL} javob berildi
-        </span>
-      </div>
-
-      {/* Score + Band (admin-only, shown only when correctMap is available) */}
-      {bandStr && (
-        <div className="flex items-center gap-3 mb-2 px-3 py-2 rounded-xl"
-          style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.2)' }}>
-          <span className="text-xs font-bold" style={{ color: 'var(--success)' }}>
-            ✅ To&apos;g&apos;ri: {correctCount} / 40
-          </span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-            Band {bandStr}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {/* Primary badge: correct count */}
+          {correctCount !== null && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+              ✓ {correctCount} / 40 to&apos;g&apos;ri
+            </span>
+          )}
+          {/* Secondary badge: answered count */}
+          <span className="text-xs px-2 py-0.5 rounded-full"
+            style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            {answeredCount} javob berildi
           </span>
         </div>
-      )}
+      </div>
 
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
         <div className="grid text-xs font-semibold px-3 py-1.5"
           style={{
-            gridTemplateColumns: correctMap ? '40px 1fr 20px' : '48px 1fr',
+            gridTemplateColumns: correctMap ? '44px 1fr 32px' : '48px 1fr',
             background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderBottom: '1px solid var(--border)',
           }}>
-          <span>#</span><span>Javob</span>{correctMap && <span />}
+          <span>#</span>
+          <span>Javob</span>
+          {correctMap && <span style={{ textAlign: 'right' }}>✓/✗</span>}
         </div>
-        {rows.map((row, idx) => (
-          <div key={`${row.key}-${idx}`} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
-            style={{
-              gridTemplateColumns: correctMap ? '40px 1fr 20px' : '48px 1fr',
-              borderColor: 'var(--border)',
-              background: row.isCorrect === false ? 'rgba(239,68,68,0.04)' : 'transparent',
-            }}>
-            <span style={{ color: 'var(--text-muted)' }}>{row.key}</span>
-            <span style={{ color: 'var(--text-primary)' }}>{row.userAns || '—'}</span>
-            {correctMap && (
-              <span style={{ color: row.isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: 700 }}>
-                {row.isCorrect ? '✓' : '✗'}
+        {rows.map((row, idx) => {
+          // Determine correctness indicator cell
+          let indicator: React.ReactNode = null
+          if (correctMap) {
+            if (row.isBlank) {
+              // Unanswered: neutral gray dash, no red highlight
+              indicator = <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>—</span>
+            } else if (row.groupScore) {
+              // '21-23' multi-select: show "X/3"
+              const { got, total } = row.groupScore
+              const allCorrect = got === total
+              const noneCorrect = got === 0
+              indicator = (
+                <span style={{
+                  fontWeight: 700,
+                  color: allCorrect ? 'var(--success)' : noneCorrect ? 'var(--error)' : 'var(--warning)',
+                  fontSize: 10,
+                }}>
+                  {got}/{total}
+                </span>
+              )
+            } else {
+              indicator = (
+                <span style={{ color: row.isCorrect ? 'var(--success)' : 'var(--error)', fontWeight: 700 }}>
+                  {row.isCorrect ? '✓' : '✗'}
+                </span>
+              )
+            }
+          }
+
+          return (
+            <div key={`${row.key}-${idx}`} className="grid text-xs px-3 py-1.5 border-b last:border-b-0"
+              style={{
+                gridTemplateColumns: correctMap ? '44px 1fr 32px' : '48px 1fr',
+                borderColor: 'var(--border)',
+                // Only highlight red for non-blank wrong answers
+                background: (!row.isBlank && row.isCorrect === false && !row.groupScore)
+                  ? 'rgba(239,68,68,0.04)'
+                  : (row.groupScore && row.groupScore.got < row.groupScore.total && !row.isBlank)
+                    ? 'rgba(245,158,11,0.04)'
+                    : 'transparent',
+              }}>
+              <span style={{ color: 'var(--text-muted)' }}>{row.key}</span>
+              <span style={{ color: row.isBlank ? 'var(--text-muted)' : 'var(--text-primary)', opacity: row.isBlank ? 0.5 : 1 }}>
+                {row.isBlank ? '—' : row.userAns}
               </span>
-            )}
-          </div>
-        ))}
+              {correctMap && (
+                <span style={{ textAlign: 'right' }}>{indicator}</span>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
