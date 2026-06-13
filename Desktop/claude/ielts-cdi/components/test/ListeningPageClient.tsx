@@ -189,14 +189,14 @@ export function ListeningPageClient({
               {sectionMode ? (
                 <>
                   <span className="flex items-center gap-1"><Clock size={12} /> 10 {t('test.minutes')}</span>
-                  <span>В·</span><span>1 {t('test.sections')}</span>
-                  <span>В·</span><span>10 {t('test.questions')}</span>
+                  <span>·</span><span>1 {t('test.sections')}</span>
+                  <span>·</span><span>10 {t('test.questions')}</span>
                 </>
               ) : (
                 <>
                   <span className="flex items-center gap-1"><Clock size={12} /> 40 {t('test.minutes')}</span>
-                  <span>В·</span><span>4 {t('test.sections')}</span>
-                  <span>В·</span><span>40 {t('test.questions')}</span>
+                  <span>·</span><span>4 {t('test.sections')}</span>
+                  <span>·</span><span>40 {t('test.questions')}</span>
                 </>
               )}
             </div>
@@ -238,7 +238,7 @@ export function ListeningPageClient({
 
   return (
     <>
-      {/* в”Ђв”Ђ Mode selector в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* Mode selector */}
       {mode === 'select' && (
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Full Test card */}
@@ -255,7 +255,7 @@ export function ListeningPageClient({
               <Headphones size={28} style={{ color: '#3b82f6' }} />
             </div>
             <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-              рџ“‹ {t('listening.fullTestTitle')}
+              📋 {t('listening.fullTestTitle')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
               {t('listening.fullTestDesc')}
@@ -285,15 +285,8 @@ export function ListeningPageClient({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.07 }}
             onClick={() => setMode('sections')}
-            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] relative overflow-hidden"
+            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99]"
           >
-            {!isPremium && (
-              <div className="absolute top-3 right-3">
-                <span className="badge-premium flex items-center gap-1 text-xs">
-                  <Crown size={10} /> {t('test.premium')}
-                </span>
-              </div>
-            )}
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
               style={{ background: 'rgba(168,85,247,0.15)' }}
@@ -301,7 +294,7 @@ export function ListeningPageClient({
               <Zap size={28} style={{ color: '#a855f7' }} />
             </div>
             <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-              рџЋЇ {t('listening.trainingTitle')}
+              🎯 {t('listening.trainingTitle')}
             </h2>
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
               {t('listening.trainingDesc')}
@@ -327,7 +320,7 @@ export function ListeningPageClient({
         </div>
       )}
 
-      {/* в”Ђв”Ђ Full test list в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* Full test list */}
       {mode === 'full' && (
         <div>
           <button
@@ -343,7 +336,7 @@ export function ListeningPageClient({
         </div>
       )}
 
-      {/* в”Ђв”Ђ Sections: part picker в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* Sections: part picker */}
       {mode === 'sections' && activePart === null && (
         <div>
           <button
@@ -412,7 +405,7 @@ export function ListeningPageClient({
         </div>
       )}
 
-      {/* в”Ђв”Ђ Sections: test list for a part в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* в"Ђв"Ђ Sections: test list for a part в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ */}
       {mode === 'sections' && activePart !== null && (
         <div>
           <button
@@ -440,7 +433,7 @@ export function ListeningPageClient({
                     {t('test.sectionMode')}
                   </p>
                   <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Part {activePart} вЂ” {info.name}
+                    Part {activePart} вЂ" {info.name}
                   </p>
                 </div>
                 <span
@@ -459,7 +452,7 @@ export function ListeningPageClient({
         </div>
       )}
 
-      {/* в”Ђв”Ђ Premium lock modal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* в"Ђв"Ђ Premium lock modal в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ */}
       <AnimatePresence>
         {showLockModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -526,7 +519,7 @@ export function ListeningPageClient({
         )}
       </AnimatePresence>
 
-      {/* в”Ђв”Ђ Payment modal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */}
+      {/* в"Ђв"Ђ Payment modal в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ */}
       <PaymentModal
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
