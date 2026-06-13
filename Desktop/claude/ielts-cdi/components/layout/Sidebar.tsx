@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
@@ -26,7 +26,7 @@ interface Profile {
 
 /** "09 Jun 2026" */
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return 'вЂ”'
   return new Date(iso).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
   })
@@ -34,15 +34,15 @@ function fmtDate(iso: string | null): string {
 
 function displayPremiumSince(profile: Profile): string {
   if (profile.premium_since) return fmtDate(profile.premium_since)
-  if (!profile.premium_until) return '—'
+  if (!profile.premium_until) return 'вЂ”'
   const d = new Date(profile.premium_until)
   d.setDate(d.getDate() - 30)
   return fmtDate(d.toISOString())
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
    Sidebar
-   ══════════════════════════════════════════════════════════════════════ */
+   в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
@@ -69,7 +69,7 @@ export function Sidebar() {
     { href: '/mock-test',  label: t('nav.mockTest'),    icon: Calendar },
   ]
 
-  /* ── Initial profile fetch ─────────────────────────────────────────── */
+  /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
@@ -100,7 +100,7 @@ export function Sidebar() {
     if (profileOpen) setNameInput(profile?.full_name ?? '')
   }, [profileOpen, profile?.full_name])
 
-  /* ── Toast helpers ─────────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Toast helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const addToast = useCallback((message: string, type: ToastData['type']) => {
     const id = `${Date.now()}-${Math.random()}`
     setToasts(prev => [...prev, { id, message, type }])
@@ -110,7 +110,7 @@ export function Sidebar() {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }, [])
 
-  /* ── Realtime subscriptions ────────────────────────────────────────── */
+  /* в”Ђв”Ђ Realtime subscriptions в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   useEffect(() => {
     if (!user?.id) return
     const supabase = createClient()
@@ -129,7 +129,7 @@ export function Sidebar() {
           const wasPremium = isActivePremium(profileRef.current)
           setProfile(merged)
           if (isActivePremium(updated) && !wasPremium) {
-            addToast('🎉 Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
+            addToast('рџЋ‰ Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
           }
         }
       )
@@ -143,7 +143,7 @@ export function Sidebar() {
         (payload) => {
           const row = payload.new as { status: string; booking_date: string; time_slot: string }
           if (row.status === 'confirmed') {
-            addToast(`✅ Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
+            addToast(`вњ… Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
           }
         }
       )
@@ -155,7 +155,7 @@ export function Sidebar() {
     }
   }, [user?.id, addToast])
 
-  /* ── Avatar upload ─────────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Avatar upload в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
@@ -175,7 +175,7 @@ export function Sidebar() {
 
       setProfile(prev => prev ? { ...prev, avatar_url: json.publicUrl } : prev)
       setLocalAvatarUrl(json.publicUrl)
-      addToast('✅ Rasm yangilandi', 'success')
+      addToast('вњ… Rasm yangilandi', 'success')
     } catch (err) {
       console.error('[avatar upload]', err)
       setLocalAvatarUrl(null)
@@ -186,7 +186,7 @@ export function Sidebar() {
     }
   }, [user, addToast])
 
-  /* ── Save name ─────────────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Save name в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const handleSaveName = useCallback(async () => {
     if (!nameInput.trim()) return
     setNameSaving(true)
@@ -197,20 +197,20 @@ export function Sidebar() {
     })
     if (res.ok) {
       setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
-      addToast('✅ Ism saqlandi', 'success')
+      addToast('вњ… Ism saqlandi', 'success')
     } else {
       addToast('Saqlashda xatolik', 'error')
     }
     setNameSaving(false)
   }, [nameInput, addToast])
 
-  /* ── Derived values ────────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Derived values в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const displayName  = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || 'User'
   const avatarLetter = displayName[0].toUpperCase()
   const isPremium    = isActivePremium(profile)
   const avatarUrl    = localAvatarUrl ?? profile?.avatar_url ?? null
 
-  /* ── Sidebar markup ────────────────────────────────────────────────── */
+  /* в”Ђв”Ђ Sidebar markup в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const sidebarContent = (
     <div
       style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
@@ -284,7 +284,7 @@ export function Sidebar() {
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
         {user && (
           <div className="relative">
-            {/* Avatar row — click to open popup */}
+            {/* Avatar row вЂ” click to open popup */}
             <button
               type="button"
               onClick={() => setProfileOpen(o => !o)}
@@ -408,7 +408,7 @@ export function Sidebar() {
                             </div>
                             <div className="flex justify-between pt-0.5" style={{ color: 'var(--text-muted)' }}>
                               <span>{t('common.premiumSince')}</span>
-                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : '—'}</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : 'вЂ”'}</span>
                             </div>
                             <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
                               <span>{t('common.premiumUntil')}</span>
@@ -439,7 +439,7 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Upgrade button — always visible for non-premium */}
+        {/* Upgrade button вЂ” always visible for non-premium */}
         {!isPremium && (
           <button
             type="button"
@@ -548,7 +548,7 @@ export function Sidebar() {
         onClose={() => setUpgradeOpen(false)}
         onSuccess={() => { setUpgradeOpen(false) }}
         type="premium"
-        amount={119000}
+        amount={50000}
         initialName={profile?.full_name ?? ''}
       />
 
@@ -557,3 +557,4 @@ export function Sidebar() {
     </>
   )
 }
+

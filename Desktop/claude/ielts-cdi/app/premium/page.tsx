@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +73,7 @@ export default function PremiumPage() {
                 className="text-2xl font-bold mb-2"
                 style={{ color: 'var(--text-primary)' }}
               >
-                So&apos;rovingiz qabul qilindi! 🎉
+                So&apos;rovingiz qabul qilindi! рџЋ‰
               </h2>
               <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
                 To&apos;lovingiz tekshirilgach, 24 soat ichida premium faollashtiriladi.
@@ -93,16 +93,16 @@ export default function PremiumPage() {
                   IELTS CDI Premium
                 </h1>
                 <div className="text-4xl font-black my-3" style={{ color: 'var(--accent)' }}>
-                  119,000 UZS
+                  50,000 UZS
                 </div>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  oyiga · istalgan vaqt bekor qilish
+                  oyiga В· istalgan vaqt bekor qilish
                 </p>
               </div>
 
               {[
-                '5 ta Premium Reading Testi (5–9)',
-                '5 ta Premium Listening Testi (5–9)',
+                '5 ta Premium Reading Testi (5вЂ“9)',
+                '5 ta Premium Listening Testi (5вЂ“9)',
                 "Mock Test Bron qilish (20,000 UZS/sessiya)",
                 "To'liq tahlil va band kuzatuvi",
                 'Ustuvor qo\'llab-quvvatlash',
@@ -140,10 +140,11 @@ export default function PremiumPage() {
         onClose={() => setModalOpen(false)}
         onSuccess={() => { setModalOpen(false); setSuccess(true) }}
         type="premium"
-        amount={119000}
+        amount={50000}
         initialName={initialName}
         initialPhone={initialPhone}
       />
     </div>
   )
 }
+

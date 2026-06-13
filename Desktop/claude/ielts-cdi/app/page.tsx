@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic'
+﻿export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
 import { BookOpen, Headphones, BarChart2, Calendar, Crown, CheckCircle, ArrowRight, Zap } from 'lucide-react'
@@ -69,7 +69,7 @@ export default async function LandingPage() {
         </h1>
         <p className="text-lg max-w-2xl mx-auto mb-10" style={{ color: 'var(--text-secondary)' }}>
           18 full-length practice tests with instant scoring, detailed analytics,
-          and band score prediction — exactly like the real IELTS exam.
+          and band score prediction вЂ” exactly like the real IELTS exam.
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link href={ctaHref} className="btn-primary text-base px-8 py-3">
@@ -82,7 +82,7 @@ export default async function LandingPage() {
           )}
         </div>
         <p className="text-xs mt-4" style={{ color: 'var(--text-muted)' }}>
-          4 free tests per section · No credit card required
+          4 free tests per section В· No credit card required
         </p>
       </section>
 
@@ -122,13 +122,13 @@ export default async function LandingPage() {
             </thead>
             <tbody>
               {[
-                { raw: '39–40', band: '9.0', color: '#10b981', level: 'Expert' },
-                { raw: '37–38', band: '8.5', color: '#22c55e', level: 'Expert' },
-                { raw: '35–36', band: '8.0', color: '#3b82f6', level: 'Very Good' },
-                { raw: '33–34', band: '7.5', color: '#6366f1', level: 'Good' },
-                { raw: '30–32', band: '7.0', color: '#6366f1', level: 'Good' },
-                { raw: '23–26', band: '6.0', color: '#f59e0b', level: 'Competent' },
-                { raw: '15–18', band: '5.0', color: '#f97316', level: 'Modest' },
+                { raw: '39вЂ“40', band: '9.0', color: '#10b981', level: 'Expert' },
+                { raw: '37вЂ“38', band: '8.5', color: '#22c55e', level: 'Expert' },
+                { raw: '35вЂ“36', band: '8.0', color: '#3b82f6', level: 'Very Good' },
+                { raw: '33вЂ“34', band: '7.5', color: '#6366f1', level: 'Good' },
+                { raw: '30вЂ“32', band: '7.0', color: '#6366f1', level: 'Good' },
+                { raw: '23вЂ“26', band: '6.0', color: '#f59e0b', level: 'Competent' },
+                { raw: '15вЂ“18', band: '5.0', color: '#f97316', level: 'Modest' },
                 { raw: 'Below 10', band: '3.5', color: '#ef4444', level: 'Limited' },
               ].map(row => (
                 <tr key={row.band} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -166,7 +166,7 @@ export default async function LandingPage() {
               <Crown size={20} style={{ color: '#f59e0b' }} />
               <h3 className="text-xl font-bold">Premium</h3>
             </div>
-            <div className="text-4xl font-black mb-1" style={{ color: 'var(--accent)' }}>119,000 UZS</div>
+            <div className="text-4xl font-black mb-1" style={{ color: 'var(--accent)' }}>50,000 UZS</div>
             <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>per month</p>
             {['Everything in Free', '5 Premium Reading Tests', '5 Premium Listening Tests', 'Mock Test Booking', 'Priority Support'].map(f => (
               <div key={f} className="flex items-center gap-2 mb-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -182,8 +182,9 @@ export default async function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t text-center py-8 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
-        © {new Date().getFullYear()} IELTS CDI. All rights reserved.
+        В© {new Date().getFullYear()} IELTS CDI. All rights reserved.
       </footer>
     </div>
   )
 }
+

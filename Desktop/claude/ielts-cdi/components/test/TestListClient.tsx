@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -118,14 +118,14 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                     {type === 'reading' ? (
                       <>
                         <span className="flex items-center gap-1"><Clock size={12} /> 60 {t('test.minutes')}</span>
-                        <span>·</span><span>3 {t('test.passages')}</span>
-                        <span>·</span><span>40 {t('test.questions')}</span>
+                        <span>В·</span><span>3 {t('test.passages')}</span>
+                        <span>В·</span><span>40 {t('test.questions')}</span>
                       </>
                     ) : (
                       <>
                         <span className="flex items-center gap-1"><Clock size={12} /> 40 {t('test.minutes')}</span>
-                        <span>·</span><span>4 {t('test.sections')}</span>
-                        <span>·</span><span>40 {t('test.questions')}</span>
+                        <span>В·</span><span>4 {t('test.sections')}</span>
+                        <span>В·</span><span>40 {t('test.questions')}</span>
                       </>
                     )}
                   </div>
@@ -243,8 +243,9 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
         onClose={() => setShowPaymentModal(false)}
         onSuccess={() => setShowPaymentModal(false)}
         type="premium"
-        amount={119000}
+        amount={50000}
       />
     </>
   )
 }
+
