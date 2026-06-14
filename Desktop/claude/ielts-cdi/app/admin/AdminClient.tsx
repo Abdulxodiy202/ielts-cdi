@@ -994,6 +994,7 @@ interface PromoUsage {
   id: string
   user_name: string | null
   user_email: string | null
+  user_phone: string | null
   original_amount: number | null
   discounted_amount: number | null
   used_at: string
@@ -1260,19 +1261,22 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                       <p className="text-xs font-semibold uppercase tracking-wide py-2" style={{ color: 'var(--text-muted)' }}>Ishlatgan foydalanuvchilar</p>
                       <div className="space-y-1">
                         {usageList.map(u => (
-                          <div key={u.id} className="flex items-center justify-between text-xs py-1.5 px-3 rounded-lg"
+                          <div key={u.id} className="text-xs py-2 px-3 rounded-lg space-y-1"
                             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                            <div>
-                              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{u.user_name || 'Noma\'lum'}</span>
-                              {u.user_email && <span className="ml-2" style={{ color: 'var(--text-muted)' }}>{u.user_email}</span>}
-                            </div>
-                            <div className="flex items-center gap-4 text-right">
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{u.user_name || 'Noma\'lum'}</span>
+                                {u.user_email && <span style={{ color: 'var(--text-muted)' }}>{u.user_email}</span>}
+                                {u.user_phone && <span style={{ color: 'var(--text-muted)' }}>{u.user_phone}</span>}
+                              </div>
+                              <div className="flex items-center gap-4 flex-wrap text-right">
                               {u.original_amount != null && (
                                 <span style={{ color: 'var(--text-muted)' }}>
                                   <s>{formatPrice(u.original_amount)}</s> → <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
                                 </span>
                               )}
-                              <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
+                                <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
+                              </div>
                             </div>
                           </div>
                         ))}

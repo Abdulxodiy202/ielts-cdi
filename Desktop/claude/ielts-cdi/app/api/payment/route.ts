@@ -80,14 +80,16 @@ export async function POST(request: NextRequest) {
       .ilike('code', promoCode)
       .single()
     if (promoRow) {
-      await admin.from('promo_code_usage').insert({
+      // Only insert columns that exist in the current table schema.
+      // Extra columns (user_name, original_amount, etc.) live in payment_requests
+      // and are joined in the admin query, so we don't need them here.
+      const { error: usageErr } = await admin.from('promo_code_usage').insert({
         promo_code_id: promoRow.id,
         user_id: user.id,
-        user_name: userName,
-        user_email: user.email,
-        original_amount: originalAmount ?? amount,
-        discounted_amount: amount,
       })
+      if (usageErr) {
+        console.error('[promo_code_usage insert]', usageErr.code, usageErr.message)
+      }
     }
   }
 

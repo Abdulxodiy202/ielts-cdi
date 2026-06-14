@@ -32,15 +32,50 @@ export async function GET() {
     return Response.json({ error: codesError.message }, { status: 500 })
   }
 
-  // Fetch usage separately (avoids relying on PostgREST FK cache for new tables)
-  const { data: usage } = await admin
+  // Fetch usage rows (minimal columns — table may not have extended cols yet)
+  const { data: usageRaw } = await admin
     .from('promo_code_usage')
-    .select('id, promo_code_id, user_name, user_email, original_amount, discounted_amount, used_at')
+    .select('id, promo_code_id, user_id, used_at')
+    .order('used_at', { ascending: false })
 
-  // Attach usage array to each code
+  const usageRows = usageRaw ?? []
+
+  // Fetch profiles for users who have usage rows
+  const userIds = [...new Set(usageRows.map(u => u.user_id).filter(Boolean))]
+  const { data: profileRows } = userIds.length
+    ? await admin.from('profiles').select('id, full_name, email, phone').in('id', userIds)
+    : { data: [] as { id: string; full_name: string | null; email: string; phone: string | null }[] }
+
+  // Fetch payment_requests that used a promo code — for amount info
+  const codeTexts = (codes ?? []).map(c => c.code)
+  const { data: paymentRows } = codeTexts.length
+    ? await admin
+        .from('payment_requests')
+        .select('user_id, promo_code, amount, original_amount')
+        .in('promo_code', codeTexts)
+    : { data: [] as { user_id: string; promo_code: string; amount: number; original_amount: number | null }[] }
+
+  const profileMap = Object.fromEntries((profileRows ?? []).map(p => [p.id, p]))
+
+  // Attach enriched usage to each code
   const result = (codes ?? []).map(c => ({
     ...c,
-    usage: (usage ?? []).filter(u => u.promo_code_id === c.id),
+    usage: usageRows
+      .filter(u => u.promo_code_id === c.id)
+      .map(u => {
+        const profile = profileMap[u.user_id] ?? {}
+        const payment = (paymentRows ?? []).find(p => p.user_id === u.user_id && p.promo_code === c.code)
+        return {
+          id: u.id,
+          user_id: u.user_id,
+          user_name: (profile as any).full_name ?? null,
+          user_email: (profile as any).email ?? null,
+          user_phone: (profile as any).phone ?? null,
+          original_amount: payment?.original_amount ?? null,
+          discounted_amount: payment?.amount ?? null,
+          used_at: u.used_at,
+        }
+      }),
   }))
 
   return Response.json(result)
