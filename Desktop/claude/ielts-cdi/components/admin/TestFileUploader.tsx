@@ -54,17 +54,41 @@ export function TestFileUploader({ type, tests, accept }: Props) {
     setMessage(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', selectedFile)
-      formData.append('testId', selectedTestId)
+      // Step 1: Ask the server for a signed upload URL (tiny JSON request — no file bytes)
+      const urlRes = await fetch('/api/admin/upload-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId: selectedTestId, fileName: selectedFile.name }),
+      })
+      if (!urlRes.ok) {
+        const err = await urlRes.json().catch(() => ({}))
+        throw new Error(err.error ?? 'URL olishda xato')
+      }
+      const { signedUrl, contentType, publicUrl } = await urlRes.json()
 
-      const res = await fetch('/api/admin/test-upload', { method: 'POST', body: formData })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? 'Yuklash xatosi')
+      // Step 2: PUT the file directly to Supabase Storage — bypasses Vercel's 4.5 MB limit
+      const uploadRes = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': contentType },
+        body: selectedFile,
+      })
+      if (!uploadRes.ok) {
+        const text = await uploadRes.text().catch(() => '')
+        throw new Error(`Storage xatosi ${uploadRes.status}${text ? ': ' + text.slice(0, 120) : ''}`)
       }
 
-      const { url } = await res.json()
+      // Step 3: Update the DB record with the public URL
+      const recordRes = await fetch('/api/admin/test-record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ testId: selectedTestId, publicUrl, fileName: selectedFile.name }),
+      })
+      if (!recordRes.ok) {
+        const err = await recordRes.json().catch(() => ({}))
+        throw new Error(err.error ?? 'DB yangilashda xato')
+      }
+
+      const { url } = await recordRes.json()
       setUploadedUrls(prev => ({ ...prev, [selectedTestId]: url }))
       setSelectedFile(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
