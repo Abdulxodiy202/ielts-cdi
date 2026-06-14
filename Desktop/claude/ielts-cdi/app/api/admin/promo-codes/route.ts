@@ -17,21 +17,33 @@ export async function GET() {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const admin = createAdminClient()
 
-  // Fetch codes + usage count in one go
-  const { data, error } = await admin
+  // Fetch promo codes
+  const { data: codes, error: codesError } = await admin
     .from('promo_codes')
-    .select('*, usage:promo_code_usage(id, user_name, user_email, original_amount, discounted_amount, used_at)')
+    .select('*')
     .order('created_at', { ascending: false })
 
-  if (error) {
+  if (codesError) {
     // 42P01 = undefined_table; surface as TABLE_NOT_FOUND so admin UI can show setup banner
-    const code = (error as any).code
-    if (code === '42P01' || error.message?.includes('does not exist')) {
+    const code = (codesError as any).code
+    if (code === '42P01' || codesError.message?.includes('does not exist')) {
       return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
     }
-    return Response.json({ error: error.message }, { status: 500 })
+    return Response.json({ error: codesError.message }, { status: 500 })
   }
-  return Response.json(data ?? [])
+
+  // Fetch usage separately (avoids relying on PostgREST FK cache for new tables)
+  const { data: usage } = await admin
+    .from('promo_code_usage')
+    .select('id, promo_code_id, user_name, user_email, original_amount, discounted_amount, used_at')
+
+  // Attach usage array to each code
+  const result = (codes ?? []).map(c => ({
+    ...c,
+    usage: (usage ?? []).filter(u => u.promo_code_id === c.id),
+  }))
+
+  return Response.json(result)
 }
 
 export async function POST(request: NextRequest) {
