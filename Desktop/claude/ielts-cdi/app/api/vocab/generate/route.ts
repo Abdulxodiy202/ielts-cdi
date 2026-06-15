@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   if (!word?.trim()) return Response.json({ error: 'Word required' }, { status: 400 })
 
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return Response.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 })
+  if (!apiKey) return Response.json({ error: 'NO_API_KEY' }, { status: 503 })
 
   const prompt = `You are a vocabulary assistant for IELTS preparation.
 Given the English word "${word.trim()}", provide:

@@ -201,7 +201,14 @@
     "wordCount": "{count} ta so'z",
     "delete": "O'chirish",
     "cancel": "Bekor qilish",
-    "readingTestsSubtitle": "Har bir test uchun so'z ro'yxatlari tez kunda. So'zlar matnlardan avtomatik ajratib olinadi."
+    "readingTestsSubtitle": "Har bir test uchun so'z ro'yxatlari tez kunda. So'zlar matnlardan avtomatik ajratib olinadi.",
+    "addWord": "So'z qo'shish",
+    "addWordBtn": "➕ Qo'shish",
+    "wordEn": "Inglizcha so'z (majburiy)",
+    "wordUz": "O'zbekcha tarjima (majburiy)",
+    "wordDef": "Ta'rif (ixtiyoriy)",
+    "wordEx": "Misol jumla (ixtiyoriy)",
+    "aiKeyMissing": "ANTHROPIC_API_KEY muhit o'zgaruvchisi sozlanmagan. Vercel → Settings → Environment Variables ga qo'shing va qayta deploy qiling."
   },
   "common": {
     "save": "Saqlash",

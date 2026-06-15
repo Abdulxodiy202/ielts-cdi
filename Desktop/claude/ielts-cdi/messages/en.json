@@ -201,7 +201,14 @@
     "wordCount": "{count} words",
     "delete": "Delete",
     "cancel": "Cancel",
-    "readingTestsSubtitle": "Vocabulary word lists per test coming soon. Words will be auto-extracted from test passages."
+    "readingTestsSubtitle": "Vocabulary word lists per test coming soon. Words will be auto-extracted from test passages.",
+    "addWord": "Add Word",
+    "addWordBtn": "➕ Add",
+    "wordEn": "English word (required)",
+    "wordUz": "O'zbekcha tarjima (required)",
+    "wordDef": "Ta'rif (optional)",
+    "wordEx": "Misol jumla (optional)",
+    "aiKeyMissing": "ANTHROPIC_API_KEY is not set in environment variables. Add it to Vercel → Settings → Environment Variables, then redeploy."
   },
   "common": {
     "save": "Save",
