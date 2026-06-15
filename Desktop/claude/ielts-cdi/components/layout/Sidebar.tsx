@@ -67,8 +67,8 @@ export function Sidebar() {
     { href: '/reading',     label: t('nav.reading'),      icon: BookOpen },
     { href: '/listening',   label: t('nav.listening'),    icon: Headphones },
     { href: '/mock-test',   label: t('nav.mockTest'),     icon: Calendar },
-    { href: '/vocabulary',  label: 'Vocabulary',           icon: Library },
-    { href: '/community',   label: 'Community',            icon: Users },
+    { href: '/vocabulary',  label: t('nav.vocabulary'),    icon: Library },
+    { href: '/community',   label: t('nav.community'),     icon: Users },
   ]
 
   /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */

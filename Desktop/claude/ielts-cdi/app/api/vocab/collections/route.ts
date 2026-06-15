@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
     .select('id, name, created_at')
     .single()
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (error) {
+    console.error('[vocab/collections POST]', error.code, error.message)
+    if (error.code === '42P01') return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    return Response.json({ error: error.message }, { status: 500 })
+  }
   return Response.json(data, { status: 201 })
 }

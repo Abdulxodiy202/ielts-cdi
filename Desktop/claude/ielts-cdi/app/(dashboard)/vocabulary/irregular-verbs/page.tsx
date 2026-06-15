@@ -4,20 +4,23 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { IRREGULAR_VERBS, type IrregularVerb } from '@/lib/data/irregular-verbs'
 import { Search, X, BookPlus, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Collection { id: string; name: string }
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export default function IrregularVerbsPage() {
-  const [search, setSearch]         = useState('')
-  const [letter, setLetter]         = useState<string | null>(null)
-  const [expanded, setExpanded]     = useState<string | null>(null)
-  const [addingVerb, setAddingVerb] = useState<IrregularVerb | null>(null)
+  const { t } = useLanguage()
+
+  const [search, setSearch]           = useState('')
+  const [letter, setLetter]           = useState<string | null>(null)
+  const [expanded, setExpanded]       = useState<string | null>(null)
+  const [addingVerb, setAddingVerb]   = useState<IrregularVerb | null>(null)
   const [collections, setCollections] = useState<Collection[]>([])
-  const [colLoading, setColLoading] = useState(false)
-  const [saving, setSaving]         = useState(false)
-  const [saved, setSaved]           = useState<string | null>(null) // verb id just saved
+  const [colLoading, setColLoading]   = useState(false)
+  const [saving, setSaving]           = useState(false)
+  const [saved, setSaved]             = useState<string | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(() => {
@@ -33,7 +36,6 @@ export default function IrregularVerbsPage() {
     return list
   }, [search, letter])
 
-  // Load collections when modal opens
   useEffect(() => {
     if (!addingVerb) return
     setColLoading(true)
@@ -43,7 +45,6 @@ export default function IrregularVerbsPage() {
       .finally(() => setColLoading(false))
   }, [addingVerb])
 
-  // Close modal on outside click
   useEffect(() => {
     if (!addingVerb) return
     const handler = (e: MouseEvent) => {
@@ -83,20 +84,24 @@ export default function IrregularVerbsPage() {
 
   const activeLetter = letter && ALPHABET.includes(letter) ? letter : null
 
+  const verbCountText = search || activeLetter
+    ? `${filtered.length} ${filtered.length === 1 ? t('vocabulary.verbs') : t('vocabulary.verbs')} — "${search || activeLetter}"`
+    : `${filtered.length} ${t('vocabulary.verbs')}`
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm mb-3" style={{ color: 'var(--text-muted)' }}>
-          <Link href="/vocabulary" className="hover:underline">Vocabulary</Link>
+          <Link href="/vocabulary" className="hover:underline">{t('vocabulary.title')}</Link>
           <span>/</span>
-          <span style={{ color: 'var(--text-primary)' }}>Irregular Verbs</span>
+          <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.irregularVerbs')}</span>
         </div>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          🔄 Irregular Verbs
+          🔄 {t('vocabulary.irregularVerbs')}
         </h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          {IRREGULAR_VERBS.length} verbs — search, filter, and save to your library
+          {IRREGULAR_VERBS.length} {t('vocabulary.verbs')} — {t('vocabulary.irregularVerbsDesc')}
         </p>
       </div>
 
@@ -107,7 +112,7 @@ export default function IrregularVerbsPage() {
           type="text"
           value={search}
           onChange={e => { setSearch(e.target.value); setLetter(null) }}
-          placeholder="Search by verb, translation or definition..."
+          placeholder={t('vocabulary.searchVerbs')}
           className="input-field w-full pl-9 pr-10 py-2.5"
         />
         {search && (
@@ -145,15 +150,13 @@ export default function IrregularVerbsPage() {
             className="px-3 h-7 rounded-md text-xs font-medium flex items-center gap-1"
             style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
           >
-            <X size={11} /> Clear
+            <X size={11} /> {t('vocabulary.clearFilter')}
           </button>
         )}
       </div>
 
-      {/* Count */}
       <p className="text-xs mb-3 font-medium" style={{ color: 'var(--text-muted)' }}>
-        {filtered.length} verb{filtered.length !== 1 ? 's' : ''}
-        {(search || activeLetter) ? ` matching "${search || activeLetter}"` : ''}
+        {verbCountText}
       </p>
 
       {/* Table */}
@@ -163,8 +166,15 @@ export default function IrregularVerbsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-                {['Base', 'Past Simple', 'Past Participle', 'O\'zbekcha', 'Definition', ''].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {[
+                  t('vocabulary.baseForm'),
+                  t('vocabulary.pastSimple'),
+                  t('vocabulary.pastParticiple'),
+                  t('vocabulary.translation'),
+                  t('vocabulary.definition'),
+                  '',
+                ].map((h, i) => (
+                  <th key={i} className="px-4 py-3 text-left text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
                     {h}
                   </th>
                 ))}
@@ -187,7 +197,7 @@ export default function IrregularVerbsPage() {
                     <td className="px-4 py-3 font-medium" style={{ color: 'var(--text-primary)' }}>{verb.participle}</td>
                     <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{verb.uzbek}</td>
                     <td className="px-4 py-3 max-w-xs" style={{ color: 'var(--text-muted)' }}>
-                      {expanded === verb.id ? '' : <span className="line-clamp-1">{verb.definition}</span>}
+                      {expanded !== verb.id && <span className="line-clamp-1">{verb.definition}</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -195,9 +205,8 @@ export default function IrregularVerbsPage() {
                           onClick={e => { e.stopPropagation(); setAddingVerb(verb) }}
                           className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-all hover:opacity-80"
                           style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
-                          title="Add to Library"
                         >
-                          <BookPlus size={13} /> Save
+                          <BookPlus size={13} /> {t('vocabulary.save')}
                         </button>
                         <span style={{ color: 'var(--text-muted)' }}>
                           {expanded === verb.id ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -210,12 +219,12 @@ export default function IrregularVerbsPage() {
                       <td colSpan={6} className="px-4 py-3">
                         <div className="space-y-1">
                           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                            <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Definition: </span>
+                            <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.definition')}: </span>
                             {verb.definition}
                           </p>
                           <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>
-                            <span className="not-italic font-semibold">Example: </span>
-                            "{verb.example}"
+                            <span className="not-italic font-semibold">{t('vocabulary.example')}: </span>
+                            &ldquo;{verb.example}&rdquo;
                           </p>
                         </div>
                       </td>
@@ -252,13 +261,13 @@ export default function IrregularVerbsPage() {
               {expanded === verb.id && (
                 <div className="px-4 pb-3 space-y-2">
                   <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{verb.definition}</p>
-                  <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>"{verb.example}"</p>
+                  <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>&ldquo;{verb.example}&rdquo;</p>
                   <button
                     onClick={() => setAddingVerb(verb)}
                     className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium"
                     style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
                   >
-                    <BookPlus size={13} /> Save to Library
+                    <BookPlus size={13} /> {t('vocabulary.saveToLibrary')}
                   </button>
                 </div>
               )}
@@ -268,7 +277,10 @@ export default function IrregularVerbsPage() {
 
         {filtered.length === 0 && (
           <div className="py-16 text-center" style={{ color: 'var(--text-muted)' }}>
-            No verbs found. <button onClick={() => { setSearch(''); setLetter(null) }} className="underline">Clear filter</button>
+            {verbCountText}.{' '}
+            <button onClick={() => { setSearch(''); setLetter(null) }} className="underline">
+              {t('vocabulary.clearFilter')}
+            </button>
           </div>
         )}
       </div>
@@ -283,7 +295,7 @@ export default function IrregularVerbsPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
-                Save "{addingVerb.base}"
+                {t('vocabulary.addToLibrary')}: &ldquo;{addingVerb.base}&rdquo;
               </h3>
               <button onClick={() => setAddingVerb(null)} style={{ color: 'var(--text-muted)' }}>
                 <X size={18} />
@@ -291,20 +303,22 @@ export default function IrregularVerbsPage() {
             </div>
 
             <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-              Choose a collection to save this verb to:
+              {t('vocabulary.chooseCollection')}
             </p>
 
             {colLoading ? (
-              <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading...</div>
+              <div className="py-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                {t('common.loading')}
+              </div>
             ) : collections.length === 0 ? (
               <div className="py-6 text-center space-y-3">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No collections yet.</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.noCollectionsHint')}</p>
                 <Link
                   href="/vocabulary/library"
                   className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg font-medium"
                   style={{ background: 'var(--accent)', color: 'white' }}
                 >
-                  <Plus size={14} /> Create a collection
+                  <Plus size={14} /> {t('vocabulary.createCollectionFirst')}
                 </Link>
               </div>
             ) : (
