@@ -67,9 +67,8 @@ export default function IrregularVerbsPage() {
           collection_id: collectionId,
           word: addingVerb.base,
           uzbek_translation: addingVerb.uzbek,
-          definition: addingVerb.definition,
+          definition: `${addingVerb.definition} | Past: ${addingVerb.past} · Participle: ${addingVerb.participle}`,
           example: addingVerb.example,
-          extra: { past: addingVerb.past, participle: addingVerb.participle },
           source: 'irregular_verb',
         }),
       })

@@ -13,7 +13,6 @@ interface Word {
   uzbek_translation: string | null
   definition: string | null
   example: string | null
-  extra: Record<string, string> | null
   source: string
   created_at: string
 }
@@ -201,9 +200,10 @@ export default function LibraryPage() {
         collection_id: targetCol,
         word: generated.word,
         uzbek_translation: generated.uzbek_translation,
-        definition: generated.definition,
+        definition: generated.collocations
+          ? `${generated.definition} | Collocations: ${generated.collocations}`
+          : generated.definition,
         example: generated.example,
-        extra: generated.collocations ? { collocations: generated.collocations } : null,
         source: 'ai_generated',
       }),
     })
@@ -557,16 +557,6 @@ export default function LibraryPage() {
                         )}
                         {w.example && (
                           <p className="text-xs mt-0.5 italic" style={{ color: 'var(--text-muted)' }}>"{w.example}"</p>
-                        )}
-                        {w.extra?.past && (
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {t('vocabulary.pastSimple')}: <strong>{w.extra.past}</strong> · {t('vocabulary.pastParticiple')}: <strong>{w.extra.participle}</strong>
-                          </p>
-                        )}
-                        {w.extra?.collocations && (
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            {t('vocabulary.collocations')}: {w.extra.collocations}
-                          </p>
                         )}
                       </div>
                       <button onClick={() => deleteWord(w.id)}
