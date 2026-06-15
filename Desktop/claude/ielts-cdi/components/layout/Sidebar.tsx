@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, BookOpen, Headphones, Calendar,
+  LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -63,10 +63,12 @@ export function Sidebar() {
   useEffect(() => { profileRef.current = profile }, [profile])
 
   const nav = [
-    { href: '/dashboard',  label: t('nav.dashboard'),  icon: LayoutDashboard },
-    { href: '/reading',    label: t('nav.reading'),     icon: BookOpen },
-    { href: '/listening',  label: t('nav.listening'),   icon: Headphones },
-    { href: '/mock-test',  label: t('nav.mockTest'),    icon: Calendar },
+    { href: '/dashboard',   label: t('nav.dashboard'),   icon: LayoutDashboard },
+    { href: '/reading',     label: t('nav.reading'),      icon: BookOpen },
+    { href: '/listening',   label: t('nav.listening'),    icon: Headphones },
+    { href: '/mock-test',   label: t('nav.mockTest'),     icon: Calendar },
+    { href: '/vocabulary',  label: 'Vocabulary',           icon: Library },
+    { href: '/community',   label: 'Community',            icon: Users },
   ]
 
   /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
