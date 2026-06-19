@@ -8,6 +8,7 @@ import { StatsCards } from '@/components/dashboard/StatsCards'
 import { TestHistory } from '@/components/dashboard/TestHistory'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { QuickActions } from '@/components/dashboard/QuickActions'
+import { ReferralCard } from '@/components/dashboard/ReferralCard'
 import { isActivePremium } from '@/lib/utils/premium'
 
 /* ── Cached: global test counts (same for all users, revalidate every 5 min) ── */
@@ -104,6 +105,8 @@ export default async function DashboardPage() {
         listeningTotal={counts.listeningTotal}
         listeningFree={counts.listeningFree}
       />
+
+      <ReferralCard />
 
       <TestHistory results={results.slice(0, 10) as any} showTitle />
     </div>

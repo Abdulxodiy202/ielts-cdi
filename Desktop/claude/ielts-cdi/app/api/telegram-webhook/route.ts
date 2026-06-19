@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { answerCallbackQuery, sendTelegramNotification } from '@/lib/telegram'
 import { sendPremiumApprovalEmail, sendBookingApprovalEmail } from '@/lib/email'
+import { handleReferralConversion } from '@/lib/referral'
 
 /** Quick health check — also shows what Telegram last delivered */
 export async function GET() {
@@ -129,6 +130,7 @@ export async function POST(request: NextRequest) {
           `✅ <b>Premium faollashtirildi</b>\n👤 ${payment.user_name}\n📧 ${payment.user_email}\n💵 ${payment.amount} UZS\n🔧 Admin: ${adminName}`
         ),
         sendPremiumApprovalEmail(payment.user_email, payment.user_name),
+        handleReferralConversion(paymentId).catch(e => console.error('[referral conversion]', e)),
       ])
     } catch (err) {
       console.error('[telegram-webhook] approve_premium error:', err)

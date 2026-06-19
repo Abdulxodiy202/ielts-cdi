@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
   const metaRaw = formData.get('meta') as string | null
   const meta = metaRaw ? JSON.parse(metaRaw) : null
   const promoCode = (formData.get('promo_code') as string | null) || null
+  const referralCode = (formData.get('referral_code') as string | null) || null
   const originalAmount = formData.get('original_amount')
     ? parseInt(formData.get('original_amount') as string)
     : null
@@ -63,6 +64,7 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       meta,
       ...(promoCode ? { promo_code: promoCode, original_amount: originalAmount ?? amount } : {}),
+      ...(referralCode ? { referral_code: referralCode } : {}),
     })
     .select()
     .single()
@@ -135,6 +137,7 @@ export async function POST(request: NextRequest) {
     `💳 Tur: ${typeLabel}\n` +
     `💵 Summa: ${amount} UZS${promoCode ? ` (chegirma bilan, asl: ${originalAmount ?? amount} UZS)` : ''}\n` +
     (promoCode ? `🎟 Promokod: ${promoCode}\n` : '') +
+    (referralCode ? `👥 Referral: ${referralCode}\n` : '') +
     `⏰ Vaqt: ${createdAt}\n\n` +
     `Admin panel: ${appUrl}/admin`
 

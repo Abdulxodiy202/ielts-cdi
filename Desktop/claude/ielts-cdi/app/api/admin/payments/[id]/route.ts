@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { handleReferralConversion } from '@/lib/referral'
 
 const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
@@ -68,6 +69,7 @@ export async function PATCH(
             premium_until: premiumUntil.toISOString(),
           })
           .eq('id', pr.user_id),
+        handleReferralConversion(id).catch(e => console.error('[referral conversion]', e)),
         admin.from('subscriptions').insert({
           user_id: pr.user_id,
           plan: 'premium',

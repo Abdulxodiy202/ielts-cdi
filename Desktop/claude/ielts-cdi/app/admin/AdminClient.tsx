@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toggleUserPremium } from '@/app/actions/admin'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
-  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -1293,6 +1293,231 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
   )
 }
 
+/* ── Referrals tab ───────────────────────────────────────────────────── */
+interface ReferrerStat {
+  id: string
+  full_name: string | null
+  email: string
+  referral_code: string
+  total_referred: number
+  converted_count: number
+  last_referral_at: string | null
+}
+
+interface ReferralRow {
+  id: string
+  referrer_id: string
+  referred_name: string | null
+  referred_email: string | null
+  created_at: string
+  converted_to_premium: boolean
+}
+
+const REFERRAL_SETUP_SQL = `-- Run in Supabase SQL Editor
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS referral_code text unique;
+
+CREATE TABLE IF NOT EXISTS referrals (
+  id uuid primary key default gen_random_uuid(),
+  referrer_id uuid references profiles(id) on delete cascade,
+  referred_id uuid references profiles(id) on delete cascade,
+  referred_email text,
+  referred_name text,
+  created_at timestamptz default now(),
+  converted_to_premium boolean default false,
+  converted_at timestamptz
+);
+ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users see own referrals" ON referrals FOR SELECT USING (auth.uid() = referrer_id);
+CREATE POLICY "Anyone can insert referral" ON referrals FOR INSERT WITH CHECK (true);
+ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS referral_code text;`
+
+function ReferralsTab() {
+  const [stats, setStats] = useState<ReferrerStat[]>([])
+  const [referrals, setReferrals] = useState<ReferralRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/referrals')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) {
+      const json = await res.json()
+      setStats(json.stats ?? [])
+      setReferrals(json.referrals ?? [])
+    }
+    setLoading(false)
+  }
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/referrals')
+    if (res.ok) {
+      const json = await res.json()
+      setStats(json.stats ?? [])
+      setReferrals(json.referrals ?? [])
+    }
+    setRefreshing(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const copySQL = async () => {
+    await navigator.clipboard.writeText(REFERRAL_SETUP_SQL)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-4" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <div className="flex items-center gap-2">
+          <Users size={18} style={{ color: 'var(--warning)' }} />
+          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishga tushiring:</p>
+        <pre className="text-xs p-4 rounded-xl overflow-x-auto" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+          {REFERRAL_SETUP_SQL}
+        </pre>
+        <div className="flex gap-3">
+          <button onClick={copySQL} className="btn-outline text-sm flex items-center gap-2">
+            {copied ? <><CheckCircle size={14} /> Nusxalandi!</> : <><Copy size={14} /> SQL nusxalash</>}
+          </button>
+          <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Summary stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>{stats.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Faol referrerlar</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(99,102,241,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{referrals.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami kelganlar</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(245,158,11,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--warning)' }}>
+            {referrals.filter(r => r.converted_to_premium).length}
+          </div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Premium olganlar</div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      {/* Referrers table */}
+      <div>
+        <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Referrerlar</h3>
+        {stats.length === 0 ? (
+          <div className="card p-12 text-center">
+            <Users size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+            <p style={{ color: 'var(--text-muted)' }}>Hali referrallar yo&apos;q</p>
+          </div>
+        ) : (
+          <div className="card overflow-hidden">
+            <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+              style={{ gridTemplateColumns: '1fr 120px 80px 80px 100px 120px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+              <span>Foydalanuvchi</span>
+              <span>Referral kodi</span>
+              <span className="text-center">Kelganlar</span>
+              <span className="text-center">Premium</span>
+              <span className="text-center">Jarayon</span>
+              <span className="text-right">So&apos;nggi</span>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {stats.map(r => {
+                const milestone5 = r.converted_count >= 5
+                const progress = r.converted_count % 5
+                return (
+                  <div key={r.id} className="grid items-center px-4 py-3 text-sm"
+                    style={{
+                      gridTemplateColumns: '1fr 120px 80px 80px 100px 120px',
+                      gap: 8,
+                      background: milestone5 ? 'rgba(245,158,11,0.04)' : undefined,
+                    }}>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{r.full_name ?? '—'}</span>
+                        {milestone5 && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.3)' }}>⭐ Milestone</span>}
+                      </div>
+                      <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{r.email}</div>
+                    </div>
+                    <span className="font-mono text-sm font-bold" style={{ color: 'var(--accent)', letterSpacing: '0.05em' }}>{r.referral_code}</span>
+                    <span className="text-center font-semibold" style={{ color: 'var(--text-primary)' }}>{r.total_referred}</span>
+                    <span className="text-center font-semibold" style={{ color: 'var(--warning)' }}>{r.converted_count}</span>
+                    <div className="text-center">
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{progress}/5 ⭐</span>
+                      <div className="mt-1 w-full rounded-full overflow-hidden" style={{ height: 4, background: 'var(--bg-secondary)' }}>
+                        <div className="h-full rounded-full" style={{ width: `${(progress / 5) * 100}%`, background: 'linear-gradient(90deg, var(--accent), var(--warning))' }} />
+                      </div>
+                    </div>
+                    <span className="text-right text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {r.last_referral_at ? new Date(r.last_referral_at).toLocaleDateString('uz-UZ') : '—'}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* All referrals list */}
+      {referrals.length > 0 && (
+        <div>
+          <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Barcha referrallar</h3>
+          <div className="card overflow-hidden">
+            <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+              style={{ gridTemplateColumns: '1fr 1fr 120px 120px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+              <span>Kelgan foydalanuvchi</span>
+              <span>Email</span>
+              <span>Sana</span>
+              <span className="text-right">Holat</span>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {referrals.slice(0, 50).map(ref => (
+                <div key={ref.id} className="grid items-center px-4 py-2.5 text-sm"
+                  style={{ gridTemplateColumns: '1fr 1fr 120px 120px', gap: 8 }}>
+                  <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{ref.referred_name ?? '—'}</span>
+                  <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{ref.referred_email ?? '—'}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{new Date(ref.created_at).toLocaleDateString('uz-UZ')}</span>
+                  <div className="text-right">
+                    {ref.converted_to_premium ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}>⭐ Premium</span>
+                    ) : (
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>Oddiy</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
@@ -1302,6 +1527,7 @@ const TABS = [
   { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
   { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
+  { id: 'referrals', label: 'Referrallar',      Icon: Users },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -1378,6 +1604,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'promo' && (
         <PromoCodesTab initialPromoCodes={initialPromoCodes} dbMissing={promoDbMissing} />
       )}
+      {activeTab === 'referrals' && <ReferralsTab />}
     </div>
   )
 }
