@@ -1,10 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function WritingVocabPage() {
   const { t } = useLanguage()
+  const router = useRouter()
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
       <div className="mb-6">
@@ -13,6 +16,13 @@ export default function WritingVocabPage() {
           <span>/</span>
           <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.writingCollocations')}</span>
         </div>
+        <button
+          onClick={() => router.push('/vocabulary')}
+          className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronLeft size={16} /> Vocabulary ga qaytish
+        </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>✍️ {t('vocabulary.writingCollocations')}</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.writingCollocationsSubtitle')}</p>
       </div>

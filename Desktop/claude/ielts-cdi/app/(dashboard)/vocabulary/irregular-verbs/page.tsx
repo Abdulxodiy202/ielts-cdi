@@ -2,8 +2,9 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { IRREGULAR_VERBS, type IrregularVerb } from '@/lib/data/irregular-verbs'
-import { Search, X, BookPlus, Check, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import { Search, X, BookPlus, Check, ChevronDown, ChevronUp, Plus, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Collection { id: string; name: string }
@@ -12,6 +13,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
 
 export default function IrregularVerbsPage() {
   const { t } = useLanguage()
+  const router = useRouter()
 
   const [search, setSearch]           = useState('')
   const [letter, setLetter]           = useState<string | null>(null)
@@ -96,6 +98,13 @@ export default function IrregularVerbsPage() {
           <span>/</span>
           <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.irregularVerbs')}</span>
         </div>
+        <button
+          onClick={() => router.push('/vocabulary')}
+          className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronLeft size={16} /> Vocabulary ga qaytish
+        </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           🔄 {t('vocabulary.irregularVerbs')}
         </h1>
