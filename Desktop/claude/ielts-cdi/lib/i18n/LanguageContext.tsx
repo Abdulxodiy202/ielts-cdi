@@ -44,9 +44,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (stored === 'en' || stored === 'uz') {
       setLangState(stored)
     } else {
-      // Detect browser language: uz or ru → Uzbek, otherwise English
-      const bl = navigator.language.toLowerCase()
-      setLangState(bl.startsWith('uz') || bl.startsWith('ru') ? 'uz' : 'en')
+      setLangState('uz')
     }
   }, [])
 
