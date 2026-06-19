@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, X, Sparkles, BookOpen, AlertTriangle, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Trash2, X, Sparkles, BookOpen, AlertTriangle, Copy, Check, ChevronDown, ChevronUp, ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Collection { id: string; name: string; created_at: string }
@@ -47,6 +48,7 @@ const EMPTY_MANUAL = { word: '', uzbek: '', definition: '', example: '' }
 
 export default function LibraryPage() {
   const { t } = useLanguage()
+  const router = useRouter()
 
   const [collections, setCollections]     = useState<Collection[]>([])
   const [words, setWords]                 = useState<Word[]>([])
@@ -241,6 +243,13 @@ export default function LibraryPage() {
             <span>/</span>
             <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.library')}</span>
           </div>
+          <button
+            onClick={() => router.push('/vocabulary')}
+            className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            <ChevronLeft size={16} /> Vocabulary ga qaytish
+          </button>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>📖 {t('vocabulary.library')}</h1>
         </div>
         <div className="rounded-xl p-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}>
@@ -279,6 +288,13 @@ export default function LibraryPage() {
           <span>/</span>
           <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.library')}</span>
         </div>
+        <button
+          onClick={() => router.push('/vocabulary')}
+          className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronLeft size={16} /> Vocabulary ga qaytish
+        </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>📖 {t('vocabulary.library')}</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.libraryDesc')}</p>
       </div>
