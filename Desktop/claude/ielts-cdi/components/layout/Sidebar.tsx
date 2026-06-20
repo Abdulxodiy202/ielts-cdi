@@ -44,7 +44,7 @@ function fmtMsgTime(iso: string): string {
 
 /** "09 Jun 2026" */
 function fmtDate(iso: string | null): string {
-  if (!iso) return 'вЂ”'
+  if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-GB', {
     day: '2-digit', month: 'short', year: 'numeric',
   })
@@ -52,7 +52,7 @@ function fmtDate(iso: string | null): string {
 
 function displayPremiumSince(profile: Profile): string {
   if (profile.premium_since) return fmtDate(profile.premium_since)
-  if (!profile.premium_until) return 'вЂ”'
+  if (!profile.premium_until) return '—'
   const d = new Date(profile.premium_until)
   d.setDate(d.getDate() - 30)
   return fmtDate(d.toISOString())
@@ -153,7 +153,7 @@ export function Sidebar() {
           const wasPremium = isActivePremium(profileRef.current)
           setProfile(merged)
           if (isActivePremium(updated) && !wasPremium) {
-            addToast('рџЋ‰ Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
+            addToast('🎉 Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
           }
         }
       )
@@ -240,7 +240,7 @@ export function Sidebar() {
 
       setProfile(prev => prev ? { ...prev, avatar_url: json.publicUrl } : prev)
       setLocalAvatarUrl(json.publicUrl)
-      addToast('вњ… Rasm yangilandi', 'success')
+      addToast('✅ Rasm yangilandi', 'success')
     } catch (err) {
       console.error('[avatar upload]', err)
       setLocalAvatarUrl(null)
@@ -262,7 +262,7 @@ export function Sidebar() {
     })
     if (res.ok) {
       setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
-      addToast('вњ… Ism saqlandi', 'success')
+      addToast('✅ Ism saqlandi', 'success')
     } else {
       addToast('Saqlashda xatolik', 'error')
     }
@@ -533,7 +533,7 @@ export function Sidebar() {
                             </div>
                             <div className="flex justify-between pt-0.5" style={{ color: 'var(--text-muted)' }}>
                               <span>{t('common.premiumSince')}</span>
-                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : 'вЂ”'}</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : '—'}</span>
                             </div>
                             <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
                               <span>{t('common.premiumUntil')}</span>

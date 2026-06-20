@@ -595,6 +595,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [msgHistoryLoading, setMsgHistoryLoading] = useState(false)
   const [broadcastOpen, setBroadcastOpen] = useState(false)
   const [broadcastText, setBroadcastText] = useState('')
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'premium' | 'free'>('all')
   const [broadcasting, setBroadcasting] = useState(false)
   const [broadcastResult, setBroadcastResult] = useState<string | null>(null)
 
@@ -606,11 +607,12 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
       const res = await fetch('/api/admin/messages/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: broadcastText.trim() }),
+        body: JSON.stringify({ message: broadcastText.trim(), target: broadcastTarget }),
       })
       const json = await res.json().catch(() => ({}))
       if (res.ok) {
-        setBroadcastResult(`✅ ${json.sent} ta foydalanuvchiga yuborildi`)
+        const label = broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Oddiy' : ''
+        setBroadcastResult(`✅ ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
         setBroadcastText('')
         setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null) }, 2500)
       } else {
@@ -792,7 +794,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
         {/* Broadcast + Refresh */}
         <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => { setBroadcastOpen(true); setBroadcastText(''); setBroadcastResult(null) }}
+            onClick={() => { setBroadcastOpen(true); setBroadcastText(''); setBroadcastResult(null); setBroadcastTarget('all') }}
             className="btn-primary text-sm flex items-center gap-2"
           >
             <Send size={14} /> Hammaga xabar
@@ -1179,10 +1181,35 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                 </button>
               </div>
               <div className="p-5 space-y-3">
+                {/* Target selector */}
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Kimga yuborilsin:</p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: 'all',     label: 'Hammaga' },
+                      { key: 'premium', label: '👑 Premium' },
+                      { key: 'free',    label: '👤 Oddiy' },
+                    ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setBroadcastTarget(key)}
+                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={{
+                          background: broadcastTarget === key ? 'rgba(99,102,241,0.15)' : 'var(--bg-secondary)',
+                          color: broadcastTarget === key ? 'var(--accent)' : 'var(--text-muted)',
+                          border: broadcastTarget === key ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <textarea
                   value={broadcastText}
                   onChange={e => setBroadcastText(e.target.value)}
-                  placeholder="Barcha userlarga yuboriladigan xabar matnini yozing..."
+                  placeholder="Yuboriladigan xabar matnini yozing..."
                   rows={4}
                   className="input-field w-full resize-none text-sm"
                   autoFocus

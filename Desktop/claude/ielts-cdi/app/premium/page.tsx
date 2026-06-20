@@ -73,7 +73,7 @@ export default function PremiumPage() {
                 className="text-2xl font-bold mb-2"
                 style={{ color: 'var(--text-primary)' }}
               >
-                So&apos;rovingiz qabul qilindi! рџЋ‰
+                So&apos;rovingiz qabul qilindi! 🎉
               </h2>
               <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
                 To&apos;lovingiz tekshirilgach, 24 soat ichida premium faollashtiriladi.
@@ -96,13 +96,13 @@ export default function PremiumPage() {
                   50,000 UZS
                 </div>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  oyiga В· istalgan vaqt bekor qilish
+                  oyiga · istalgan vaqt bekor qilish
                 </p>
               </div>
 
               {[
-                '5 ta Premium Reading Testi (5вЂ“9)',
-                '5 ta Premium Listening Testi (5вЂ“9)',
+                '5 ta Premium Reading Testi (5–9)',
+                '5 ta Premium Listening Testi (5–9)',
                 "Mock Test Bron qilish (20,000 UZS/sessiya)",
                 "To'liq tahlil va band kuzatuvi",
                 'Ustuvor qo\'llab-quvvatlash',

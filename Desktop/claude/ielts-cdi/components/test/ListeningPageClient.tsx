@@ -433,14 +433,14 @@ export function ListeningPageClient({
                     {t('test.sectionMode')}
                   </p>
                   <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Part {activePart} вЂ" {info.name}
+                    Part {activePart} — {info.name}
                   </p>
                 </div>
                 <span
                   className="text-xs px-2.5 py-1 rounded-full font-medium shrink-0"
                   style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
                 >
-                  рџЋЇ {t('test.training')}
+                  🎧 {t('test.training')}
                 </span>
               </div>
             )

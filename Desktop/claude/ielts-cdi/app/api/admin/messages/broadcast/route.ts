@@ -12,17 +12,21 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { message } = await req.json()
+  const { message, target = 'all' } = await req.json()
   if (!message?.trim()) {
     return Response.json({ error: 'message kerak' }, { status: 400 })
+  }
+  if (!['all', 'premium', 'free'].includes(target)) {
+    return Response.json({ error: 'target noto\'g\'ri' }, { status: 400 })
   }
 
   const admin = createAdminClient()
 
-  // Get all user IDs from profiles
-  const { data: profiles, error: profErr } = await admin
-    .from('profiles')
-    .select('id')
+  let query = admin.from('profiles').select('id')
+  if (target === 'premium') query = query.eq('is_premium', true)
+  if (target === 'free') query = query.eq('is_premium', false)
+
+  const { data: profiles, error: profErr } = await query
 
   if (profErr) return Response.json({ error: profErr.message }, { status: 500 })
   if (!profiles || profiles.length === 0) {
