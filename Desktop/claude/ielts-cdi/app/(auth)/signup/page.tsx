@@ -31,6 +31,8 @@ export default function SignupPage() {
       options: { data: { full_name: name } },
     })
     if (error) { setError(error.message); setLoading(false); return }
+    // Auto-assign referral code immediately after signup
+    await fetch('/api/referral/generate', { method: 'POST' }).catch(() => null)
     router.push('/dashboard')
   }
 

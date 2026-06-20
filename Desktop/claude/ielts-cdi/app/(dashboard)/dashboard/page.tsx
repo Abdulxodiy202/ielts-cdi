@@ -32,39 +32,32 @@ const getCachedTestCounts = unstable_cache(
   { revalidate: 300 },
 )
 
-/* ── Cached: per-user dashboard stats (keyed by userId, revalidate 60s) ── */
+/* ── Cached: per-user test results + stats only (no profile — that's fetched fresh) ── */
 const getCachedUserStats = unstable_cache(
   async (userId: string) => {
     const supabase = createAdminClient()
-    const [resultsRes, profileRes] = await Promise.all([
-      supabase
-        .from('test_results')
-        .select('*, tests(type, title)')
-        .eq('user_id', userId)
-        .order('completed_at', { ascending: false })
-        .limit(50),
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-    ])
+    const { data: resultsData } = await supabase
+      .from('test_results')
+      .select('*, tests(type, title)')
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false })
+      .limit(50)
 
-    const results = resultsRes.data ?? []
-    const profile = profileRes.data
-
+    const results = resultsData ?? []
     const now = new Date()
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
     const thisWeek = results.filter(r => new Date(r.completed_at) > weekAgo).length
-
     const bands = results.map(r => r.band_score)
     const avgBand = bands.length ? bands.reduce((a, b) => a + b, 0) / bands.length : 0
     const highestBand = bands.length ? Math.max(...bands) : 0
 
     return {
       results,
-      profile,
       stats: {
-        totalTests:     results.length,
-        averageBand:    avgBand,
+        totalTests:    results.length,
+        averageBand:   avgBand,
         highestBand,
-        testsThisWeek:  thisWeek,
+        testsThisWeek: thisWeek,
       },
     }
   },
@@ -73,17 +66,19 @@ const getCachedUserStats = unstable_cache(
 )
 
 export default async function DashboardPage() {
-  // Auth check always runs fresh (cookies-based, not cached)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch cached data in parallel
-  const [{ results, profile, stats }, counts] = await Promise.all([
+  // Profile fetched FRESH every request so premium status is never stale
+  const admin = createAdminClient()
+  const [{ results, stats }, counts, profileRes] = await Promise.all([
     getCachedUserStats(user.id),
     getCachedTestCounts(),
+    admin.from('profiles').select('full_name, is_premium, premium_until').eq('id', user.id).single(),
   ])
 
+  const profile = profileRes.data
   const firstName = profile?.full_name?.split(' ')[0] ?? user.email?.split('@')[0] ?? 'there'
   const isPremium = isActivePremium(profile)
 

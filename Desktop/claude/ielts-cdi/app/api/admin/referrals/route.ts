@@ -12,44 +12,41 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  // Get all referrers with stats
-  const { data: referrers, error: refErr } = await admin
+  // All profiles
+  const { data: profiles, error: profErr } = await admin
     .from('profiles')
     .select('id, full_name, email, referral_code')
-    .not('referral_code', 'is', null)
-
-  if (refErr?.code === '42P01' || refErr?.code === '42703') {
-    return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
-  }
-  if (refErr) return Response.json({ error: refErr.message }, { status: 500 })
-
-  // Get all referrals
-  const { data: referrals, error: rErr } = await admin
-    .from('referrals')
-    .select('*')
     .order('created_at', { ascending: false })
 
+  if (profErr?.code === '42703') {
+    return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+  }
+  if (profErr) return Response.json({ error: profErr.message }, { status: 500 })
+
+  // All referrals (to count conversions per referrer)
+  const { data: referrals, error: rErr } = await admin
+    .from('referrals')
+    .select('referrer_id, converted_to_premium')
+
   if (rErr?.code === '42P01') return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
-  if (rErr) return Response.json({ error: rErr.message }, { status: 500 })
+  // If referrals table missing but profiles is OK, just return 0 counts
+  const allReferrals = rErr ? [] : (referrals ?? [])
 
-  const allReferrals = referrals ?? []
-
-  // Build per-referrer stats
-  const stats = (referrers ?? []).map(r => {
-    const mine = allReferrals.filter(ref => ref.referrer_id === r.id)
-    const converted = mine.filter(ref => ref.converted_to_premium)
-    const lastDate = mine.length ? mine[0].created_at : null
-    return {
-      id: r.id,
-      full_name: r.full_name,
-      email: r.email,
-      referral_code: r.referral_code,
-      total_referred: mine.length,
-      converted_count: converted.length,
-      last_referral_at: lastDate,
+  // Build conversion count map
+  const conversionMap = new Map<string, number>()
+  for (const ref of allReferrals) {
+    if (ref.converted_to_premium) {
+      conversionMap.set(ref.referrer_id, (conversionMap.get(ref.referrer_id) ?? 0) + 1)
     }
-  }).filter(r => r.total_referred > 0)
-    .sort((a, b) => b.total_referred - a.total_referred)
+  }
 
-  return Response.json({ stats, referrals: allReferrals })
+  const stats = (profiles ?? []).map(p => ({
+    id: p.id,
+    full_name: p.full_name,
+    email: p.email,
+    referral_code: p.referral_code,
+    converted_count: conversionMap.get(p.id) ?? 0,
+  }))
+
+  return Response.json({ stats })
 }

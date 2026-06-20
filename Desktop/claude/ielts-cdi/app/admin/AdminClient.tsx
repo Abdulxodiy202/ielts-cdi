@@ -1335,12 +1335,12 @@ function ReferralsTab() {
     setBackfilling(true)
     setBackfillResult(null)
     const res = await fetch('/api/admin/referral/backfill', { method: 'POST' })
+    const json = await res.json().catch(() => ({}))
     if (res.ok) {
-      const json = await res.json()
-      setBackfillResult(`${json.updated} ta foydalanuvchiga kod berildi (${json.failed} ta xato)`)
+      setBackfillResult(`${json.updated ?? 0} ta foydalanuvchiga kod berildi (${json.failed ?? 0} ta xato, jami ${json.total ?? 0} ta)`)
       await refresh()
     } else {
-      setBackfillResult('Xato yuz berdi')
+      setBackfillResult(`Xato: ${json.error ?? res.status}`)
     }
     setBackfilling(false)
   }
