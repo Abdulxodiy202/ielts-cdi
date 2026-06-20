@@ -178,33 +178,21 @@ export function Sidebar() {
     }
   }, [user?.id, addToast])
 
-  /* ── Admin messages: initial fetch + realtime ────────────────────────── */
+  /* ── Admin messages: fetch + 10-second polling ───────────────────────── */
   useEffect(() => {
     if (!user?.id) return
 
-    // Initial fetch
-    fetch('/api/messages')
-      .then(res => {
-        if (res.status === 503) { setMsgTableMissing(true); return }
-        if (res.ok) res.json().then((data: AdminMessage[]) => setMessages(data))
-      })
-      .catch(() => null)
+    const fetchMsgs = () =>
+      fetch('/api/messages')
+        .then(res => {
+          if (res.status === 503) { setMsgTableMissing(true); return }
+          if (res.ok) res.json().then((data: AdminMessage[]) => setMessages(data))
+        })
+        .catch(() => null)
 
-    // Realtime: listen for new rows inserted for this user
-    const supabase = createClient()
-    const msgChannel = supabase
-      .channel(`admin-messages-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'admin_messages', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const newMsg = payload.new as AdminMessage
-          setMessages(prev => [newMsg, ...prev])
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(msgChannel) }
+    fetchMsgs()
+    const interval = setInterval(fetchMsgs, 10000)
+    return () => clearInterval(interval)
   }, [user?.id])
 
   // Close messages panel on outside click
@@ -359,7 +347,7 @@ export function Sidebar() {
       {/* User section */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
         {user && !msgTableMissing && (
-          <div ref={msgsRef} className="mb-3">
+          <div ref={msgsRef} className="relative mb-3">
             <button
               onClick={handleMsgsOpen}
               className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-colors"
@@ -376,38 +364,43 @@ export function Sidebar() {
             </button>
             <AnimatePresence>
               {msgsOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
-                  transition={{ duration: 0.14 }}
-                  style={{ position: 'fixed', bottom: '120px', left: '8px', width: '244px', maxHeight: '340px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', zIndex: 60, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
-                >
-                  <div className="px-4 py-2.5 text-xs font-semibold shrink-0" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                    Admin xabarlari
-                  </div>
-                  <div className="overflow-y-auto flex-1">
-                    {messages.length === 0 ? (
-                      <div className="p-6 text-center">
-                        <Bell size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hali xabar yo&apos;q</p>
-                      </div>
-                    ) : (
-                      <div>
-                        {messages.map((msg, i) => (
-                          <div key={msg.id} className="px-4 py-2.5" style={{ background: !msg.is_read ? 'rgba(99,102,241,0.05)' : 'transparent', borderBottom: i < messages.length - 1 ? '1px solid var(--border)' : 'none', opacity: !msg.is_read ? 1 : 0.75 }}>
-                            <div className="flex items-center gap-1.5 mb-1">
-                              <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Admin</span>
-                              {!msg.is_read && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#ef4444' }} />}
-                              <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{fmtMsgTime(msg.created_at)}</span>
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setMsgsOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-2xl overflow-hidden shadow-2xl"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 -8px 32px rgba(0,0,0,0.3)', maxHeight: '340px', display: 'flex', flexDirection: 'column' }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="px-4 py-2.5 text-xs font-semibold shrink-0" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                      Admin xabarlari
+                    </div>
+                    <div className="overflow-y-auto flex-1">
+                      {messages.length === 0 ? (
+                        <div className="p-6 text-center">
+                          <Bell size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hali xabar yo&apos;q</p>
+                        </div>
+                      ) : (
+                        <div>
+                          {messages.map((msg, i) => (
+                            <div key={msg.id} className="px-4 py-2.5" style={{ background: !msg.is_read ? 'rgba(99,102,241,0.05)' : 'transparent', borderBottom: i < messages.length - 1 ? '1px solid var(--border)' : 'none', opacity: !msg.is_read ? 1 : 0.75 }}>
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Admin</span>
+                                {!msg.is_read && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#ef4444' }} />}
+                                <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{fmtMsgTime(msg.created_at)}</span>
+                              </div>
+                              <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{msg.message}</p>
                             </div>
-                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{msg.message}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
