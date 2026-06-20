@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
-  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -587,6 +587,10 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [newPassword, setNewPassword] = useState('')
   const [savingPass, setSavingPass] = useState(false)
   const [passSaved, setPassSaved] = useState(false)
+  const [msgModal, setMsgModal] = useState<{ userId: string; name: string } | null>(null)
+  const [msgText, setMsgText] = useState('')
+  const [sendingMsg, setSendingMsg] = useState(false)
+  const [msgSent, setMsgSent] = useState(false)
 
   const handleSetPassword = async () => {
     if (!setPassModal || newPassword.length < 6) return
@@ -610,6 +614,27 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
       }
     } finally {
       setSavingPass(false)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!msgModal || !msgText.trim()) return
+    setSendingMsg(true)
+    try {
+      const res = await fetch('/api/admin/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: msgModal.userId, message: msgText.trim() }),
+      })
+      if (res.ok) {
+        setMsgSent(true)
+        setTimeout(() => { setMsgModal(null); setMsgText(''); setMsgSent(false) }, 1500)
+      } else {
+        const json = await res.json()
+        alert(json.error ?? 'Xatolik yuz berdi')
+      }
+    } finally {
+      setSendingMsg(false)
     }
   }
 
@@ -866,6 +891,14 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                       >
                         🔑
                       </button>
+                      <button
+                        onClick={() => { setMsgModal({ userId: u.id, name: u.full_name ?? u.email }); setMsgText(''); setMsgSent(false) }}
+                        title="Xabar yuborish"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:opacity-80"
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}
+                      >
+                        <Send size={14} />
+                      </button>
                     </div>
                   </div>
 
@@ -979,6 +1012,68 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   className="btn-primary w-full font-semibold disabled:opacity-50"
                 >
                   {passSaved ? '✅ Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Send message modal */}
+      <AnimatePresence>
+        {msgModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setMsgModal(null); setMsgText('') }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm"
+              style={{ zIndex: 51 }}
+            >
+              <button
+                onClick={() => { setMsgModal(null); setMsgText('') }}
+                className="absolute top-4 right-4 p-1.5 rounded-lg"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <XCircle size={18} />
+              </button>
+              <div className="flex items-center gap-2 mb-4">
+                <Send size={16} style={{ color: 'var(--accent)' }} />
+                <div>
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                    Xabar yuborish
+                  </h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {msgModal.name}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <textarea
+                  value={msgText}
+                  onChange={e => setMsgText(e.target.value)}
+                  placeholder="Xabar matnini yozing..."
+                  rows={4}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={sendingMsg || !msgText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {msgSent
+                    ? '✅ Yuborildi!'
+                    : sendingMsg
+                    ? 'Yuborilmoqda...'
+                    : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>

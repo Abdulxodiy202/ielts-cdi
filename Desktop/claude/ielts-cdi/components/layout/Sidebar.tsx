@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import { ToastContainer, type ToastData } from '@/components/ui/Toast'
 import { isActivePremium } from '@/lib/utils/premium'
+import { MessagesPanel } from '@/components/layout/MessagesPanel'
 
 interface Profile {
   full_name: string | null
@@ -258,8 +259,13 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Messages panel */}
+      <div className="px-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+        {user && <MessagesPanel />}
+      </div>
+
       {/* Theme switcher */}
-      <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
+      <div className="p-4" style={{ borderTop: 'none' }}>
         <div className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>{t('common.theme')}</div>
         <div className="flex gap-2">
           {([
