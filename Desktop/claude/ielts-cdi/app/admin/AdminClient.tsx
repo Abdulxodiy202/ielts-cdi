@@ -591,6 +591,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [msgText, setMsgText] = useState('')
   const [sendingMsg, setSendingMsg] = useState(false)
   const [msgSent, setMsgSent] = useState(false)
+  const [msgHistory, setMsgHistory] = useState<{ id: string; message: string; is_read: boolean; created_at: string }[]>([])
+  const [msgHistoryLoading, setMsgHistoryLoading] = useState(false)
 
   const handleSetPassword = async () => {
     if (!setPassModal || newPassword.length < 6) return
@@ -617,6 +619,23 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
     }
   }
 
+  const openMsgModal = async (userId: string, name: string) => {
+    setMsgModal({ userId, name })
+    setMsgText('')
+    setMsgSent(false)
+    setMsgHistory([])
+    setMsgHistoryLoading(true)
+    try {
+      const res = await fetch('/api/admin/messages')
+      if (res.ok) {
+        const all = await res.json()
+        setMsgHistory(all.filter((m: { user_id: string }) => m.user_id === userId))
+      }
+    } finally {
+      setMsgHistoryLoading(false)
+    }
+  }
+
   const handleSendMessage = async () => {
     if (!msgModal || !msgText.trim()) return
     setSendingMsg(true)
@@ -628,7 +647,9 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
       })
       if (res.ok) {
         setMsgSent(true)
-        setTimeout(() => { setMsgModal(null); setMsgText(''); setMsgSent(false) }, 1500)
+        const sent = { id: Date.now().toString(), message: msgText.trim(), is_read: false, created_at: new Date().toISOString() }
+        setMsgHistory(prev => [sent, ...prev])
+        setTimeout(() => { setMsgSent(false); setMsgText('') }, 1500)
       } else {
         const json = await res.json()
         alert(json.error ?? 'Xatolik yuz berdi')
@@ -892,7 +913,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         🔑
                       </button>
                       <button
-                        onClick={() => { setMsgModal({ userId: u.id, name: u.full_name ?? u.email }); setMsgText(''); setMsgSent(false) }}
+                        onClick={() => openMsgModal(u.id, u.full_name ?? u.email)}
                         title="Xabar yuborish"
                         className="w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:opacity-80"
                         style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}
@@ -1034,33 +1055,52 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 16 }}
               transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-              className="relative card p-6 w-full max-w-sm"
+              className="relative card w-full max-w-md overflow-hidden"
               style={{ zIndex: 51 }}
             >
-              <button
-                onClick={() => { setMsgModal(null); setMsgText('') }}
-                className="absolute top-4 right-4 p-1.5 rounded-lg"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <XCircle size={18} />
-              </button>
-              <div className="flex items-center gap-2 mb-4">
-                <Send size={16} style={{ color: 'var(--accent)' }} />
-                <div>
-                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                    Xabar yuborish
-                  </h3>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {msgModal.name}
-                  </p>
+              {/* Header */}
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--accent)' }} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Xabar yuborish</h3>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{msgModal.name}</p>
                 </div>
+                <button onClick={() => { setMsgModal(null); setMsgText('') }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
               </div>
-              <div className="space-y-3">
+
+              {/* Previous messages */}
+              {(msgHistoryLoading || msgHistory.length > 0) && (
+                <div className="border-b" style={{ borderColor: 'var(--border)', maxHeight: 180, overflowY: 'auto' }}>
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+                    Oldingi xabarlar
+                  </div>
+                  {msgHistoryLoading ? (
+                    <div className="px-5 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+                  ) : msgHistory.map(m => (
+                    <div key={m.id} className="px-5 py-2.5 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {new Date(m.created_at).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full" style={m.is_read ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' } : { background: 'rgba(245,158,11,0.1)', color: 'var(--warning)' }}>
+                          {m.is_read ? "O'qildi" : "O'qilmagan"}
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{m.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Send form */}
+              <div className="p-5 space-y-3">
                 <textarea
                   value={msgText}
                   onChange={e => setMsgText(e.target.value)}
                   placeholder="Xabar matnini yozing..."
-                  rows={4}
+                  rows={3}
                   className="input-field w-full resize-none text-sm"
                   autoFocus
                 />
@@ -1069,11 +1109,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   disabled={sendingMsg || !msgText.trim()}
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {msgSent
-                    ? '✅ Yuborildi!'
-                    : sendingMsg
-                    ? 'Yuborilmoqda...'
-                    : <><Send size={14} /> Yuborish</>}
+                  {msgSent ? '✅ Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>

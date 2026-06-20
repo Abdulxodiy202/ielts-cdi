@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
-  LogOut, Menu, X, Crown, Zap, CheckCircle, Camera,
+  LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -15,7 +15,6 @@ import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import { ToastContainer, type ToastData } from '@/components/ui/Toast'
 import { isActivePremium } from '@/lib/utils/premium'
-import { MessagesPanel } from '@/components/layout/MessagesPanel'
 
 interface Profile {
   full_name: string | null
@@ -23,6 +22,23 @@ interface Profile {
   is_premium: boolean
   premium_since: string | null
   premium_until: string | null
+}
+
+interface AdminMessage {
+  id: string
+  message: string
+  is_read: boolean
+  created_at: string
+}
+
+function fmtMsgTime(iso: string): string {
+  const d = new Date(iso)
+  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000)
+  if (diffMin < 1) return 'Hozir'
+  if (diffMin < 60) return `${diffMin} daq oldin`
+  const diffH = Math.floor(diffMin / 60)
+  if (diffH < 24) return `${diffH} soat oldin`
+  return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })
 }
 
 /** "09 Jun 2026" */
@@ -58,6 +74,10 @@ export function Sidebar() {
   const [nameSaving,      setNameSaving]       = useState(false)
   const [avatarUploading, setAvatarUploading]  = useState(false)
   const [localAvatarUrl,  setLocalAvatarUrl]   = useState<string | null>(null)
+  const [messages,        setMessages]         = useState<AdminMessage[]>([])
+  const [msgsOpen,        setMsgsOpen]         = useState(false)
+  const [msgTableMissing, setMsgTableMissing]  = useState(false)
+  const msgsRef = useRef<HTMLDivElement>(null)
 
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const profileRef    = useRef<Profile | null>(null)
@@ -157,6 +177,59 @@ export function Sidebar() {
       supabase.removeChannel(bookingChannel)
     }
   }, [user?.id, addToast])
+
+  /* ── Admin messages: initial fetch + realtime ────────────────────────── */
+  useEffect(() => {
+    if (!user?.id) return
+
+    // Initial fetch
+    fetch('/api/messages')
+      .then(res => {
+        if (res.status === 503) { setMsgTableMissing(true); return }
+        if (res.ok) res.json().then((data: AdminMessage[]) => setMessages(data))
+      })
+      .catch(() => null)
+
+    // Realtime: listen for new rows inserted for this user
+    const supabase = createClient()
+    const msgChannel = supabase
+      .channel(`admin-messages-${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'admin_messages', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const newMsg = payload.new as AdminMessage
+          setMessages(prev => [newMsg, ...prev])
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(msgChannel) }
+  }, [user?.id])
+
+  // Close messages panel on outside click
+  useEffect(() => {
+    if (!msgsOpen) return
+    const handler = (e: MouseEvent) => {
+      if (msgsRef.current && !msgsRef.current.contains(e.target as Node)) {
+        setMsgsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [msgsOpen])
+
+  const handleMsgsOpen = async () => {
+    const willOpen = !msgsOpen
+    setMsgsOpen(willOpen)
+    if (willOpen) {
+      const unread = messages.filter(m => !m.is_read)
+      if (unread.length > 0) {
+        setMessages(prev => prev.map(m => ({ ...m, is_read: true })))
+        fetch('/api/messages/mark-read', { method: 'POST' }).catch(() => null)
+      }
+    }
+  }
 
   /* в”Ђв”Ђ Avatar upload в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -259,13 +332,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Messages panel */}
-      <div className="px-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
-        {user && <MessagesPanel />}
-      </div>
-
       {/* Theme switcher */}
-      <div className="p-4" style={{ borderTop: 'none' }}>
+      <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
         <div className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>{t('common.theme')}</div>
         <div className="flex gap-2">
           {([
@@ -290,6 +358,61 @@ export function Sidebar() {
 
       {/* User section */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
+        {user && !msgTableMissing && (
+          <div ref={msgsRef} className="mb-3">
+            <button
+              onClick={handleMsgsOpen}
+              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+              style={{ background: msgsOpen ? 'rgba(99,102,241,0.1)' : 'transparent', color: 'var(--text-secondary)' }}
+            >
+              <Bell size={16} />
+              <span>Xabarlar</span>
+              {messages.filter(m => !m.is_read).length > 0 && (
+                <span className="ml-auto flex items-center justify-center rounded-full text-white font-bold"
+                  style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 11 }}>
+                  {messages.filter(m => !m.is_read).length > 99 ? '99+' : messages.filter(m => !m.is_read).length}
+                </span>
+              )}
+            </button>
+            <AnimatePresence>
+              {msgsOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                  transition={{ duration: 0.14 }}
+                  style={{ position: 'fixed', bottom: '120px', left: '8px', width: '244px', maxHeight: '340px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.35)', zIndex: 60, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+                >
+                  <div className="px-4 py-2.5 text-xs font-semibold shrink-0" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                    Admin xabarlari
+                  </div>
+                  <div className="overflow-y-auto flex-1">
+                    {messages.length === 0 ? (
+                      <div className="p-6 text-center">
+                        <Bell size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hali xabar yo&apos;q</p>
+                      </div>
+                    ) : (
+                      <div>
+                        {messages.map((msg, i) => (
+                          <div key={msg.id} className="px-4 py-2.5" style={{ background: !msg.is_read ? 'rgba(99,102,241,0.05)' : 'transparent', borderBottom: i < messages.length - 1 ? '1px solid var(--border)' : 'none', opacity: !msg.is_read ? 1 : 0.75 }}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Admin</span>
+                              {!msg.is_read && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#ef4444' }} />}
+                              <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{fmtMsgTime(msg.created_at)}</span>
+                            </div>
+                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{msg.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
         {user && (
           <div className="relative">
             {/* Avatar row вЂ” click to open popup */}
