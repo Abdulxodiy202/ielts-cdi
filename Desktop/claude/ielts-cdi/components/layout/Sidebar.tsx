@@ -33,12 +33,13 @@ interface AdminMessage {
 
 function fmtMsgTime(iso: string): string {
   const d = new Date(iso)
-  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000)
-  if (diffMin < 1) return 'Hozir'
-  if (diffMin < 60) return `${diffMin} daq oldin`
-  const diffH = Math.floor(diffMin / 60)
-  if (diffH < 24) return `${diffH} soat oldin`
-  return d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })
+  const now = new Date()
+  const hhmm = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+  const isToday = d.toDateString() === now.toDateString()
+  if (isToday) return hhmm
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) return `Kecha ${hhmm}`
+  return `${d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })} ${hhmm}`
 }
 
 /** "09 Jun 2026" */

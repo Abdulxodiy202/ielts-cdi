@@ -1,0 +1,42 @@
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+
+const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+
+export async function POST(req: Request) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user || user.email !== ADMIN_EMAIL) {
+    return Response.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { message } = await req.json()
+  if (!message?.trim()) {
+    return Response.json({ error: 'message kerak' }, { status: 400 })
+  }
+
+  const admin = createAdminClient()
+
+  // Get all user IDs from profiles
+  const { data: profiles, error: profErr } = await admin
+    .from('profiles')
+    .select('id')
+
+  if (profErr) return Response.json({ error: profErr.message }, { status: 500 })
+  if (!profiles || profiles.length === 0) {
+    return Response.json({ sent: 0 })
+  }
+
+  // Batch insert one message per user
+  const rows = profiles.map(p => ({
+    user_id: p.id,
+    message: message.trim(),
+  }))
+
+  const { error: insertErr } = await admin.from('admin_messages').insert(rows)
+  if (insertErr) return Response.json({ error: insertErr.message }, { status: 500 })
+
+  return Response.json({ sent: rows.length })
+}

@@ -593,6 +593,33 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [msgSent, setMsgSent] = useState(false)
   const [msgHistory, setMsgHistory] = useState<{ id: string; message: string; is_read: boolean; created_at: string }[]>([])
   const [msgHistoryLoading, setMsgHistoryLoading] = useState(false)
+  const [broadcastOpen, setBroadcastOpen] = useState(false)
+  const [broadcastText, setBroadcastText] = useState('')
+  const [broadcasting, setBroadcasting] = useState(false)
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null)
+
+  const handleBroadcast = async () => {
+    if (!broadcastText.trim()) return
+    setBroadcasting(true)
+    setBroadcastResult(null)
+    try {
+      const res = await fetch('/api/admin/messages/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: broadcastText.trim() }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setBroadcastResult(`✅ ${json.sent} ta foydalanuvchiga yuborildi`)
+        setBroadcastText('')
+        setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null) }, 2500)
+      } else {
+        setBroadcastResult(`Xato: ${json.error ?? res.status}`)
+      }
+    } finally {
+      setBroadcasting(false)
+    }
+  }
 
   const handleSetPassword = async () => {
     if (!setPassModal || newPassword.length < 6) return
@@ -762,8 +789,14 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
           style={{ maxWidth: 300 }}
         />
 
-        {/* Refresh */}
-        <div className="ml-auto">
+        {/* Broadcast + Refresh */}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => { setBroadcastOpen(true); setBroadcastText(''); setBroadcastResult(null) }}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <Send size={14} /> Hammaga xabar
+          </button>
           <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
           </button>
@@ -1110,6 +1143,62 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {msgSent ? '✅ Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Broadcast modal */}
+      <AnimatePresence>
+        {broadcastOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setBroadcastOpen(false); setBroadcastResult(null) }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card w-full max-w-md overflow-hidden"
+              style={{ zIndex: 51 }}
+            >
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--warning)' }} />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Hammaga xabar yuborish</h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Barcha foydalanuvchilarga bir vaqtda yuboriladi</p>
+                </div>
+                <button onClick={() => { setBroadcastOpen(false); setBroadcastResult(null) }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
+              </div>
+              <div className="p-5 space-y-3">
+                <textarea
+                  value={broadcastText}
+                  onChange={e => setBroadcastText(e.target.value)}
+                  placeholder="Barcha userlarga yuboriladigan xabar matnini yozing..."
+                  rows={4}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                {broadcastResult && (
+                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('✅') ? 'var(--success)' : 'var(--error)' }}>
+                    {broadcastResult}
+                  </p>
+                )}
+                <button
+                  onClick={handleBroadcast}
+                  disabled={broadcasting || !broadcastText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                >
+                  {broadcasting ? 'Yuborilmoqda...' : <><Send size={14} /> Hammaga yuborish</>}
                 </button>
               </div>
             </motion.div>
