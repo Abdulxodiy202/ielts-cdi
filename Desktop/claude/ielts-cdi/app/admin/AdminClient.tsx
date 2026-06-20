@@ -7,7 +7,7 @@ import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
-  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -1660,6 +1660,251 @@ function ReferralsTab() {
   )
 }
 
+/* ── Feedback tab ────────────────────────────────────────────────────── */
+interface FeedbackItem {
+  id: string
+  user_id: string
+  user_name: string | null
+  user_email: string
+  message: string
+  status: string
+  created_at: string
+}
+
+function FeedbackTab() {
+  const [items, setItems] = useState<FeedbackItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [replyModal, setReplyModal] = useState<FeedbackItem | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/feedback')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) setItems(await res.json())
+    setLoading(false)
+  }
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/feedback')
+    if (res.ok) setItems(await res.json())
+    setRefreshing(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const openReply = (item: FeedbackItem) => {
+    setReplyModal(item)
+    setReplyText('')
+    setReplySent(false)
+  }
+
+  const handleSendReply = async () => {
+    if (!replyModal || !replyText.trim()) return
+    setSending(true)
+    try {
+      const msgRes = await fetch('/api/admin/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: replyModal.user_id, message: replyText.trim() }),
+      })
+      if (!msgRes.ok) {
+        const json = await msgRes.json().catch(() => ({}))
+        alert(json.error ?? 'Xatolik yuz berdi')
+        setSending(false)
+        return
+      }
+      await fetch(`/api/admin/feedback/${replyModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'replied' }),
+      })
+      setItems(prev => prev.map(f => f.id === replyModal.id ? { ...f, status: 'replied' } : f))
+      setReplySent(true)
+      setTimeout(() => { setReplyModal(null); setReplySent(false) }, 1500)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ feedback jadvali topilmadi</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Supabase SQL Editor da migration ni ishga tushiring, keyin sahifani yangilang.
+        </p>
+        <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </div>
+    )
+  }
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {items.length} ta feedback · {items.filter(f => f.status === 'new').length} ta yangi
+        </p>
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="card p-12 text-center">
+          <MessageSquare size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali feedback yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '1fr 2fr auto auto',
+              gap: '12px',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span>Foydalanuvchi</span>
+            <span>Xabar</span>
+            <span>Vaqt</span>
+            <span className="text-right">Amal</span>
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="grid items-start px-4 py-3"
+                style={{ gridTemplateColumns: '1fr 2fr auto auto', gap: '12px' }}
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {item.user_name ?? '—'}
+                  </div>
+                  <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {item.user_email}
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {item.message}
+                </p>
+                <div className="shrink-0">
+                  <div className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                    {fmtTime(item.created_at)}
+                  </div>
+                  <span
+                    className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium"
+                    style={item.status === 'replied'
+                      ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' }
+                      : { background: 'rgba(245,158,11,0.12)', color: 'var(--warning)' }}
+                  >
+                    {item.status === 'replied' ? '✓ Javob berilgan' : '● Yangi'}
+                  </span>
+                </div>
+                <div className="shrink-0">
+                  <button
+                    onClick={() => openReply(item)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                    style={{
+                      background: item.status === 'replied' ? 'var(--bg-secondary)' : 'rgba(99,102,241,0.1)',
+                      color: item.status === 'replied' ? 'var(--text-muted)' : 'var(--accent)',
+                      border: item.status === 'replied' ? '1px solid var(--border)' : '1px solid rgba(99,102,241,0.25)',
+                    }}
+                  >
+                    {item.status === 'replied' ? 'Qayta javob' : 'Javob berish'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reply modal */}
+      <AnimatePresence>
+        {replyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setReplyModal(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card w-full max-w-md overflow-hidden"
+              style={{ zIndex: 51 }}
+            >
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--accent)' }} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Feedback'ga javob</h3>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                    {replyModal.user_name ?? replyModal.user_email}
+                  </p>
+                </div>
+                <button onClick={() => setReplyModal(null)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
+              </div>
+
+              {/* Original feedback */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
+                <p className="text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  Foydalanuvchi yozgani
+                </p>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {replyModal.message}
+                </p>
+              </div>
+
+              <div className="p-5 space-y-3">
+                <textarea
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Javob matnini yozing..."
+                  rows={4}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendReply}
+                  disabled={sending || !replyText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {replySent ? '✅ Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
@@ -1670,6 +1915,7 @@ const TABS = [
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
   { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
   { id: 'referrals', label: 'Referrallar',      Icon: Users },
+  { id: 'feedback',  label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -1747,6 +1993,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
         <PromoCodesTab initialPromoCodes={initialPromoCodes} dbMissing={promoDbMissing} />
       )}
       {activeTab === 'referrals' && <ReferralsTab />}
+      {activeTab === 'feedback' && <FeedbackTab />}
     </div>
   )
 }

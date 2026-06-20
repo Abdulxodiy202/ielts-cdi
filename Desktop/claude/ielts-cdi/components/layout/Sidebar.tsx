@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
-  LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell,
+  LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -91,6 +91,7 @@ export function Sidebar() {
     { href: '/mock-test',   label: t('nav.mockTest'),     icon: Calendar },
     { href: '/vocabulary',  label: t('nav.vocabulary'),    icon: Library },
     { href: '/community',   label: t('nav.community'),     icon: Users },
+    { href: '/feedback',    label: 'Feedback',             icon: MessageSquarePlus },
   ]
 
   /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
