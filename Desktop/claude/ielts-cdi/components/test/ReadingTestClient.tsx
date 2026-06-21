@@ -46,6 +46,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [cdiSubmitted, setCdiSubmitted] = useState(false)  // CDI_SUBMIT received
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
+  const submittedRef = useRef(false)
 
   const fileUrl = test.fileUrl ?? null
   const ext = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
@@ -82,8 +83,10 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   useEffect(() => {
     if (!isHtmlFile) return
     const onMsg = (e: MessageEvent) => {
-      // New CDI_SUBMIT: save score to DB, show success, redirect
+      // CDI_SUBMIT: save score to DB, show success overlay
       if (e.data?.type === 'CDI_SUBMIT') {
+        if (submittedRef.current) return
+        submittedRef.current = true
         const score = typeof e.data.score === 'number' ? e.data.score : 0
         fetch('/api/results/cdi', {
           method: 'POST',
@@ -91,11 +94,11 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score }),
         }).catch(() => {})
         setCdiSubmitted(true)
-        setTimeout(() => { window.location.href = '/dashboard' }, 3000)
         return
       }
-      // Legacy CDI_CHECK_ANSWERS: just show exit button
+      // Legacy CDI_CHECK_ANSWERS: only if CDI_SUBMIT not already received
       if (e.data?.type === 'CDI_CHECK_ANSWERS') {
+        if (submittedRef.current) return
         fetch('/api/results', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -180,9 +183,24 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <h2 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 8 }}>
                 Test topshirildi!
               </h2>
-              <p style={{ color: '#666', fontSize: 15 }}>
-                Dashboard&apos;ga yo&apos;naltirilmoqda…
+              <p style={{ color: '#666', fontSize: 15, marginBottom: 24 }}>
+                Natijangiz saqlandi.
               </p>
+              <a
+                href="/dashboard"
+                style={{
+                  display: 'inline-block',
+                  padding: '12px 28px',
+                  borderRadius: 12,
+                  background: '#111',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 15,
+                  textDecoration: 'none',
+                }}
+              >
+                Dashboard&apos;ga qaytish →
+              </a>
             </div>
           </div>
         )}
