@@ -38,6 +38,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
   const submittedRef = useRef(false)
+  const startTimeRef = useRef<number>(Date.now())
 
   const fileUrl = test.fileUrl
   const ext = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
@@ -79,10 +80,11 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
         if (submittedRef.current) return
         submittedRef.current = true
         const score = typeof e.data.score === 'number' ? e.data.score : 0
+        const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000)
         fetch('/api/results/cdi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: session.id, testId: test.id, score }),
+          body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken }),
         }).catch(() => {})
         setCdiSubmitted(true)
         return
