@@ -76,7 +76,12 @@ export function ReferralCard() {
   if (loading) return <div className="card mb-8 animate-pulse" style={{ height: 80 }} />
 
   return (
-    <div className="card p-4 mb-8 flex items-center gap-4 flex-wrap">
+    <div className="card p-4 mb-8 flex flex-col gap-3">
+      <p className="text-xs leading-relaxed" style={{ color: 'var(--accent)', opacity: 0.85 }}>
+        🎁 <strong>5 do&#39;stingizni taklif qiling</strong> — ular sizning kodingiz bilan Premium olsa, siz <strong>100% chegirma</strong> yutib olasiz!
+      </p>
+
+      <div className="flex items-center gap-4 flex-wrap">
       <Gift size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
 
       <div className="flex items-center gap-2">
@@ -97,6 +102,7 @@ export function ReferralCard() {
       <div className="ml-auto flex items-center gap-1.5 text-sm">
         <span style={{ color: 'var(--text-muted)' }}>Premium olganlar:</span>
         <span className="font-bold" style={{ color: 'var(--warning)' }}>{convertedCount}</span>
+      </div>
       </div>
     </div>
   )
