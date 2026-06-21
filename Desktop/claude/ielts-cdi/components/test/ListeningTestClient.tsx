@@ -9,6 +9,7 @@ import { QuestionPanel } from './QuestionPanel'
 import { useTest } from '@/lib/hooks/useTest'
 import { getBandColor, getBandLabel } from '@/lib/utils/bandScore'
 import { formatTime } from '@/lib/utils/formatters'
+import { buildInjectScript } from '@/lib/utils/injectScript'
 
 interface Question {
   id: string
@@ -26,27 +27,6 @@ interface ListeningTestClientProps {
   userId: string
 }
 
-// Script injected into the CDI HTML to detect "Check Answers" and notify parent
-const buildInjectScript = () => {
-  const close = '</' + 'script>'
-  return (
-    `<script>` +
-    `(function(){` +
-    `function bind(){` +
-    `document.querySelectorAll('button,input[type=button],input[type=submit]').forEach(function(el){` +
-    `var t=(el.textContent||el.value||'').toLowerCase().trim();` +
-    `if(t.includes('check')||t.includes('submit')||t.includes('finish')||t.includes('done')){` +
-    `el.addEventListener('click',function(){window.parent.postMessage({type:'CDI_CHECK_ANSWERS'},'*')},{once:true})` +
-    `}` +
-    `})` +
-    `}` +
-    `if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',bind)}` +
-    `else{bind()}` +
-    `setTimeout(bind,1500)` +
-    `})()` +
-    close
-  )
-}
 
 export function ListeningTestClient({ test, questions, session }: ListeningTestClientProps) {
   const [submitting, setSubmitting] = useState(false)
