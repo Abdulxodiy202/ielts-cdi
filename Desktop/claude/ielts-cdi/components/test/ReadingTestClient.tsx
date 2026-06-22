@@ -43,6 +43,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
   const [cdiSubmitted, setCdiSubmitted] = useState(false)  // CDI_SUBMIT received
+  const [cdiSaveError, setCdiSaveError] = useState(false)
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
   const submittedRef = useRef(false)
@@ -96,7 +97,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken }),
-        }).catch(() => {})
+        }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
         setCdiSubmitted(true)
         return
       }
@@ -173,12 +174,12 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               textAlign: 'center', maxWidth: 360,
               boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+              <div style={{ fontSize: 56, marginBottom: 16 }}>{cdiSaveError ? '⚠️' : '✅'}</div>
               <h2 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 8 }}>
-                Test topshirildi!
+                {cdiSaveError ? 'Xatolik yuz berdi' : 'Test topshirildi!'}
               </h2>
               <p style={{ color: '#666', fontSize: 15, marginBottom: 24 }}>
-                Natijangiz saqlandi.
+                {cdiSaveError ? 'Natija saqlanmadi. Internet aloqasini tekshiring.' : 'Natijangiz saqlandi.'}
               </p>
               <a
                 href="/dashboard"
