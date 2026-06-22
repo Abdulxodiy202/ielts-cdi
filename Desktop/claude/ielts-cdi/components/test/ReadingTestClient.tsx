@@ -42,7 +42,6 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
-  const [showExit, setShowExit] = useState(false)   // floating Exit for HTML mode
   const [cdiSubmitted, setCdiSubmitted] = useState(false)  // CDI_SUBMIT received
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
@@ -100,16 +99,6 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         }).catch(() => {})
         setCdiSubmitted(true)
         return
-      }
-      // Legacy CDI_CHECK_ANSWERS: only if CDI_SUBMIT not already received
-      if (e.data?.type === 'CDI_CHECK_ANSWERS') {
-        if (submittedRef.current) return
-        fetch('/api/results', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: session.id, testId: test.id, timeRemaining: 0 }),
-        }).catch(() => {})
-        setShowExit(true)
       }
     }
     window.addEventListener('message', onMsg)
@@ -210,24 +199,6 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           </div>
         )}
 
-        {/* Floating Exit button — only shown after legacy CDI_CHECK_ANSWERS */}
-        {showExit && !cdiSubmitted && (
-          <Link
-            href={exitHref}
-            style={{
-              position: 'fixed', bottom: 24, right: 24, zIndex: 110,
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '12px 22px', borderRadius: 14,
-              background: 'var(--accent)', color: '#fff',
-              fontWeight: 700, fontSize: 15, textDecoration: 'none',
-              boxShadow: '0 4px 32px rgba(0,0,0,0.30)',
-              transition: 'opacity 0.2s',
-            }}
-          >
-            <ArrowLeft size={17} />
-            Exit Test
-          </Link>
-        )}
       </>
     )
   }
