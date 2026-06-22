@@ -3055,6 +3055,7 @@ That is the end of the listening test. In the IELTS test, you will now have 10 m
             // MOCK: modal hidden
 
             // Notify parent window with score and answers
+            window.parent.postMessage({ type: 'CDI_NATIVE' }, '*');
             window.parent.postMessage({ type: 'CDI_SUBMIT', testType: 'listening', answers: resultsData, score: score, timeTaken: 3600 - timeInSeconds }, '*');
         }
         
