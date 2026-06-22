@@ -2677,7 +2677,7 @@
             // MOCK: score/band/modal hidden
 
             // Notify parent window with score and answers
-            window.parent.postMessage({ type: 'CDI_SUBMIT', testType: 'reading', answers: resultsData, score: score }, '*');
+            window.parent.postMessage({ type: 'CDI_SUBMIT', testType: 'reading', answers: resultsData, score: score, timeTaken: 3600 - timeInSeconds }, '*');
 
             // Change button to "My Result" with green styling
             deliverButton.innerHTML = '<span>✓ Javoblar Saqlandi</span>';

@@ -89,7 +89,10 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         if (submittedRef.current) return
         submittedRef.current = true
         const score = typeof e.data.score === 'number' ? e.data.score : 0
-        const timeTaken = Math.round((Date.now() - startTimeRef.current) / 1000)
+        // Prefer HTML's own timer (3600 - timeInSeconds); fall back to wall clock
+        const timeTaken = typeof e.data.timeTaken === 'number' && e.data.timeTaken > 0
+          ? e.data.timeTaken
+          : Math.round((Date.now() - startTimeRef.current) / 1000)
         fetch('/api/results/cdi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
