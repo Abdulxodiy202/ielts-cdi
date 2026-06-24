@@ -163,7 +163,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
 
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
-          <div style={{ position: 'fixed', bottom: 16, right: 16, display: 'flex', gap: 8, zIndex: 200 }}>
+          <div style={{ position: 'fixed', bottom: 16, right: 160, display: 'flex', gap: 8, zIndex: 200 }}>
             <button
               onClick={() => router.push('/dashboard')}
               style={{
