@@ -87,6 +87,12 @@ export function Sidebar() {
 
   const navGroups = [
     {
+      label: '',
+      items: [
+        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null },
+      ],
+    },
+    {
       label: "KO'NIKMALAR",
       items: [
         { href: '/reading',   label: 'Reading',  icon: BookOpen,   badge: null },
@@ -329,10 +335,12 @@ export function Sidebar() {
       {/* Nav */}
       <nav className="flex-1 p-4 overflow-y-auto" style={{ paddingTop: '8px' }}>
         {navGroups.map(group => (
-          <div key={group.label} className="mb-4">
-            <div className="px-3 mb-1" style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              {group.label}
-            </div>
+          <div key={group.label || '_top'} className="mb-4">
+            {group.label && (
+              <div className="px-3 mb-1" style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                {group.label}
+              </div>
+            )}
             <div className="space-y-0.5">
               {group.items.map(({ href, label, icon: Icon, badge }) => {
                 const active = pathname === href || (href !== '/coming-soon' && pathname.startsWith(href + '/'))
