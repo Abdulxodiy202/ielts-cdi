@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Trash2, X, Sparkles, BookOpen, AlertTriangle, Copy, Check, ChevronDown, ChevronUp, ChevronLeft } from 'lucide-react'
+import { Plus, Trash2, X, Sparkles, BookOpen, AlertTriangle, Copy, Check, ChevronDown, ChevronUp, ChevronLeft, Pencil } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -14,8 +14,17 @@ interface Word {
   uzbek_translation: string | null
   definition: string | null
   example: string | null
+  extra: { word_type?: string } | null
   source: string
   created_at: string
+}
+
+interface EditDraft {
+  word: string
+  uzbek_translation: string
+  word_type: string
+  definition: string
+  example: string
 }
 
 const SETUP_SQL = `create table if not exists public.vocab_collections (
@@ -66,7 +75,7 @@ export default function LibraryPage() {
   const [addingManual, setAddingManual]   = useState(false)
   const [manualError, setManualError]     = useState<string | null>(null)
 
-  // AI generator
+  // AI generator (state kept for saveGeneratedWord compatibility)
   const [wordInput, setWordInput]         = useState('')
   const [targetCol, setTargetCol]         = useState<string | null>(null)
   const [generating, setGenerating]       = useState(false)
@@ -75,6 +84,12 @@ export default function LibraryPage() {
   const [genNoKey, setGenNoKey]           = useState(false)
   const [saving, setSaving]               = useState(false)
   const [copiedSql, setCopiedSql]         = useState(false)
+
+  // Inline edit
+  const [editingId, setEditingId]         = useState<string | null>(null)
+  const [editDraft, setEditDraft]         = useState<EditDraft>({ word: '', uzbek_translation: '', word_type: '', definition: '', example: '' })
+  const [editSaving, setEditSaving]       = useState(false)
+  const [editError, setEditError]         = useState<string | null>(null)
 
   const loadAll = useCallback(async () => {
     setLoading(true)
@@ -138,6 +153,44 @@ export default function LibraryPage() {
   async function deleteWord(id: string) {
     const res = await fetch(`/api/vocab/words/${id}`, { method: 'DELETE' })
     if (res.ok) setWords(prev => prev.filter(w => w.id !== id))
+  }
+
+  function startEdit(w: Word) {
+    setEditingId(w.id)
+    setEditDraft({
+      word: w.word,
+      uzbek_translation: w.uzbek_translation ?? '',
+      word_type: w.extra?.word_type ?? '',
+      definition: w.definition ?? '',
+      example: w.example ?? '',
+    })
+    setEditError(null)
+  }
+
+  async function saveEdit() {
+    if (!editingId || !editDraft.word.trim()) return
+    setEditSaving(true)
+    setEditError(null)
+    const res = await fetch(`/api/vocab/words/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        word: editDraft.word.trim(),
+        uzbek_translation: editDraft.uzbek_translation.trim() || null,
+        definition: editDraft.definition.trim() || null,
+        example: editDraft.example.trim() || null,
+        extra: editDraft.word_type.trim() ? { word_type: editDraft.word_type.trim() } : null,
+      }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setWords(prev => prev.map(w => w.id === editingId ? updated : w))
+      setEditingId(null)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setEditError(d.error ?? 'Xatolik yuz berdi')
+    }
+    setEditSaving(false)
   }
 
   async function addManualWord() {
@@ -475,59 +528,153 @@ export default function LibraryPage() {
                     <div key={w.id}
                       className="rounded-xl p-4 group transition-all"
                       style={{
-                        background: 'var(--bg-card)',
-                        border: '1px solid var(--border)',
+                        background: editingId === w.id ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                        border: `1px solid ${editingId === w.id ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
                         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)')}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                      onMouseEnter={e => { if (editingId !== w.id) e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)' }}
+                      onMouseLeave={e => { if (editingId !== w.id) e.currentTarget.style.borderColor = 'var(--border)' }}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0">
-                          {/* Word + translation row */}
-                          <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-                            <span className="font-bold text-base" style={{ color: 'var(--accent)' }}>{w.word}</span>
-                            {w.uzbek_translation && (
-                              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>— {w.uzbek_translation}</span>
+                      {editingId === w.id ? (
+                        /* ── Inline edit mode ── */
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>So&apos;z</label>
+                              <input
+                                type="text"
+                                value={editDraft.word}
+                                onChange={e => setEditDraft(p => ({ ...p, word: e.target.value }))}
+                                className="input-field text-sm py-1.5 w-full"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Tarjima</label>
+                              <input
+                                type="text"
+                                value={editDraft.uzbek_translation}
+                                onChange={e => setEditDraft(p => ({ ...p, uzbek_translation: e.target.value }))}
+                                className="input-field text-sm py-1.5 w-full"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>So&apos;z turi</label>
+                            <select
+                              value={editDraft.word_type}
+                              onChange={e => setEditDraft(p => ({ ...p, word_type: e.target.value }))}
+                              className="input-field text-sm py-1.5 w-full"
+                            >
+                              <option value="">— tanlang —</option>
+                              <option value="noun">noun</option>
+                              <option value="verb">verb</option>
+                              <option value="adjective">adjective</option>
+                              <option value="adverb">adverb</option>
+                              <option value="phrase">phrase</option>
+                              <option value="idiom">idiom</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Ta&apos;rif</label>
+                            <textarea
+                              value={editDraft.definition}
+                              onChange={e => setEditDraft(p => ({ ...p, definition: e.target.value }))}
+                              rows={2}
+                              className="input-field text-sm py-1.5 w-full resize-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Misol gap</label>
+                            <textarea
+                              value={editDraft.example}
+                              onChange={e => setEditDraft(p => ({ ...p, example: e.target.value }))}
+                              rows={2}
+                              className="input-field text-sm py-1.5 w-full resize-none"
+                            />
+                          </div>
+                          {editError && (
+                            <p className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>{editError}</p>
+                          )}
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={saveEdit}
+                              disabled={editSaving || !editDraft.word.trim()}
+                              className="btn-primary text-xs px-3 py-1.5 disabled:opacity-50 flex items-center gap-1.5"
+                            >
+                              {editSaving
+                                ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <Check size={13} />}
+                              Saqlash
+                            </button>
+                            <button
+                              onClick={() => { setEditingId(null); setEditError(null) }}
+                              className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                              style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                            >
+                              Bekor qilish
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* ── View mode ── */
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+                              <span className="font-bold text-base" style={{ color: 'var(--accent)' }}>{w.word}</span>
+                              {w.uzbek_translation && (
+                                <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>— {w.uzbek_translation}</span>
+                              )}
+                              {w.extra?.word_type && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                                  style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                  {w.extra.word_type}
+                                </span>
+                              )}
+                              {w.source === 'ai_generated' && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5"
+                                  style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                  <Sparkles size={9} /> AI
+                                </span>
+                              )}
+                              {w.source === 'irregular_verb' && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                                  style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                  verb
+                                </span>
+                              )}
+                            </div>
+                            {w.definition && (
+                              <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-muted)' }}>{w.definition}</p>
                             )}
-                            {/* Source badge */}
-                            {w.source === 'ai_generated' && (
-                              <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5 ml-1"
-                                style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                                <Sparkles size={9} /> AI
-                              </span>
-                            )}
-                            {w.source === 'irregular_verb' && (
-                              <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold ml-1"
-                                style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
-                                verb
-                              </span>
+                            {w.example && (
+                              <p className="text-xs italic px-2 py-1 rounded-lg"
+                                style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderLeft: '2px solid rgba(99,102,241,0.3)' }}>
+                                &ldquo;{w.example}&rdquo;
+                              </p>
                             )}
                           </div>
-                          {/* Definition */}
-                          {w.definition && (
-                            <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-muted)' }}>
-                              {w.definition}
-                            </p>
-                          )}
-                          {/* Example */}
-                          {w.example && (
-                            <p className="text-xs italic px-2 py-1 rounded-lg"
-                              style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderLeft: '2px solid rgba(99,102,241,0.3)' }}>
-                              "{w.example}"
-                            </p>
-                          )}
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                            <button
+                              onClick={() => startEdit(w)}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ color: 'var(--accent)', background: 'transparent' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(99,102,241,0.1)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => deleteWord(w.id)}
+                              className="p-1.5 rounded-lg transition-all"
+                              style={{ color: 'var(--error)', background: 'transparent' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <button
-                          onClick={() => deleteWord(w.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg shrink-0 transition-all"
-                          style={{ color: 'var(--error)', background: 'transparent' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
