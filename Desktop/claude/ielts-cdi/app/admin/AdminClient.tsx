@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Dispatch, SetStateAction } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toggleUserPremium } from '@/app/actions/admin'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
-  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare, Loader2,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -1675,6 +1675,7 @@ interface FeedbackItem {
 interface ArticleRow {
   id: string
   title: string
+  description: string | null
   level: string
   category: string
   read_time: number
@@ -1683,173 +1684,463 @@ interface ArticleRow {
   created_at: string
 }
 
-const ARTICLE_LEVELS   = ['beginner', 'intermediate', 'advanced']
-const ARTICLE_CATS     = ['general', 'science', 'technology', 'culture', 'business', 'environment']
-const EMPTY_ARTICLE    = { title: '', description: '', content: '', category: 'general', level: 'intermediate', read_time: 5, is_premium: false, is_published: true }
+interface ArticleFormState {
+  title: string
+  description: string
+  content: string
+  category: string
+  level: string
+  read_time: number
+  is_premium: boolean
+  is_published: boolean
+}
+
+const ARTICLE_LEVELS = ['beginner', 'intermediate', 'advanced']
+const ARTICLE_CATS   = ['general', 'science', 'technology', 'culture', 'business', 'environment']
+const EMPTY_ARTICLE: ArticleFormState = { title: '', description: '', content: '', category: 'general', level: 'intermediate', read_time: 5, is_premium: false, is_published: true }
+
+function ArticleFormModal({
+  heading,
+  form,
+  setForm,
+  onSave,
+  onClose,
+  saving,
+  saveError,
+}: {
+  heading: string
+  form: ArticleFormState
+  setForm: Dispatch<SetStateAction<ArticleFormState>>
+  onSave: () => void
+  onClose: () => void
+  saving: boolean
+  saveError: string | null
+}) {
+  return (
+    <div
+      className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{heading}</h3>
+        <button onClick={onClose} style={{ color: 'var(--text-muted)' }}>
+          <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+        </button>
+      </div>
+      <input
+        type="text"
+        value={form.title}
+        onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+        placeholder="Sarlavha *"
+        className="input-field w-full text-sm py-2"
+      />
+      <textarea
+        value={form.description}
+        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+        placeholder="Qisqacha ta'rif"
+        rows={2}
+        className="input-field w-full text-sm py-2 resize-none"
+      />
+      <textarea
+        value={form.content}
+        onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
+        placeholder="Maqola matni (bo'sh qoldirsa o'zgarmaydi)..."
+        rows={10}
+        className="input-field w-full text-sm py-2 resize-none font-mono"
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Kategoriya</label>
+          <select
+            value={form.category}
+            onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+            className="input-field w-full text-sm py-2"
+          >
+            {ARTICLE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Daraja</label>
+          <select
+            value={form.level}
+            onChange={e => setForm(p => ({ ...p, level: e.target.value }))}
+            className="input-field w-full text-sm py-2"
+          >
+            {ARTICLE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>
+          O&apos;qish vaqti (daqiqa)
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={60}
+          value={form.read_time}
+          onChange={e => setForm(p => ({ ...p, read_time: Number(e.target.value) }))}
+          className="input-field w-32 text-sm py-2"
+        />
+      </div>
+      <div className="flex gap-6">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.is_premium}
+            onChange={e => setForm(p => ({ ...p, is_premium: e.target.checked }))}
+            className="w-4 h-4"
+          />
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={form.is_published}
+            onChange={e => setForm(p => ({ ...p, is_published: e.target.checked }))}
+            className="w-4 h-4"
+          />
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Published</span>
+        </label>
+      </div>
+      {saveError && (
+        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>
+          {saveError}
+        </p>
+      )}
+      <div className="flex gap-3 pt-2">
+        <button
+          onClick={onSave}
+          disabled={saving || !form.title.trim()}
+          className="btn-primary text-sm px-5 py-2 disabled:opacity-50"
+        >
+          {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+        </button>
+        <button
+          onClick={onClose}
+          className="text-sm px-4 py-2 rounded-lg"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+        >
+          Bekor qilish
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function ArticlesTab() {
-  const [articles, setArticles]   = useState<ArticleRow[]>([])
-  const [loading, setLoading]     = useState(true)
-  const [dbMissing, setDbMissing] = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm]           = useState(EMPTY_ARTICLE)
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [articles, setArticles]           = useState<ArticleRow[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [selectedId, setSelectedId]       = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting]           = useState(false)
+  const [deleteError, setDeleteError]     = useState<string | null>(null)
+  const [showCreate, setShowCreate]       = useState(false)
+  const [showEdit, setShowEdit]           = useState(false)
+  const [createForm, setCreateForm]       = useState<ArticleFormState>(EMPTY_ARTICLE)
+  const [editForm, setEditForm]           = useState<ArticleFormState>(EMPTY_ARTICLE)
+  const [saving, setSaving]               = useState(false)
+  const [saveError, setSaveError]         = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/articles')
+    fetch('/api/admin/articles')
       .then(async r => {
-        if (r.status === 503) { setDbMissing(true); return }
-        if (!r.ok) return
-        const data = await r.json()
+        const data = await r.json().catch(() => [])
         if (Array.isArray(data)) setArticles(data)
       })
       .finally(() => setLoading(false))
   }, [])
 
-  async function handleSave() {
-    if (!form.title.trim()) return
-    setSaving(true); setSaveError(null)
-    const res = await fetch('/api/articles', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    if (res.ok) {
-      const created = await res.json()
-      setArticles(prev => [created, ...prev])
-      setShowModal(false)
-      setForm(EMPTY_ARTICLE)
-    } else {
-      const d = await res.json().catch(() => ({}))
-      setSaveError(d.error ?? 'Xatolik')
+  const selectedArticle = articles.find(a => a.id === selectedId) ?? null
+
+  function handleSelect(id: string) {
+    setSelectedId(id)
+    setShowDeleteConfirm(false)
+    setDeleteError(null)
+  }
+
+  async function handleDelete() {
+    if (!selectedId) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/articles/${selectedId}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) {
+        const d = await res.json().catch(() => ({}))
+        setDeleteError(d.error ?? "O'chirishda xatolik")
+        return
+      }
+      setArticles(prev => prev.filter(a => a.id !== selectedId))
+      setSelectedId('')
+      setShowDeleteConfirm(false)
+    } finally {
+      setDeleting(false)
     }
-    setSaving(false)
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Maqolani o\'chirish?')) return
-    const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
-    if (res.ok) setArticles(prev => prev.filter(a => a.id !== id))
+  async function handleCreate() {
+    if (!createForm.title.trim()) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const res = await fetch('/api/articles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createForm),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setArticles(prev => [created, ...prev])
+        setShowCreate(false)
+        setCreateForm(EMPTY_ARTICLE)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setSaveError(d.error ?? 'Xatolik')
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
-  if (loading) return <div className="flex justify-center p-12"><div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} /></div>
+  function openEdit() {
+    if (!selectedArticle) return
+    setEditForm({
+      title: selectedArticle.title,
+      description: selectedArticle.description ?? '',
+      content: '',
+      category: selectedArticle.category,
+      level: selectedArticle.level,
+      read_time: selectedArticle.read_time,
+      is_premium: selectedArticle.is_premium,
+      is_published: selectedArticle.is_published,
+    })
+    setSaveError(null)
+    setShowEdit(true)
+  }
 
-  if (dbMissing) return (
-    <div className="rounded-xl p-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}>
-      <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>articles jadvali topilmadi — Supabase SQL Editor'da yarating.</p>
-    </div>
-  )
+  async function handleEdit() {
+    if (!selectedId || !editForm.title.trim()) return
+    setSaving(true)
+    setSaveError(null)
+    try {
+      const body: Record<string, unknown> = {
+        title: editForm.title,
+        description: editForm.description,
+        category: editForm.category,
+        level: editForm.level,
+        read_time: editForm.read_time,
+        is_premium: editForm.is_premium,
+        is_published: editForm.is_published,
+      }
+      if (editForm.content.trim()) body.content = editForm.content
+      const res = await fetch(`/api/articles/${selectedId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, ...updated } : a))
+        setShowEdit(false)
+      } else {
+        const d = await res.json().catch(() => ({}))
+        setSaveError(d.error ?? 'Xatolik')
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center p-12">
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+      </div>
+    )
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Maqolalar ({articles.length})</h2>
-        <button onClick={() => { setShowModal(true); setForm(EMPTY_ARTICLE); setSaveError(null) }}
-          className="btn-primary flex items-center gap-2 text-sm">
+    <div className="space-y-4 max-w-lg">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+          {articles.length} ta maqola
+        </span>
+        <button
+          onClick={() => { setShowCreate(true); setCreateForm(EMPTY_ARTICLE); setSaveError(null) }}
+          className="btn-primary flex items-center gap-2 text-sm"
+        >
           <Plus size={15} /> Yangi maqola
         </button>
       </div>
 
-      {articles.length === 0 ? (
-        <div className="py-12 text-center rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <BookOpen size={32} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Hali maqolalar yo&apos;q</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
+      {/* Dropdown selector */}
+      <div className="card p-4">
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+          Maqola tanlang
+        </label>
+        <select
+          value={selectedId}
+          onChange={e => handleSelect(e.target.value)}
+          className="input-field"
+        >
+          <option value="">— Maqola tanlang —</option>
           {articles.map(a => (
-            <div key={a.id} className="flex items-center gap-4 px-4 py-3 rounded-xl"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{a.title}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{a.level}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{a.category}</span>
-                  {a.is_premium && <span className="text-xs px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>Premium</span>}
-                  {!a.is_published && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)' }}>Draft</span>}
-                </div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{a.read_time} min · {new Date(a.created_at).toLocaleDateString('uz-UZ')}</div>
+            <option key={a.id} value={a.id}>
+              {a.title} [{a.level}]{!a.is_published ? ' (Draft)' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Selected article info + actions */}
+      {selectedId && selectedArticle && (
+        <div className="card p-5 space-y-4">
+          {/* Info */}
+          <div
+            className="flex items-start gap-3 p-3 rounded-xl"
+            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}
+          >
+            <BookOpen size={16} style={{ color: 'var(--accent)', marginTop: 2, flexShrink: 0 }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>Joriy maqola:</p>
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                {selectedArticle.title}
+              </p>
+              {selectedArticle.description && (
+                <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                  {selectedArticle.description}
+                </p>
+              )}
+              <div className="flex items-center gap-2 flex-wrap mt-2">
+                <span className="text-xs px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  {selectedArticle.level}
+                </span>
+                <span className="text-xs px-1.5 py-0.5 rounded"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  {selectedArticle.category}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {selectedArticle.read_time} min
+                </span>
+                {selectedArticle.is_premium && (
+                  <span className="text-xs px-1.5 py-0.5 rounded font-semibold"
+                    style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+                    Premium
+                  </span>
+                )}
+                {!selectedArticle.is_published && (
+                  <span className="text-xs px-1.5 py-0.5 rounded"
+                    style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)' }}>
+                    Draft
+                  </span>
+                )}
               </div>
-              <button onClick={() => handleDelete(a.id)} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--error)' }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                <Trash2 size={15} />
+            </div>
+          </div>
+
+          {/* Inline delete confirm */}
+          {showDeleteConfirm && (
+            <div
+              className="flex items-center justify-between gap-3 p-3 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>
+                Haqiqatan ham o&apos;chirilsinmi?
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                >
+                  Bekor
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--error)', color: '#fff', opacity: deleting ? 0.7 : 1 }}
+                >
+                  {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {deleteError && (
+            <p className="text-xs" style={{ color: 'var(--error)' }}>{deleteError}</p>
+          )}
+
+          {/* Action buttons */}
+          {!showDeleteConfirm && (
+            <div className="flex gap-2">
+              <button
+                onClick={openEdit}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}
+              >
+                <Edit3 size={14} /> Tahrirlash
+              </button>
+              <button
+                onClick={() => { setShowDeleteConfirm(true); setDeleteError(null) }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
+                style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}
+              >
+                <Trash2 size={14} /> O&apos;chirish
               </button>
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {/* Create modal */}
       <AnimatePresence>
-        {showModal && (
+        {showCreate && (
           <>
-            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowModal(false)} />
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowCreate(false)} />
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
               className="fixed inset-0 z-50 flex items-center justify-center p-4"
             >
-              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-                onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Yangi maqola</h3>
-                  <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-muted)' }}><Plus size={18} style={{ transform: 'rotate(45deg)' }} /></button>
-                </div>
+              <ArticleFormModal
+                heading="Yangi maqola"
+                form={createForm}
+                setForm={setCreateForm}
+                onSave={handleCreate}
+                onClose={() => setShowCreate(false)}
+                saving={saving}
+                saveError={saveError}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
-                <input type="text" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="Sarlavha *" className="input-field w-full text-sm py-2" />
-
-                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                  placeholder="Qisqacha ta'rif" rows={2} className="input-field w-full text-sm py-2 resize-none" />
-
-                <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
-                  placeholder="Maqola matni..." rows={10} className="input-field w-full text-sm py-2 resize-none font-mono" />
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Kategoriya</label>
-                    <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="input-field w-full text-sm py-2">
-                      {ARTICLE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Daraja</label>
-                    <select value={form.level} onChange={e => setForm(p => ({ ...p, level: e.target.value }))} className="input-field w-full text-sm py-2">
-                      {ARTICLE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-<label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>O'qish vaqti (daqiqa)</label>
-                  <input type="number" min={1} max={60} value={form.read_time} onChange={e => setForm(p => ({ ...p, read_time: Number(e.target.value) }))}
-                    className="input-field w-32 text-sm py-2" />
-                </div>
-
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.is_premium} onChange={e => setForm(p => ({ ...p, is_premium: e.target.checked }))} className="w-4 h-4" />
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={form.is_published} onChange={e => setForm(p => ({ ...p, is_published: e.target.checked }))} className="w-4 h-4" />
-                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Published</span>
-                  </label>
-                </div>
-
-                {saveError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>{saveError}</p>}
-
-                <div className="flex gap-3 pt-2">
-                  <button onClick={handleSave} disabled={saving || !form.title.trim()} className="btn-primary text-sm px-5 py-2 disabled:opacity-50">
-                    {saving ? 'Saqlanmoqda...' : 'Saqlash'}
-                  </button>
-                  <button onClick={() => setShowModal(false)} className="text-sm px-4 py-2 rounded-lg" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                    Bekor qilish
-                  </button>
-                </div>
-              </div>
+      {/* Edit modal */}
+      <AnimatePresence>
+        {showEdit && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowEdit(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <ArticleFormModal
+                heading="Maqolani tahrirlash"
+                form={editForm}
+                setForm={setEditForm}
+                onSave={handleEdit}
+                onClose={() => setShowEdit(false)}
+                saving={saving}
+                saveError={saveError}
+              />
             </motion.div>
           </>
         )}
