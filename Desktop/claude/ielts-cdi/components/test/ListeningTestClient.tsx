@@ -80,6 +80,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type === 'CDI_NATIVE') {
         nativeSubmitRef.current = true
+        setShowExit(true)
         return
       }
       // Only accept CDI_SUBMIT from the HTML file itself (flagged by CDI_NATIVE)

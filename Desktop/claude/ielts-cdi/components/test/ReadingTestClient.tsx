@@ -89,6 +89,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type === 'CDI_NATIVE') {
         nativeSubmitRef.current = true
+        setShowExit(true)
         return
       }
       if (e.data?.type === 'CDI_TRANSLATE') {
