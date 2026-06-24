@@ -55,6 +55,17 @@ create policy "vocab_words_all" on public.vocab_words
 
 const EMPTY_MANUAL = { word: '', uzbek: '', word_type: '', definition: '', example: '' }
 
+const WORD_TYPE_COLORS: Record<string, { bg: string; color: string; border: string }> = {
+  verb:      { bg: 'rgba(59,130,246,0.12)',  color: '#3b82f6', border: 'rgba(59,130,246,0.25)' },
+  noun:      { bg: 'rgba(245,158,11,0.12)',  color: '#f59e0b', border: 'rgba(245,158,11,0.25)' },
+  adjective: { bg: 'rgba(139,92,246,0.12)',  color: '#8b5cf6', border: 'rgba(139,92,246,0.25)' },
+  adverb:    { bg: 'rgba(20,184,166,0.12)',  color: '#14b8a6', border: 'rgba(20,184,166,0.25)' },
+  phrase:    { bg: 'rgba(244,63,94,0.12)',   color: '#f43f5e', border: 'rgba(244,63,94,0.25)' },
+  other:     { bg: 'rgba(148,163,184,0.12)', color: '#94a3b8', border: 'rgba(148,163,184,0.25)' },
+}
+
+const TYPE_OPTIONS = ['verb', 'noun', 'adjective', 'adverb', 'phrase', 'other']
+
 export default function LibraryPage() {
   const { t } = useLanguage()
   const router = useRouter()
@@ -85,6 +96,10 @@ export default function LibraryPage() {
   const [saving, setSaving]               = useState(false)
   const [copiedSql, setCopiedSql]         = useState(false)
 
+  // Search & filter
+  const [search, setSearch]               = useState('')
+  const [typeFilter, setTypeFilter]       = useState('')
+
   // Inline edit
   const [editingId, setEditingId]         = useState<string | null>(null)
   const [editDraft, setEditDraft]         = useState<EditDraft>({ word: '', uzbek_translation: '', word_type: '', definition: '', example: '' })
@@ -113,7 +128,7 @@ export default function LibraryPage() {
   }, [collections.length])
 
   // Reset manual form when switching collections
-  useEffect(() => { setManual(EMPTY_MANUAL); setManualError(null); setShowManual(false) }, [expanded])
+  useEffect(() => { setManual(EMPTY_MANUAL); setManualError(null); setShowManual(false); setSearch(''); setTypeFilter('') }, [expanded])
 
   async function createCollection() {
     if (!newName.trim()) return
@@ -332,6 +347,14 @@ export default function LibraryPage() {
 
   const activeCol = collections.find(c => c.id === expanded)
   const colWords  = words.filter(w => w.collection_id === expanded)
+  const filteredWords = colWords.filter(w => {
+    const q = search.trim().toLowerCase()
+    const matchSearch = !q ||
+      w.word.toLowerCase().includes(q) ||
+      (w.uzbek_translation ?? '').toLowerCase().includes(q)
+    const matchType = !typeFilter || (w.extra?.word_type ?? '') === typeFilter
+    return matchSearch && matchType
+  })
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
@@ -452,6 +475,34 @@ export default function LibraryPage() {
                 📁 {activeCol.name} — {t('vocabulary.wordCount').replace('{count}', String(colWords.length))}
               </h2>
 
+              {/* ── Search & type filter ── */}
+              {colWords.length > 0 && (
+                <div className="mb-3 space-y-2">
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="So'z qidirish..."
+                    className="input-field w-full text-sm py-2"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    {['', ...TYPE_OPTIONS].map(type => (
+                      <button
+                        key={type || '_all'}
+                        onClick={() => setTypeFilter(type)}
+                        className="text-xs px-2.5 py-1 rounded-lg font-medium transition-all"
+                        style={typeFilter === type
+                          ? { background: type ? WORD_TYPE_COLORS[type]?.bg ?? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.15)', color: type ? WORD_TYPE_COLORS[type]?.color ?? 'var(--accent)' : 'var(--accent)', border: `1px solid ${type ? WORD_TYPE_COLORS[type]?.border ?? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.3)'}` }
+                          : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+                        }
+                      >
+                        {type || 'Barchasi'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ── Manual add form ── */}
               <div className="mb-3 rounded-xl overflow-hidden"
                 style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
@@ -536,9 +587,14 @@ export default function LibraryPage() {
                   <BookOpen size={28} className="mx-auto mb-2 opacity-30" />
                   <p className="text-sm">{t('vocabulary.noWords')}</p>
                 </div>
+              ) : filteredWords.length === 0 ? (
+                <div className="py-8 text-center rounded-xl"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                  <p className="text-sm">Hech narsa topilmadi</p>
+                </div>
               ) : (
                 <div className="space-y-2">
-                  {colWords.map(w => (
+                  {filteredWords.map(w => (
                     <div key={w.id}
                       className="rounded-xl p-4 group transition-all"
                       style={{
@@ -638,12 +694,15 @@ export default function LibraryPage() {
                               {w.uzbek_translation && (
                                 <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>— {w.uzbek_translation}</span>
                               )}
-                              {w.extra?.word_type && (
-                                <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
-                                  style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
-                                  {w.extra.word_type}
-                                </span>
-                              )}
+                              {w.extra?.word_type && (() => {
+                                const c = WORD_TYPE_COLORS[w.extra.word_type] ?? WORD_TYPE_COLORS.other
+                                return (
+                                  <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                                    style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}>
+                                    {w.extra.word_type}
+                                  </span>
+                                )
+                              })()}
                               {w.source === 'ai_generated' && (
                                 <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5"
                                   style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
