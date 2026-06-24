@@ -167,20 +167,21 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             onClick={() => router.push('/dashboard')}
             style={{
               position: 'fixed',
-              bottom: 16,
-              right: 200,
-              zIndex: 200,
+              bottom: '20px',
+              right: '20px',
+              zIndex: 99999,
               background: '#4f46e5',
-              color: '#fff',
+              color: 'white',
               border: 'none',
-              padding: '10px 20px',
-              borderRadius: 8,
+              padding: '12px 24px',
+              borderRadius: '8px',
               cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 14,
+              fontWeight: 700,
+              fontSize: '15px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             }}
           >
-            ← Exit Test
+            ← Testdan chiqish
           </button>
         )}
       </>
