@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { sessionId, testId, score, timeTaken } = await req.json()
+  const { sessionId, testId, score, timeTaken, answers } = await req.json()
 
   if (typeof score !== 'number') {
     return NextResponse.json({ error: 'Invalid score' }, { status: 400 })
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
       raw_score: score,
       band_score: bandScore,
       time_taken: typeof timeTaken === 'number' && timeTaken > 0 ? timeTaken : null,
+      answers: answers || null,
     })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -125,6 +125,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         if (submittedRef.current) return
         submittedRef.current = true
         const score = typeof e.data.score === 'number' ? e.data.score : 0
+        const answers = e.data.answers || null
         // Prefer HTML's own timer (3600 - timeInSeconds); fall back to wall clock
         const timeTaken = typeof e.data.timeTaken === 'number' && e.data.timeTaken > 0
           ? e.data.timeTaken
@@ -132,7 +133,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         fetch('/api/results/cdi', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken }),
+          body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken, answers }),
         }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
         setCdiSubmitted(true)
         return
