@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2 } from 'lucide-react'
+import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { TestTimer } from './TestTimer'
@@ -43,7 +43,6 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
-  const [cdiSubmitted, setCdiSubmitted] = useState(false)  // CDI_SUBMIT received
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
@@ -135,7 +134,6 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken, answers }),
         }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
-        setCdiSubmitted(true)
         return
       }
     }
@@ -199,61 +197,31 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           </div>
         )}
 
-        {/* CDI_SUBMIT received — success overlay with redirect */}
-        {cdiSubmitted && (
-          <div style={{
-            position: 'fixed', inset: 0, zIndex: 200,
+        {/* Exit Test button — always visible over iframe */}
+        <button
+          onClick={() => router.push('/dashboard')}
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            zIndex: 200,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 20px',
+            borderRadius: 12,
             background: 'rgba(0,0,0,0.75)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <div style={{
-              background: 'white', borderRadius: 20, padding: '48px 56px',
-              textAlign: 'center', maxWidth: 360,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
-            }}>
-              <div style={{ fontSize: 56, marginBottom: 16 }}>{cdiSaveError ? '⚠️' : '✅'}</div>
-              <h2 style={{ fontSize: 24, fontWeight: 700, color: '#111', marginBottom: 8 }}>
-                {cdiSaveError ? 'Xatolik yuz berdi' : 'Test topshirildi!'}
-              </h2>
-              <p style={{ color: '#666', fontSize: 15, marginBottom: 24 }}>
-                {cdiSaveError ? 'Natija saqlanmadi. Internet aloqasini tekshiring.' : 'Natijangiz saqlandi.'}
-              </p>
-              <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => setCdiSubmitted(false)}
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: 12,
-                    background: 'transparent',
-                    color: '#111',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    border: '2px solid #111',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Tahlil qilish
-                </button>
-                <a
-                  href="/dashboard"
-                  style={{
-                    display: 'inline-block',
-                    padding: '12px 24px',
-                    borderRadius: 12,
-                    background: '#111',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    textDecoration: 'none',
-                  }}
-                >
-                  Dashboard&apos;ga qaytish →
-                </a>
-              </div>
-            </div>
-          </div>
-        )}
-
+            color: '#fff',
+            fontWeight: 600,
+            fontSize: 14,
+            border: 'none',
+            cursor: 'pointer',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <LogOut size={16} />
+          Exit Test
+        </button>
       </>
     )
   }
