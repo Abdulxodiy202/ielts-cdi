@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   // Mark session completed via admin client (bypasses RLS; unique constraint fixed by migration 015)
   await admin
     .from('test_sessions')
-    .update({ status: 'completed', completed_at: new Date().toISOString() })
+    .update({ status: 'completed', completed_at: new Date().toISOString(), time_remaining: 0 })
     .eq('id', sessionId)
 
   // Bust the 60-second dashboard cache so results appear immediately

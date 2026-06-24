@@ -201,28 +201,25 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
 
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
-          <div style={{ position: 'fixed', bottom: 16, right: 160, display: 'flex', gap: 8, zIndex: 200 }}>
-            <button
-              onClick={() => router.push('/dashboard')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '10px 20px',
-                borderRadius: 12,
-                background: 'rgba(0,0,0,0.75)',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 14,
-                border: 'none',
-                cursor: 'pointer',
-                backdropFilter: 'blur(4px)',
-              }}
-            >
-              <LogOut size={16} />
-              ← Exit Test
-            </button>
-          </div>
+          <button
+            onClick={() => router.push('/dashboard')}
+            style={{
+              position: 'fixed',
+              bottom: 16,
+              right: 200,
+              zIndex: 200,
+              background: '#4f46e5',
+              color: '#fff',
+              border: 'none',
+              padding: '10px 20px',
+              borderRadius: 8,
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+            }}
+          >
+            ← Exit Test
+          </button>
         )}
       </>
     )
