@@ -709,7 +709,7 @@ export default function LibraryPage() {
                                   <Sparkles size={9} /> AI
                                 </span>
                               )}
-                              {w.source === 'irregular_verb' && (
+                              {w.source === 'irregular_verb' && !w.extra?.word_type && (
                                 <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
                                   style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
                                   verb
