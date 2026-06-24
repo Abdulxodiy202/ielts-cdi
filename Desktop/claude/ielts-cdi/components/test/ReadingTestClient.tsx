@@ -122,6 +122,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
       }
       // Only accept CDI_SUBMIT from the HTML file itself (flagged by CDI_NATIVE)
       if (e.data?.type === 'CDI_SUBMIT') {
+        console.log('[CDI_SUBMIT] received, nativeRef:', nativeSubmitRef.current, 'submittedRef:', submittedRef.current, 'score:', e.data?.score)
         if (!nativeSubmitRef.current) return
         if (submittedRef.current) return
         submittedRef.current = true
