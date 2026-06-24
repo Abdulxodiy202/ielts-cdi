@@ -93,14 +93,17 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
       }
       if (e.data?.type === 'CDI_TRANSLATE') {
         const word = e.data.word
+        console.log('[CDI_TRANSLATE] word received:', word)
         if (!word) return
+        console.log('[CDI_TRANSLATE] fetching /api/translate...')
         fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ word })
         })
-          .then(r => r.json())
+          .then(r => { console.log('[CDI_TRANSLATE] response status:', r.status); return r.json() })
           .then(data => {
+            console.log('[CDI_TRANSLATE] result:', data)
             const iframe = document.querySelector('iframe') as HTMLIFrameElement
             iframe?.contentWindow?.postMessage({
               type: 'CDI_TRANSLATE_RESULT',
@@ -109,7 +112,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               extra: data.extra || ''
             }, '*')
           })
-          .catch(() => {})
+          .catch(err => console.error('[CDI_TRANSLATE] error:', err))
         return
       }
       if (e.data?.type === 'CDI_GO_DASHBOARD') {

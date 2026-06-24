@@ -80,6 +80,25 @@ export function buildInjectScript(): string {
     bind();
   }
   setTimeout(bind,1500);
+
+  // Event delegation for CDI buttons (works even if elements are hidden at load time)
+  document.addEventListener('click',function(e){
+    var target=e.target;
+    if(!target) return;
+    var el=target;
+    while(el&&el!==document.body){
+      if(el.id==='go-dashboard-btn'){
+        window.parent.postMessage({type:'CDI_GO_DASHBOARD'},'*');
+        return;
+      }
+      if(el.id==='analyse-btn'){
+        var modal=document.getElementById('results-modal');
+        if(modal) modal.classList.add('hidden');
+        return;
+      }
+      el=el.parentElement;
+    }
+  });
 })()
 `
 
