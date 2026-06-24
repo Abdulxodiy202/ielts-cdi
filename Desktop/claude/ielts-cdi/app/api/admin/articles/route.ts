@@ -12,7 +12,7 @@ export async function GET() {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('articles')
-    .select('id, title, description, category, level, read_time, is_premium, is_published, word_count, created_at')
+    .select('id, title, file_url, is_premium, is_published, created_at')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useEffect, Dispatch, SetStateAction } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toggleUserPremium } from '@/app/actions/admin'
 import {
   CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
-  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare, Loader2,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
+  Loader2, Upload, FileText, X,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -1672,477 +1673,323 @@ interface FeedbackItem {
 }
 
 /* ── Articles Tab ────────────────────────────────────────────────────── */
-interface ArticleRow {
+interface ArticleItem {
   id: string
   title: string
-  description: string | null
-  level: string
-  category: string
-  read_time: number
+  file_url: string | null
   is_premium: boolean
   is_published: boolean
   created_at: string
 }
 
-interface ArticleFormState {
-  title: string
-  description: string
-  content: string
-  category: string
-  level: string
-  read_time: number
-  is_premium: boolean
-  is_published: boolean
-}
-
-const ARTICLE_LEVELS = ['beginner', 'intermediate', 'advanced']
-const ARTICLE_CATS   = ['general', 'science', 'technology', 'culture', 'business', 'environment']
-const EMPTY_ARTICLE: ArticleFormState = { title: '', description: '', content: '', category: 'general', level: 'intermediate', read_time: 5, is_premium: false, is_published: true }
-
-function ArticleFormModal({
-  heading,
-  form,
-  setForm,
-  onSave,
-  onClose,
-  saving,
-  saveError,
-}: {
-  heading: string
-  form: ArticleFormState
-  setForm: Dispatch<SetStateAction<ArticleFormState>>
-  onSave: () => void
-  onClose: () => void
-  saving: boolean
-  saveError: string | null
-}) {
-  return (
-    <div
-      className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      onClick={e => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>{heading}</h3>
-        <button onClick={onClose} style={{ color: 'var(--text-muted)' }}>
-          <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
-        </button>
-      </div>
-      <input
-        type="text"
-        value={form.title}
-        onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-        placeholder="Sarlavha *"
-        className="input-field w-full text-sm py-2"
-      />
-      <textarea
-        value={form.description}
-        onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-        placeholder="Qisqacha ta'rif"
-        rows={2}
-        className="input-field w-full text-sm py-2 resize-none"
-      />
-      <textarea
-        value={form.content}
-        onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
-        placeholder="Maqola matni (bo'sh qoldirsa o'zgarmaydi)..."
-        rows={10}
-        className="input-field w-full text-sm py-2 resize-none font-mono"
-      />
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Kategoriya</label>
-          <select
-            value={form.category}
-            onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-            className="input-field w-full text-sm py-2"
-          >
-            {ARTICLE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Daraja</label>
-          <select
-            value={form.level}
-            onChange={e => setForm(p => ({ ...p, level: e.target.value }))}
-            className="input-field w-full text-sm py-2"
-          >
-            {ARTICLE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>
-          O&apos;qish vaqti (daqiqa)
-        </label>
-        <input
-          type="number"
-          min={1}
-          max={60}
-          value={form.read_time}
-          onChange={e => setForm(p => ({ ...p, read_time: Number(e.target.value) }))}
-          className="input-field w-32 text-sm py-2"
-        />
-      </div>
-      <div className="flex gap-6">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.is_premium}
-            onChange={e => setForm(p => ({ ...p, is_premium: e.target.checked }))}
-            className="w-4 h-4"
-          />
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.is_published}
-            onChange={e => setForm(p => ({ ...p, is_published: e.target.checked }))}
-            className="w-4 h-4"
-          />
-          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Published</span>
-        </label>
-      </div>
-      {saveError && (
-        <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>
-          {saveError}
-        </p>
-      )}
-      <div className="flex gap-3 pt-2">
-        <button
-          onClick={onSave}
-          disabled={saving || !form.title.trim()}
-          className="btn-primary text-sm px-5 py-2 disabled:opacity-50"
-        >
-          {saving ? 'Saqlanmoqda...' : 'Saqlash'}
-        </button>
-        <button
-          onClick={onClose}
-          className="text-sm px-4 py-2 rounded-lg"
-          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
-        >
-          Bekor qilish
-        </button>
-      </div>
-    </div>
-  )
-}
 
 function ArticlesTab() {
-  const [articles, setArticles]           = useState<ArticleRow[]>([])
+  const [articles, setArticles]           = useState<ArticleItem[]>([])
   const [loading, setLoading]             = useState(true)
   const [selectedId, setSelectedId]       = useState('')
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [deleting, setDeleting]           = useState(false)
-  const [deleteError, setDeleteError]     = useState<string | null>(null)
-  const [showCreate, setShowCreate]       = useState(false)
-  const [showEdit, setShowEdit]           = useState(false)
-  const [createForm, setCreateForm]       = useState<ArticleFormState>(EMPTY_ARTICLE)
-  const [editForm, setEditForm]           = useState<ArticleFormState>(EMPTY_ARTICLE)
+  const [selectedFile, setSelectedFile]   = useState<File | null>(null)
   const [saving, setSaving]               = useState(false)
-  const [saveError, setSaveError]         = useState<string | null>(null)
+  const [deleting, setDeleting]           = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [message, setMessage]             = useState<{ ok: boolean; text: string } | null>(null)
+  const [uploadedUrls, setUploadedUrls]   = useState<Record<string, string | null>>({})
+  const [showCreate, setShowCreate]       = useState(false)
+  const [newTitle, setNewTitle]           = useState('')
+  const [creating, setCreating]           = useState(false)
+  const [togglingPremium, setTogglingPremium] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/admin/articles')
-      .then(async r => {
-        const data = await r.json().catch(() => [])
-        if (Array.isArray(data)) setArticles(data)
-      })
+      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setArticles(d) })
       .finally(() => setLoading(false))
   }, [])
 
   const selectedArticle = articles.find(a => a.id === selectedId) ?? null
+  const currentUrl = selectedId in uploadedUrls ? uploadedUrls[selectedId] : (selectedArticle?.file_url ?? null)
+  const currentFileName = currentUrl ? decodeURIComponent(currentUrl.split('/').pop()?.split('?')[0] ?? '') : null
 
-  function handleSelect(id: string) {
-    setSelectedId(id)
-    setShowDeleteConfirm(false)
-    setDeleteError(null)
+  function handleArticleChange(id: string) {
+    setSelectedId(id); setSelectedFile(null); setMessage(null); setShowDeleteConfirm(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  async function handleDelete() {
-    if (!selectedId) return
-    setDeleting(true)
-    setDeleteError(null)
+  async function handleSave() {
+    if (!selectedId || !selectedFile) return
+    setSaving(true); setMessage(null)
     try {
-      const res = await fetch(`/api/articles/${selectedId}`, { method: 'DELETE' })
-      if (!res.ok && res.status !== 204) {
-        const d = await res.json().catch(() => ({}))
-        setDeleteError(d.error ?? "O'chirishda xatolik")
-        return
-      }
-      setArticles(prev => prev.filter(a => a.id !== selectedId))
-      setSelectedId('')
+      const urlRes = await fetch('/api/admin/article-upload-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: selectedId, fileName: selectedFile.name }),
+      })
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL olishda xato') }
+      const { signedUrl, contentType, publicUrl } = await urlRes.json()
+
+      const uploadRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile })
+      if (!uploadRes.ok) { const t = await uploadRes.text().catch(() => ''); throw new Error(`Storage xatosi ${uploadRes.status}${t ? ': '+t.slice(0,120) : ''}`) }
+
+      const recordRes = await fetch('/api/admin/article-record', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: selectedId, publicUrl }),
+      })
+      if (!recordRes.ok) { const e = await recordRes.json().catch(() => ({})); throw new Error(e.error ?? 'DB xato') }
+
+      const { url } = await recordRes.json()
+      setUploadedUrls(prev => ({ ...prev, [selectedId]: url }))
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setMessage({ ok: true, text: 'Fayl muvaffaqiyatli yuklandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+    } finally { setSaving(false) }
+  }
+
+  async function handleDeleteFile() {
+    if (!selectedId || !currentFileName) return
+    setDeleting(true); setMessage(null)
+    try {
+      const res = await fetch('/api/admin/article-delete', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: selectedId, fileName: currentFileName }),
+      })
+      if (!res.ok) { const e = await res.json(); throw new Error(e.error ?? "O'chirish xatosi") }
+      setUploadedUrls(prev => ({ ...prev, [selectedId]: null }))
       setShowDeleteConfirm(false)
-    } finally {
-      setDeleting(false)
-    }
+      setMessage({ ok: true, text: "Fayl o'chirildi!" })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+    } finally { setDeleting(false) }
+  }
+
+  async function handleTogglePremium() {
+    if (!selectedArticle) return
+    setTogglingPremium(true)
+    try {
+      const res = await fetch(`/api/articles/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_premium: !selectedArticle.is_premium }),
+      })
+      if (res.ok) setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, is_premium: !a.is_premium } : a))
+    } finally { setTogglingPremium(false) }
   }
 
   async function handleCreate() {
-    if (!createForm.title.trim()) return
-    setSaving(true)
-    setSaveError(null)
+    if (!newTitle.trim()) return
+    setCreating(true)
     try {
       const res = await fetch('/api/articles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle.trim() }),
       })
       if (res.ok) {
         const created = await res.json()
         setArticles(prev => [created, ...prev])
-        setShowCreate(false)
-        setCreateForm(EMPTY_ARTICLE)
-      } else {
-        const d = await res.json().catch(() => ({}))
-        setSaveError(d.error ?? 'Xatolik')
+        setSelectedId(created.id)
+        setShowCreate(false); setNewTitle(''); setMessage(null)
+        setSelectedFile(null); setShowDeleteConfirm(false)
+        if (fileInputRef.current) fileInputRef.current.value = ''
       }
-    } finally {
-      setSaving(false)
-    }
+    } finally { setCreating(false) }
   }
 
-  function openEdit() {
-    if (!selectedArticle) return
-    setEditForm({
-      title: selectedArticle.title,
-      description: selectedArticle.description ?? '',
-      content: '',
-      category: selectedArticle.category,
-      level: selectedArticle.level,
-      read_time: selectedArticle.read_time,
-      is_premium: selectedArticle.is_premium,
-      is_published: selectedArticle.is_published,
-    })
-    setSaveError(null)
-    setShowEdit(true)
-  }
-
-  async function handleEdit() {
-    if (!selectedId || !editForm.title.trim()) return
-    setSaving(true)
-    setSaveError(null)
-    try {
-      const body: Record<string, unknown> = {
-        title: editForm.title,
-        description: editForm.description,
-        category: editForm.category,
-        level: editForm.level,
-        read_time: editForm.read_time,
-        is_premium: editForm.is_premium,
-        is_published: editForm.is_published,
-      }
-      if (editForm.content.trim()) body.content = editForm.content
-      const res = await fetch(`/api/articles/${selectedId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (res.ok) {
-        const updated = await res.json()
-        setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, ...updated } : a))
-        setShowEdit(false)
-      } else {
-        const d = await res.json().catch(() => ({}))
-        setSaveError(d.error ?? 'Xatolik')
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center p-12">
-        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
-          style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="flex justify-center p-12">
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    </div>
+  )
 
   return (
     <div className="space-y-4 max-w-lg">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-          {articles.length} ta maqola
-        </span>
-        <button
-          onClick={() => { setShowCreate(true); setCreateForm(EMPTY_ARTICLE); setSaveError(null) }}
-          className="btn-primary flex items-center gap-2 text-sm"
-        >
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{articles.length} ta maqola</span>
+        <button onClick={() => { setShowCreate(true); setNewTitle('') }}
+          className="btn-primary flex items-center gap-2 text-sm">
           <Plus size={15} /> Yangi maqola
         </button>
       </div>
 
-      {/* Dropdown selector */}
       <div className="card p-4">
-        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
-          Maqola tanlang
-        </label>
-        <select
-          value={selectedId}
-          onChange={e => handleSelect(e.target.value)}
-          className="input-field"
-        >
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Maqola tanlang</label>
+        <select value={selectedId} onChange={e => handleArticleChange(e.target.value)} className="input-field">
           <option value="">— Maqola tanlang —</option>
           {articles.map(a => (
-            <option key={a.id} value={a.id}>
-              {a.title} [{a.level}]{!a.is_published ? ' (Draft)' : ''}
-            </option>
+            <option key={a.id} value={a.id}>{a.title}{!a.is_published ? ' (Draft)' : ''}</option>
           ))}
         </select>
       </div>
 
-      {/* Selected article info + actions */}
-      {selectedId && selectedArticle && (
+      {selectedId && (
         <div className="card p-5 space-y-4">
-          {/* Info */}
-          <div
-            className="flex items-start gap-3 p-3 rounded-xl"
-            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}
-          >
-            <BookOpen size={16} style={{ color: 'var(--accent)', marginTop: 2, flexShrink: 0 }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>Joriy maqola:</p>
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                {selectedArticle.title}
-              </p>
-              {selectedArticle.description && (
-                <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text-muted)' }}>
-                  {selectedArticle.description}
-                </p>
-              )}
-              <div className="flex items-center gap-2 flex-wrap mt-2">
-                <span className="text-xs px-1.5 py-0.5 rounded"
-                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
-                  {selectedArticle.level}
-                </span>
-                <span className="text-xs px-1.5 py-0.5 rounded"
-                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
-                  {selectedArticle.category}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {selectedArticle.read_time} min
-                </span>
-                {selectedArticle.is_premium && (
-                  <span className="text-xs px-1.5 py-0.5 rounded font-semibold"
-                    style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
-                    Premium
-                  </span>
-                )}
-                {!selectedArticle.is_published && (
-                  <span className="text-xs px-1.5 py-0.5 rounded"
-                    style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)' }}>
-                    Draft
-                  </span>
-                )}
+          {/* is_premium toggle */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Premium holati</span>
+            <button
+              onClick={handleTogglePremium}
+              disabled={togglingPremium}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+              style={selectedArticle?.is_premium ? {
+                background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)',
+              } : {
+                background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)',
+              }}
+            >
+              {selectedArticle?.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+              {togglingPremium ? '...' : selectedArticle?.is_premium ? 'Premium' : 'Bepul'}
+            </button>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Current file */}
+          {currentFileName && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-3 p-3 rounded-xl"
+                style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                <CheckCircle size={16} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Joriy fayl:</p>
+                  <a href={currentUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+                    className="text-sm truncate block hover:underline" style={{ color: 'var(--success)' }}>
+                    {currentFileName}
+                  </a>
+                </div>
+                <button type="button"
+                  onClick={() => { setShowDeleteConfirm(true); setMessage(null) }}
+                  disabled={deleting}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium shrink-0"
+                  style={{ color: 'var(--error)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <Trash2 size={13} /><span>O&apos;chirish</span>
+                </button>
               </div>
+
+              {showDeleteConfirm && (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl"
+                  style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                  <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>Haqiqatan ham o&apos;chirilsinmi?</p>
+                  <div className="flex gap-2 shrink-0">
+                    <button type="button" onClick={() => setShowDeleteConfirm(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                      style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                      Bekor
+                    </button>
+                    <button type="button" onClick={handleDeleteFile} disabled={deleting}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                      style={{ background: 'var(--error)', color: '#fff', opacity: deleting ? 0.7 : 1 }}>
+                      {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      {deleting ? "O'chirilmoqda…" : "Ha, o'chirish"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* File picker */}
+          <div>
+            <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+              {currentFileName ? 'Yangi fayl bilan almashtirish:' : 'Fayl yuklash:'}
+            </p>
+            <div
+              className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-xl cursor-pointer"
+              style={{
+                border: `2px dashed ${selectedFile ? 'var(--accent)' : 'var(--border)'}`,
+                background: selectedFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {selectedFile ? (
+                <>
+                  <FileText size={28} style={{ color: 'var(--accent)' }} />
+                  <div className="text-center">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedFile.name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{(selectedFile.size / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>
+                  <button type="button"
+                    onClick={e => { e.stopPropagation(); setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                    className="absolute top-2 right-2 p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <X size={14} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                    <Upload size={22} style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Maqola faylini yuklash</p>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>PDF, HTML qabul qilinadi</p>
+                  </div>
+                </>
+              )}
+              <input ref={fileInputRef} type="file" accept=".pdf,.html,.htm" className="hidden"
+                onChange={e => { setSelectedFile(e.target.files?.[0] ?? null); setMessage(null) }} />
             </div>
           </div>
 
-          {/* Inline delete confirm */}
-          {showDeleteConfirm && (
-            <div
-              className="flex items-center justify-between gap-3 p-3 rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}
-            >
-              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>
-                Haqiqatan ham o&apos;chirilsinmi?
-              </p>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => { setShowDeleteConfirm(false); setDeleteError(null) }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-                >
-                  Bekor
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: 'var(--error)', color: '#fff', opacity: deleting ? 0.7 : 1 }}
-                >
-                  {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  {deleting ? "O'chirilmoqda..." : "Ha, o'chirish"}
-                </button>
-              </div>
+          {message && (
+            <div className="p-3 rounded-xl text-sm font-medium"
+              style={{
+                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: message.ok ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {message.ok ? '✅' : '❌'} {message.text}
             </div>
           )}
 
-          {deleteError && (
-            <p className="text-xs" style={{ color: 'var(--error)' }}>{deleteError}</p>
-          )}
+          <button onClick={handleSave} disabled={!selectedFile || saving}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+            style={{ opacity: !selectedFile || saving ? 0.5 : 1, cursor: !selectedFile || saving ? 'not-allowed' : 'pointer' }}>
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={16} /> Saqlash</>}
+          </button>
+        </div>
+      )}
 
-          {/* Action buttons */}
-          {!showDeleteConfirm && (
-            <div className="flex gap-2">
-              <button
-                onClick={openEdit}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}
-              >
-                <Edit3 size={14} /> Tahrirlash
-              </button>
-              <button
-                onClick={() => { setShowDeleteConfirm(true); setDeleteError(null) }}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium"
-                style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}
-              >
-                <Trash2 size={14} /> O&apos;chirish
-              </button>
-            </div>
-          )}
+      {!selectedId && (
+        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+          Yuqoridan maqola tanlang
         </div>
       )}
 
       {/* Create modal */}
       <AnimatePresence>
         {showCreate && (
-          <>
-            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowCreate(false)} />
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowCreate(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm space-y-4"
+              style={{ zIndex: 51 }}
+              onClick={e => e.stopPropagation()}
             >
-              <ArticleFormModal
-                heading="Yangi maqola"
-                form={createForm}
-                setForm={setCreateForm}
-                onSave={handleCreate}
-                onClose={() => setShowCreate(false)}
-                saving={saving}
-                saveError={saveError}
-              />
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi maqola</h3>
+                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
+                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Maqola sarlavhasi
+                </label>
+                <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                  placeholder="Sarlavha..." className="input-field w-full text-sm" autoFocus />
+              </div>
+              <button onClick={handleCreate} disabled={creating || !newTitle.trim()}
+                className="btn-primary w-full text-sm disabled:opacity-50">
+                {creating ? 'Yaratilyapti...' : 'Yaratish'}
+              </button>
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Edit modal */}
-      <AnimatePresence>
-        {showEdit && (
-          <>
-            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowEdit(false)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
-              className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            >
-              <ArticleFormModal
-                heading="Maqolani tahrirlash"
-                form={editForm}
-                setForm={setEditForm}
-                onSave={handleEdit}
-                onClose={() => setShowEdit(false)}
-                saving={saving}
-                saveError={saveError}
-              />
-            </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </div>
