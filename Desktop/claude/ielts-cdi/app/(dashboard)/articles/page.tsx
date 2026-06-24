@@ -62,11 +62,12 @@ export default function ArticlesPage() {
     })
 
     fetch('/api/articles')
-      .then(r => {
-        if (r.status === 503) { setDbMissing(true); setLoading(false); return }
-        return r.json()
+      .then(async r => {
+        if (r.status === 503) { setDbMissing(true); return }
+        if (!r.ok) return
+        const data = await r.json()
+        if (Array.isArray(data)) setArticles(data)
       })
-      .then(data => { if (data) setArticles(data) })
       .finally(() => setLoading(false))
   }, [])
 

@@ -14,9 +14,11 @@ export async function GET() {
     .eq('is_published', true)
     .order('created_at', { ascending: false })
 
-  if (error?.code === '42P01') return NextResponse.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+  if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+    return NextResponse.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data ?? [])
+  return NextResponse.json(Array.isArray(data) ? data : [])
 }
 
 export async function POST(req: NextRequest) {
