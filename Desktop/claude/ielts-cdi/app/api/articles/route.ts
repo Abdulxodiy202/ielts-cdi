@@ -3,22 +3,26 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('articles')
-    .select('id, title, description, category, level, read_time, is_premium, cover_image, word_count, created_at')
-    .eq('is_published', true)
-    .order('created_at', { ascending: false })
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('articles')
+      .select('id, title, description, category, level, read_time, is_premium, cover_image, word_count, created_at')
+      .eq('is_published', true)
+      .order('created_at', { ascending: false })
 
-  if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
-    return NextResponse.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+      return NextResponse.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    }
+    if (error) return NextResponse.json([], { status: 200 })
+    return NextResponse.json(Array.isArray(data) ? data : [])
+  } catch {
+    return NextResponse.json([], { status: 200 })
   }
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(Array.isArray(data) ? data : [])
 }
 
 export async function POST(req: NextRequest) {
