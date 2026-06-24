@@ -62,6 +62,9 @@ export function buildInjectScript(): string {
 
   function notify(){
     var score=extractScore();
+    // Always send CDI_NATIVE first so parent's nativeSubmitRef gate opens,
+    // even if the HTML file's own CDI_NATIVE failed (e.g. exception before it).
+    window.parent.postMessage({type:'CDI_NATIVE'},'*');
     if(score!==null&&score>=0){
       window.parent.postMessage({type:'CDI_SUBMIT',score:score},'*');
     }else{
