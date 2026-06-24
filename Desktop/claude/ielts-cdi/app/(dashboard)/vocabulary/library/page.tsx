@@ -391,82 +391,6 @@ export default function LibraryPage() {
         {/* ── Right: Word list + forms ── */}
         <div className="lg:col-span-3 space-y-4">
 
-          {/* AI Word Generator */}
-          <div className="rounded-xl p-4" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <h2 className="text-sm font-semibold mb-3 flex items-center gap-2" style={{ color: 'var(--accent)' }}>
-              <Sparkles size={15} /> {t('vocabulary.aiGenerator')}
-            </h2>
-
-            {genNoKey ? (
-              <div className="rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: '#f59e0b' }}>⚙️ API Key sozlanmagan</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.aiKeyMissing')}</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    value={wordInput}
-                    onChange={e => { setWordInput(e.target.value); setGenerated(null); setGenError(null) }}
-                    onKeyDown={e => e.key === 'Enter' && generateWord()}
-                    placeholder={t('vocabulary.enterWord')}
-                    className="input-field text-sm flex-1 py-2"
-                  />
-                  <button onClick={generateWord} disabled={generating || !wordInput.trim()}
-                    className="btn-primary flex items-center gap-1.5 px-3 py-2 text-sm disabled:opacity-50">
-                    {generating
-                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <Sparkles size={14} />}
-                    {generating ? t('vocabulary.generating') : t('vocabulary.generate')}
-                  </button>
-                </div>
-
-                {genError && (
-                  <p className="text-sm py-2 px-3 rounded-lg mb-2"
-                    style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                    {genError}
-                  </p>
-                )}
-
-                {generated && (
-                  <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                    <p className="font-bold text-lg" style={{ color: 'var(--accent)' }}>{generated.word}</p>
-                    <p className="text-sm">
-                      <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.translation')}: </span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{generated.uzbek_translation}</span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.definition')}: </span>
-                      <span style={{ color: 'var(--text-secondary)' }}>{generated.definition}</span>
-                    </p>
-                    <p className="text-sm italic">
-                      <span className="not-italic font-medium" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.example')}: </span>
-                      <span style={{ color: 'var(--text-muted)' }}>"{generated.example}"</span>
-                    </p>
-                    {generated.collocations && (
-                      <p className="text-sm">
-                        <span className="font-medium" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.collocations')}: </span>
-                        <span style={{ color: 'var(--text-secondary)' }}>{generated.collocations}</span>
-                      </p>
-                    )}
-                    <div className="pt-2 flex items-center gap-2">
-                      <select value={targetCol ?? ''} onChange={e => setTargetCol(e.target.value)}
-                        className="input-field text-sm py-1.5 flex-1">
-                        <option value="">{t('vocabulary.chooseCollection')}</option>
-                        {collections.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      <button onClick={saveGeneratedWord} disabled={saving || !targetCol}
-                        className="btn-primary text-sm px-3 py-1.5 disabled:opacity-50">
-                        {saving ? t('vocabulary.saving') : t('vocabulary.save')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
           {/* Collection word list */}
           {activeCol ? (
             <div>
@@ -479,13 +403,13 @@ export default function LibraryPage() {
                 style={{ border: '1px solid var(--border)', background: 'var(--bg-card)' }}>
                 <button
                   onClick={() => { setShowManual(v => !v); setManualError(null) }}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold"
-                  style={{ color: 'var(--accent)' }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold transition-colors"
+                  style={{ color: showManual ? 'var(--accent)' : 'var(--text-primary)', background: showManual ? 'rgba(99,102,241,0.06)' : 'transparent' }}
                 >
                   <span className="flex items-center gap-2">
-                    <Plus size={15} /> {t('vocabulary.addWord')}
+                    <Plus size={15} style={{ color: 'var(--accent)' }} /> {t('vocabulary.addWord')}
                   </span>
-                  {showManual ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  {showManual ? <ChevronUp size={15} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={15} style={{ color: 'var(--text-muted)' }} />}
                 </button>
 
                 {showManual && (
@@ -542,44 +466,68 @@ export default function LibraryPage() {
               {colWords.length === 0 ? (
                 <div className="py-10 text-center rounded-xl"
                   style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                  <BookOpen size={28} className="mx-auto mb-2 opacity-30" />
                   <p className="text-sm">{t('vocabulary.noWords')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {colWords.map(w => (
-                    <div key={w.id} className="rounded-xl px-4 py-3 group flex gap-3"
-                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold" style={{ color: 'var(--accent)' }}>{w.word}</span>
-                          {w.uzbek_translation && (
-                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{w.uzbek_translation}</span>
+                    <div key={w.id}
+                      className="rounded-xl p-4 group transition-all"
+                      style={{
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)')}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          {/* Word + translation row */}
+                          <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
+                            <span className="font-bold text-base" style={{ color: 'var(--accent)' }}>{w.word}</span>
+                            {w.uzbek_translation && (
+                              <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>— {w.uzbek_translation}</span>
+                            )}
+                            {/* Source badge */}
+                            {w.source === 'ai_generated' && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold flex items-center gap-0.5 ml-1"
+                                style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                <Sparkles size={9} /> AI
+                              </span>
+                            )}
+                            {w.source === 'irregular_verb' && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-md font-semibold ml-1"
+                                style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                verb
+                              </span>
+                            )}
+                          </div>
+                          {/* Definition */}
+                          {w.definition && (
+                            <p className="text-xs leading-relaxed mb-1" style={{ color: 'var(--text-muted)' }}>
+                              {w.definition}
+                            </p>
                           )}
-                          {w.source === 'ai_generated' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
-                              style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)' }}>
-                              <Sparkles size={9} /> AI
-                            </span>
-                          )}
-                          {w.source === 'irregular_verb' && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full"
-                              style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
-                              🔄 verb
-                            </span>
+                          {/* Example */}
+                          {w.example && (
+                            <p className="text-xs italic px-2 py-1 rounded-lg"
+                              style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderLeft: '2px solid rgba(99,102,241,0.3)' }}>
+                              "{w.example}"
+                            </p>
                           )}
                         </div>
-                        {w.definition && (
-                          <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{w.definition}</p>
-                        )}
-                        {w.example && (
-                          <p className="text-xs mt-0.5 italic" style={{ color: 'var(--text-muted)' }}>"{w.example}"</p>
-                        )}
+                        <button
+                          onClick={() => deleteWord(w.id)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg shrink-0 transition-all"
+                          style={{ color: 'var(--error)', background: 'transparent' }}
+                          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                      <button onClick={() => deleteWord(w.id)}
-                        className="opacity-0 group-hover:opacity-100 p-1 self-start shrink-0 transition-opacity"
-                        style={{ color: 'var(--error)' }}>
-                        <X size={14} />
-                      </button>
                     </div>
                   ))}
                 </div>
