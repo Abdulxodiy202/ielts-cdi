@@ -51,7 +51,7 @@ export function buildInjectScript(): string {
     for(var i=40;i>=0;i--){
       var s=String(i);
       var patterns=[' '+s+'/40',' '+s+' /40',' '+s+'/ 40',' '+s+' / 40',
-                    '\n'+s+'/40','\n'+s+' / 40'];
+                    '\\n'+s+'/40','\\n'+s+' / 40'];
       for(var p=0;p<patterns.length;p++){
         if(text.indexOf(patterns[p])!==-1) return i;
       }
