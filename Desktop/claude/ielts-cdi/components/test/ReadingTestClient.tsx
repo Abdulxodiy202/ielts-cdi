@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { TestTimer } from './TestTimer'
 import { QuestionPanel } from './QuestionPanel'
 import { useTest } from '@/lib/hooks/useTest'
@@ -49,6 +50,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const submittedRef = useRef(false)
   const nativeSubmitRef = useRef(false)
   const startTimeRef = useRef<number>(Date.now())
+  const router = useRouter()
 
   const fileUrl = test.fileUrl ?? null
   const ext = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
@@ -87,6 +89,31 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type === 'CDI_NATIVE') {
         nativeSubmitRef.current = true
+        return
+      }
+      if (e.data?.type === 'CDI_TRANSLATE') {
+        const word = e.data.word
+        if (!word) return
+        fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word })
+        })
+          .then(r => r.json())
+          .then(data => {
+            const iframe = document.querySelector('iframe') as HTMLIFrameElement
+            iframe?.contentWindow?.postMessage({
+              type: 'CDI_TRANSLATE_RESULT',
+              word,
+              uzb: data.uzb || '',
+              extra: data.extra || ''
+            }, '*')
+          })
+          .catch(() => {})
+        return
+      }
+      if (e.data?.type === 'CDI_GO_DASHBOARD') {
+        router.push('/dashboard')
         return
       }
       // Only accept CDI_SUBMIT from the HTML file itself (flagged by CDI_NATIVE)
