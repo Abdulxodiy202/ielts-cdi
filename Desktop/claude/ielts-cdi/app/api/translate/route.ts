@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     if (!word || word.length > 50) return NextResponse.json({ uzb: '', extra: '' })
 
     const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 80,
       messages: [{
         role: 'user',
