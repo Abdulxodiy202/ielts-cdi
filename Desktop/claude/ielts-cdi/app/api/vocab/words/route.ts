@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient()
   let query = admin
     .from('vocab_words')
-    .select('id, collection_id, word, uzbek_translation, definition, example, source, created_at')
+    .select('id, collection_id, word, uzbek_translation, definition, example, extra, source, created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { collection_id, word, uzbek_translation, definition, example, source } = body
+  const { collection_id, word, uzbek_translation, definition, example, extra, source } = body
 
   if (!collection_id || !word?.trim()) {
     return Response.json({ error: 'collection_id and word required' }, { status: 400 })
@@ -57,9 +57,10 @@ export async function POST(req: NextRequest) {
       uzbek_translation: uzbek_translation ?? null,
       definition: definition ?? null,
       example: example ?? null,
+      extra: extra ?? null,
       source: source ?? 'manual',
     })
-    .select('id, collection_id, word, uzbek_translation, definition, example, source, created_at')
+    .select('id, collection_id, word, uzbek_translation, definition, example, extra, source, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
