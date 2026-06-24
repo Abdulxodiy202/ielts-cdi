@@ -53,7 +53,7 @@ alter table public.vocab_words enable row level security;
 create policy "vocab_words_all" on public.vocab_words
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);`
 
-const EMPTY_MANUAL = { word: '', uzbek: '', definition: '', example: '' }
+const EMPTY_MANUAL = { word: '', uzbek: '', word_type: '', definition: '', example: '' }
 
 export default function LibraryPage() {
   const { t } = useLanguage()
@@ -206,6 +206,7 @@ export default function LibraryPage() {
         uzbek_translation: manual.uzbek.trim(),
         definition: manual.definition.trim() || null,
         example: manual.example.trim() || null,
+        extra: manual.word_type.trim() ? { word_type: manual.word_type.trim() } : null,
         source: 'manual',
       }),
     })
@@ -483,6 +484,19 @@ export default function LibraryPage() {
                         className="input-field text-sm py-2"
                       />
                     </div>
+                    <select
+                      value={manual.word_type}
+                      onChange={e => setManual(p => ({ ...p, word_type: e.target.value }))}
+                      className="input-field w-full text-sm py-2"
+                    >
+                      <option value="">So&apos;z turi (ixtiyoriy)</option>
+                      <option value="noun">noun</option>
+                      <option value="verb">verb</option>
+                      <option value="adjective">adjective</option>
+                      <option value="adverb">adverb</option>
+                      <option value="phrase">phrase</option>
+                      <option value="other">other</option>
+                    </select>
                     <input
                       type="text"
                       value={manual.definition}
