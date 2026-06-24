@@ -15,12 +15,13 @@ export async function GET() {
       .eq('is_published', true)
       .order('created_at', { ascending: false })
 
-    if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
-      return NextResponse.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    if (error) {
+      console.log('[articles GET] error:', error.code, error.message)
+      return NextResponse.json([], { status: 200 })
     }
-    if (error) return NextResponse.json([], { status: 200 })
     return NextResponse.json(Array.isArray(data) ? data : [])
-  } catch {
+  } catch (e) {
+    console.log('[articles GET] catch:', e)
     return NextResponse.json([], { status: 200 })
   }
 }

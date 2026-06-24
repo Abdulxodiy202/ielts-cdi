@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Lock, BookOpen, ChevronRight, Beaker, Cpu, Globe, Briefcase, Leaf, AlertTriangle } from 'lucide-react'
+import { Clock, Lock, BookOpen, ChevronRight, Beaker, Cpu, Globe, Briefcase, Leaf } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
 
@@ -49,7 +49,6 @@ export default function ArticlesPage() {
   const router = useRouter()
   const [articles, setArticles]       = useState<Article[]>([])
   const [loading, setLoading]         = useState(true)
-  const [dbMissing, setDbMissing]     = useState(false)
   const [isPremium, setIsPremium]     = useState(false)
   const [levelFilter, setLevelFilter] = useState<string>('all')
 
@@ -63,9 +62,7 @@ export default function ArticlesPage() {
 
     fetch('/api/articles')
       .then(async r => {
-        if (r.status === 503) { setDbMissing(true); return }
-        if (!r.ok) return
-        const data = await r.json()
+        const data = await r.json().catch(() => [])
         if (Array.isArray(data)) setArticles(data)
       })
       .finally(() => setLoading(false))
@@ -80,21 +77,6 @@ export default function ArticlesPage() {
       <div className="p-8 flex items-center justify-center min-h-[60vh]">
         <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
           style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
-      </div>
-    )
-  }
-
-  if (dbMissing) {
-    return (
-      <div className="p-6 md:p-8 max-w-3xl mx-auto">
-        <div className="rounded-xl p-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}>
-          <div className="flex items-center gap-2 font-semibold mb-2" style={{ color: '#f59e0b' }}>
-            <AlertTriangle size={18} /> Jadval topilmadi
-          </div>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Supabase SQL Editor'da <code>articles</code> jadvalini yarating.
-          </p>
-        </div>
       </div>
     )
   }
