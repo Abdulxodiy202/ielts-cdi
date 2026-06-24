@@ -1671,6 +1671,192 @@ interface FeedbackItem {
   created_at: string
 }
 
+/* ── Articles Tab ────────────────────────────────────────────────────── */
+interface ArticleRow {
+  id: string
+  title: string
+  level: string
+  category: string
+  read_time: number
+  is_premium: boolean
+  is_published: boolean
+  created_at: string
+}
+
+const ARTICLE_LEVELS   = ['beginner', 'intermediate', 'advanced']
+const ARTICLE_CATS     = ['general', 'science', 'technology', 'culture', 'business', 'environment']
+const EMPTY_ARTICLE    = { title: '', description: '', content: '', category: 'general', level: 'intermediate', read_time: 5, is_premium: false, is_published: true }
+
+function ArticlesTab() {
+  const [articles, setArticles]   = useState<ArticleRow[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm]           = useState(EMPTY_ARTICLE)
+  const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/articles')
+      .then(r => {
+        if (r.status === 503) { setDbMissing(true); setLoading(false); return }
+        return r.json()
+      })
+      .then(data => { if (data) setArticles(data) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave() {
+    if (!form.title.trim()) return
+    setSaving(true); setSaveError(null)
+    const res = await fetch('/api/articles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    if (res.ok) {
+      const created = await res.json()
+      setArticles(prev => [created, ...prev])
+      setShowModal(false)
+      setForm(EMPTY_ARTICLE)
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setSaveError(d.error ?? 'Xatolik')
+    }
+    setSaving(false)
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Maqolani o\'chirish?')) return
+    const res = await fetch(`/api/articles/${id}`, { method: 'DELETE' })
+    if (res.ok) setArticles(prev => prev.filter(a => a.id !== id))
+  }
+
+  if (loading) return <div className="flex justify-center p-12"><div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} /></div>
+
+  if (dbMissing) return (
+    <div className="rounded-xl p-5" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}>
+      <p className="text-sm font-semibold" style={{ color: '#f59e0b' }}>articles jadvali topilmadi — Supabase SQL Editor'da yarating.</p>
+    </div>
+  )
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Maqolalar ({articles.length})</h2>
+        <button onClick={() => { setShowModal(true); setForm(EMPTY_ARTICLE); setSaveError(null) }}
+          className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} /> Yangi maqola
+        </button>
+      </div>
+
+      {articles.length === 0 ? (
+        <div className="py-12 text-center rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <BookOpen size={32} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Hali maqolalar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {articles.map(a => (
+            <div key={a.id} className="flex items-center gap-4 px-4 py-3 rounded-xl"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{a.title}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{a.level}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>{a.category}</span>
+                  {a.is_premium && <span className="text-xs px-1.5 py-0.5 rounded font-semibold" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>Premium</span>}
+                  {!a.is_published && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)' }}>Draft</span>}
+                </div>
+                <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{a.read_time} min · {new Date(a.created_at).toLocaleDateString('uz-UZ')}</div>
+              </div>
+              <button onClick={() => handleDelete(a.id)} className="p-2 rounded-lg transition-colors" style={{ color: 'var(--error)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <Trash2 size={15} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create modal */}
+      <AnimatePresence>
+        {showModal && (
+          <>
+            <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowModal(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            >
+              <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-lg" style={{ color: 'var(--text-primary)' }}>Yangi maqola</h3>
+                  <button onClick={() => setShowModal(false)} style={{ color: 'var(--text-muted)' }}><Plus size={18} style={{ transform: 'rotate(45deg)' }} /></button>
+                </div>
+
+                <input type="text" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Sarlavha *" className="input-field w-full text-sm py-2" />
+
+                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Qisqacha ta'rif" rows={2} className="input-field w-full text-sm py-2 resize-none" />
+
+                <textarea value={form.content} onChange={e => setForm(p => ({ ...p, content: e.target.value }))}
+                  placeholder="Maqola matni..." rows={10} className="input-field w-full text-sm py-2 resize-none font-mono" />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Kategoriya</label>
+                    <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className="input-field w-full text-sm py-2">
+                      {ARTICLE_CATS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Daraja</label>
+                    <select value={form.level} onChange={e => setForm(p => ({ ...p, level: e.target.value }))} className="input-field w-full text-sm py-2">
+                      {ARTICLE_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+<label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>O'qish vaqti (daqiqa)</label>
+                  <input type="number" min={1} max={60} value={form.read_time} onChange={e => setForm(p => ({ ...p, read_time: Number(e.target.value) }))}
+                    className="input-field w-32 text-sm py-2" />
+                </div>
+
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.is_premium} onChange={e => setForm(p => ({ ...p, is_premium: e.target.checked }))} className="w-4 h-4" />
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={form.is_published} onChange={e => setForm(p => ({ ...p, is_published: e.target.checked }))} className="w-4 h-4" />
+                    <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Published</span>
+                  </label>
+                </div>
+
+                {saveError && <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>{saveError}</p>}
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={handleSave} disabled={saving || !form.title.trim()} className="btn-primary text-sm px-5 py-2 disabled:opacity-50">
+                    {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+                  </button>
+                  <button onClick={() => setShowModal(false)} className="text-sm px-4 py-2 rounded-lg" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                    Bekor qilish
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function FeedbackTab() {
   const [items, setItems] = useState<FeedbackItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -1915,6 +2101,7 @@ const TABS = [
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
   { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
   { id: 'referrals', label: 'Referrallar',      Icon: Users },
+  { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
   { id: 'feedback',  label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
@@ -1993,6 +2180,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
         <PromoCodesTab initialPromoCodes={initialPromoCodes} dbMissing={promoDbMissing} />
       )}
       {activeTab === 'referrals' && <ReferralsTab />}
+      {activeTab === 'articles' && <ArticlesTab />}
       {activeTab === 'feedback' && <FeedbackTab />}
     </div>
   )

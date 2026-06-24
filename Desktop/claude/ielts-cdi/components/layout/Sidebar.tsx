@@ -113,7 +113,7 @@ export function Sidebar() {
         { href: '/vocabulary',    label: 'Vocabulary',   icon: Library,     badge: null },
         { href: '/coming-soon',   label: 'Collocations', icon: BookMarked,  badge: 'pro' },
         { href: '/coming-soon',   label: 'Kitoblar',     icon: BookOpen,    badge: 'pro' },
-        { href: '/coming-soon',   label: 'Articles',     icon: FileText,    badge: 'pro' },
+        { href: '/articles',       label: 'Articles',     icon: FileText,    badge: null },
         { href: '/coming-soon',   label: 'Video darslar', icon: Video,      badge: 'pro' },
       ],
     },
