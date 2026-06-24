@@ -94,7 +94,7 @@ export function TestHistory({ results, showTitle }: TestHistoryProps) {
                       <span className="font-black text-base" style={{ color }}>{r.band_score}</span>
                     </td>
                     <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>
-                      {r.raw_score}/40
+                      {r.raw_score}/{r.tests.title?.toLowerCase().includes('part') ? 10 : 40}
                     </td>
                     <td className="px-4 py-3 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
                       <Clock size={12} /> {formatTime(r.time_taken)}
