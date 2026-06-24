@@ -35,6 +35,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
+  const [showExit, setShowExit] = useState(false)
   const router = useRouter()
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
@@ -96,6 +97,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken }),
         }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
+        setShowExit(true)
         return
       }
     }
@@ -159,31 +161,31 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           </div>
         )}
 
-        {/* Exit Test button — always visible over iframe */}
-        <button
-          onClick={() => router.push('/dashboard')}
-          style={{
-            position: 'fixed',
-            bottom: 24,
-            right: 24,
-            zIndex: 200,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 20px',
-            borderRadius: 12,
-            background: 'rgba(0,0,0,0.75)',
-            color: '#fff',
-            fontWeight: 600,
-            fontSize: 14,
-            border: 'none',
-            cursor: 'pointer',
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <LogOut size={16} />
-          Exit Test
-        </button>
+        {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
+        {showExit && (
+          <div style={{ position: 'fixed', bottom: 16, right: 16, display: 'flex', gap: 8, zIndex: 200 }}>
+            <button
+              onClick={() => router.push('/dashboard')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '10px 20px',
+                borderRadius: 12,
+                background: 'rgba(0,0,0,0.75)',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: 14,
+                border: 'none',
+                cursor: 'pointer',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              <LogOut size={16} />
+              ← Exit Test
+            </button>
+          </div>
+        )}
       </>
     )
   }
