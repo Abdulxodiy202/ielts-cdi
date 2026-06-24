@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
+  PenLine, Mic, BookMarked, FileText, Video, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -84,14 +85,39 @@ export function Sidebar() {
   const profileRef    = useRef<Profile | null>(null)
   useEffect(() => { profileRef.current = profile }, [profile])
 
-  const nav = [
-    { href: '/dashboard',   label: t('nav.dashboard'),   icon: LayoutDashboard },
-    { href: '/reading',     label: t('nav.reading'),      icon: BookOpen },
-    { href: '/listening',   label: t('nav.listening'),    icon: Headphones },
-    { href: '/mock-test',   label: t('nav.mockTest'),     icon: Calendar },
-    { href: '/vocabulary',  label: t('nav.vocabulary'),    icon: Library },
-    { href: '/community',   label: t('nav.community'),     icon: Users },
-    { href: '/feedback',    label: 'Feedback',             icon: MessageSquarePlus },
+  const navGroups = [
+    {
+      label: "KO'NIKMALAR",
+      items: [
+        { href: '/reading',   label: 'Reading',  icon: BookOpen,   badge: null },
+        { href: '/listening', label: 'Listening', icon: Headphones, badge: null },
+        { href: '/writing',   label: 'Writing',  icon: PenLine,    badge: 'ai' },
+        { href: '/speaking',  label: 'Speaking', icon: Mic,        badge: 'ai' },
+      ],
+    },
+    {
+      label: 'IMTIHON',
+      items: [
+        { href: '/mock-test', label: 'Mock Test', icon: Calendar, badge: 'book' },
+      ],
+    },
+    {
+      label: 'RESURSLAR',
+      items: [
+        { href: '/vocabulary',    label: 'Vocabulary',   icon: Library,     badge: null },
+        { href: '/coming-soon',   label: 'Collocations', icon: BookMarked,  badge: 'pro' },
+        { href: '/coming-soon',   label: 'Kitoblar',     icon: BookOpen,    badge: 'pro' },
+        { href: '/coming-soon',   label: 'Articles',     icon: FileText,    badge: 'pro' },
+        { href: '/coming-soon',   label: 'Video darslar', icon: Video,      badge: 'pro' },
+      ],
+    },
+    {
+      label: 'BOSHQA',
+      items: [
+        { href: '/community', label: 'Community', icon: Users,             badge: null },
+        { href: '/feedback',  label: 'Feedback',  icon: MessageSquarePlus, badge: null },
+      ],
+    },
   ]
 
   /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
@@ -301,25 +327,43 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + '/')
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all"
-              style={{
-                background: active ? 'var(--accent)' : 'transparent',
-                color: active ? 'white' : 'var(--text-secondary)',
-              }}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          )
-        })}
+      <nav className="flex-1 p-4 overflow-y-auto" style={{ paddingTop: '8px' }}>
+        {navGroups.map(group => (
+          <div key={group.label} className="mb-4">
+            <div className="px-3 mb-1" style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              {group.label}
+            </div>
+            <div className="space-y-0.5">
+              {group.items.map(({ href, label, icon: Icon, badge }) => {
+                const active = pathname === href || (href !== '/coming-soon' && pathname.startsWith(href + '/'))
+                return (
+                  <Link
+                    key={label}
+                    href={href}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    style={{
+                      background: active ? 'var(--accent)' : 'transparent',
+                      color: active ? 'white' : 'var(--text-secondary)',
+                    }}
+                  >
+                    <Icon size={16} style={{ flexShrink: 0 }} />
+                    <span className="flex-1">{label}</span>
+                    {badge === 'ai' && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>
+                    )}
+                    {badge === 'book' && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>
+                    )}
+                    {badge === 'pro' && !isPremium && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)', lineHeight: '16px' }}>Pro</span>
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Theme switcher */}
