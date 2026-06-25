@@ -25,8 +25,8 @@ const GRADIENTS = [
 ]
 
 function getGradient(id: string) {
-  const num = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return GRADIENTS[num % GRADIENTS.length]
+  const n = id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return GRADIENTS[n % GRADIENTS.length]
 }
 
 export default function ArticlesPage() {
@@ -42,12 +42,8 @@ export default function ArticlesPage() {
       supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single()
         .then(({ data }) => setIsPremium(isActivePremium(data)))
     })
-
     fetch('/api/articles')
-      .then(async r => {
-        const d = await r.json().catch(() => [])
-        if (Array.isArray(d)) setArticles(d)
-      })
+      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setArticles(d) })
       .finally(() => setLoading(false))
   }, [])
 
@@ -63,17 +59,12 @@ export default function ArticlesPage() {
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          Maqolalar
-        </h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          IELTS uchun foydali inglizcha maqolalar
-        </p>
+        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Maqolalar</h1>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS uchun foydali inglizcha maqolalar</p>
       </div>
 
       {articles.length === 0 ? (
-        <div className="py-20 flex flex-col items-center gap-4"
-          style={{ color: 'var(--text-muted)' }}>
+        <div className="py-20 flex flex-col items-center gap-4" style={{ color: 'var(--text-muted)' }}>
           <BookOpen size={48} className="opacity-20" />
           <p className="font-medium">Hali maqolalar qo&apos;shilmagan</p>
         </div>
@@ -86,6 +77,7 @@ export default function ArticlesPage() {
             return (
               <div
                 key={article.id}
+                onClick={() => canRead && router.push(`/articles/${article.id}`)}
                 className="rounded-2xl overflow-hidden flex flex-col transition-all duration-200"
                 style={{
                   background: 'var(--bg-card)',
@@ -93,11 +85,10 @@ export default function ArticlesPage() {
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                   cursor: canRead ? 'pointer' : 'default',
                 }}
-                onClick={() => canRead && router.push(`/articles/${article.id}`)}
                 onMouseEnter={e => {
                   if (canRead) {
                     e.currentTarget.style.transform = 'translateY(-3px)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.14)'
                     e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'
                   }
                 }}
@@ -107,101 +98,75 @@ export default function ArticlesPage() {
                   e.currentTarget.style.borderColor = 'var(--border)'
                 }}
               >
-                {/* Cover */}
-                <div className="relative" style={{ height: 190, flexShrink: 0 }}>
+                {/* ── TOP: Title + Badge ── */}
+                <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
+                  <h3
+                    className="font-bold leading-snug"
+                    style={{ fontSize: 17, color: 'var(--text-primary)', lineHeight: 1.35 }}
+                  >
+                    {article.title}
+                  </h3>
+                  {article.is_premium ? (
+                    <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
+                      style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', whiteSpace: 'nowrap' }}>
+                      👑 Premium
+                    </span>
+                  ) : (
+                    <span className="shrink-0 px-2.5 py-1 rounded-full text-xs font-bold"
+                      style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)', whiteSpace: 'nowrap' }}>
+                      Bepul
+                    </span>
+                  )}
+                </div>
+
+                {/* ── MIDDLE: Cover image ── */}
+                <div className="relative mx-4 rounded-xl overflow-hidden" style={{ height: 200, flexShrink: 0 }}>
                   {article.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={article.cover_image_url}
-                      alt={article.title}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={article.cover_image_url} alt={article.title} className="w-full h-full object-cover" />
                   ) : (
-                    <div
-                      className="w-full h-full flex items-center justify-center"
-                      style={{ background: getGradient(article.id) }}
-                    >
-                      <BookOpen size={48} color="rgba(255,255,255,0.25)" />
+                    <div className="w-full h-full flex items-center justify-center"
+                      style={{ background: getGradient(article.id) }}>
+                      <BookOpen size={44} color="rgba(255,255,255,0.22)" />
                     </div>
                   )}
 
-                  {/* Premium badge overlay */}
-                  <div className="absolute top-3 right-3">
-                    {article.is_premium ? (
-                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
-                        style={{
-                          background: 'rgba(245,158,11,0.9)',
-                          color: 'white',
-                          backdropFilter: 'blur(4px)',
-                        }}>
-                        👑 Premium
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
-                        style={{
-                          background: 'rgba(34,197,94,0.85)',
-                          color: 'white',
-                          backdropFilter: 'blur(4px)',
-                        }}>
-                        Bepul
-                      </span>
-                    )}
-                  </div>
-
                   {/* Lock overlay */}
                   {locked && (
-                    <div
-                      className="absolute inset-0 flex flex-col items-center justify-center gap-2"
-                      style={{
-                        background: 'rgba(0,0,0,0.45)',
-                        backdropFilter: 'blur(6px)',
-                      }}
-                    >
-                      <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+                      style={{ background: 'rgba(0,0,0,0.48)', backdropFilter: 'blur(6px)' }}>
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center"
                         style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.3)' }}>
-                        <Lock size={22} color="white" />
+                        <Lock size={20} color="white" />
                       </div>
                       <span className="text-xs font-semibold text-white opacity-90">Premium kerak</span>
                     </div>
                   )}
                 </div>
 
-                {/* Body */}
-                <div className="flex flex-col flex-1 p-4 gap-3">
-                  <h3
-                    className="font-bold leading-snug"
-                    style={{ fontSize: '1rem', color: 'var(--text-primary)', lineHeight: 1.4 }}
-                  >
-                    {article.title}
-                  </h3>
-
-                  <div className="mt-auto">
-                    {locked ? (
-                      <button
-                        onClick={e => { e.stopPropagation(); router.push('/pricing') }}
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                        style={{
-                          background: 'rgba(245,158,11,0.1)',
-                          color: '#f59e0b',
-                          border: '1px solid rgba(245,158,11,0.3)',
-                        }}
-                      >
-                        <Lock size={14} /> Premium olish
-                      </button>
-                    ) : !article.file_url ? (
-                      <div className="w-full py-2.5 text-center text-sm rounded-xl"
-                        style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                        Tez kunda
-                      </div>
-                    ) : (
-                      <button
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all"
-                        style={{ background: 'var(--accent)', color: 'white' }}
-                      >
-                        O&apos;qish <ChevronRight size={15} />
-                      </button>
-                    )}
-                  </div>
+                {/* ── BOTTOM: Action button ── */}
+                <div className="px-4 pt-3 pb-4">
+                  {locked ? (
+                    <button
+                      onClick={e => { e.stopPropagation(); router.push('/pricing') }}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                    >
+                      <Lock size={13} /> Premium olish
+                    </button>
+                  ) : !article.file_url ? (
+                    <div className="w-full py-2.5 text-center text-sm rounded-xl"
+                      style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                      Tez kunda
+                    </div>
+                  ) : (
+                    <button
+                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
+                      style={{ background: 'var(--accent)', color: 'white' }}
+                    >
+                      O&apos;qish <ChevronRight size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             )

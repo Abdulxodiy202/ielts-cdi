@@ -1798,6 +1798,23 @@ function ArticlesTab() {
     } finally { setTogglingPremium(false) }
   }
 
+  async function handleDeleteCover() {
+    if (!selectedId) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const res = await fetch('/api/admin/article-cover-url', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: selectedId }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? "O'chirishda xato") }
+      setCoverUrls(prev => ({ ...prev, [selectedId]: null }))
+      setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, cover_image_url: null } : a))
+      setMessage({ ok: true, text: 'Muqova rasmi o\'chirildi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+    } finally { setSavingCover(false) }
+  }
+
   async function handleSaveCover() {
     if (!selectedId || !selectedCoverFile) return
     setSavingCover(true); setMessage(null)
@@ -1919,9 +1936,19 @@ function ArticlesTab() {
               <div className="space-y-2">
                 <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Muqova rasmi</p>
                 {currentCover && !selectedCoverFile && (
-                  <div className="rounded-xl overflow-hidden" style={{ height: 100, border: '1px solid var(--border)' }}>
+                  <div className="relative rounded-xl overflow-hidden" style={{ height: 100, border: '1px solid var(--border)' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={currentCover} alt="cover" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={handleDeleteCover}
+                      disabled={savingCover}
+                      className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                      style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', backdropFilter: 'blur(4px)' }}
+                    >
+                      {savingCover ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                      O&apos;chirish
+                    </button>
                   </div>
                 )}
                 <div
