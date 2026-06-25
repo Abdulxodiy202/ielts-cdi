@@ -1697,6 +1697,7 @@ function ArticlesTab() {
   const [newTitle, setNewTitle]           = useState('')
   const [creating, setCreating]           = useState(false)
   const [togglingPremium, setTogglingPremium] = useState(false)
+  const [editTitle, setEditTitle]             = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -1710,35 +1711,52 @@ function ArticlesTab() {
   const currentFileName = currentUrl ? decodeURIComponent(currentUrl.split('/').pop()?.split('?')[0] ?? '') : null
 
   function handleArticleChange(id: string) {
-    setSelectedId(id); setSelectedFile(null); setMessage(null); setShowDeleteConfirm(false)
+    setSelectedId(id)
+    setEditTitle(articles.find(a => a.id === id)?.title ?? '')
+    setSelectedFile(null); setMessage(null); setShowDeleteConfirm(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function handleSave() {
-    if (!selectedId || !selectedFile) return
+    if (!selectedId) return
+    const trimmedTitle = editTitle.trim()
+    const titleChanged = trimmedTitle && trimmedTitle !== selectedArticle?.title
+    if (!titleChanged && !selectedFile) return
     setSaving(true); setMessage(null)
     try {
-      const urlRes = await fetch('/api/admin/article-upload-url', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleId: selectedId, fileName: selectedFile.name }),
-      })
-      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL olishda xato') }
-      const { signedUrl, contentType, publicUrl } = await urlRes.json()
+      if (titleChanged) {
+        const res = await fetch(`/api/articles/${selectedId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: trimmedTitle }),
+        })
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Nom saqlashda xato') }
+        setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, title: trimmedTitle } : a))
+      }
 
-      const uploadRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile })
-      if (!uploadRes.ok) { const t = await uploadRes.text().catch(() => ''); throw new Error(`Storage xatosi ${uploadRes.status}${t ? ': '+t.slice(0,120) : ''}`) }
+      if (selectedFile) {
+        const urlRes = await fetch('/api/admin/article-upload-url', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ articleId: selectedId, fileName: selectedFile.name }),
+        })
+        if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL olishda xato') }
+        const { signedUrl, contentType, publicUrl } = await urlRes.json()
 
-      const recordRes = await fetch('/api/admin/article-record', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ articleId: selectedId, publicUrl }),
-      })
-      if (!recordRes.ok) { const e = await recordRes.json().catch(() => ({})); throw new Error(e.error ?? 'DB xato') }
+        const uploadRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedFile })
+        if (!uploadRes.ok) { const t = await uploadRes.text().catch(() => ''); throw new Error(`Storage xatosi ${uploadRes.status}${t ? ': '+t.slice(0,120) : ''}`) }
 
-      const { url } = await recordRes.json()
-      setUploadedUrls(prev => ({ ...prev, [selectedId]: url }))
-      setSelectedFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-      setMessage({ ok: true, text: 'Fayl muvaffaqiyatli yuklandi!' })
+        const recordRes = await fetch('/api/admin/article-record', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ articleId: selectedId, publicUrl }),
+        })
+        if (!recordRes.ok) { const e = await recordRes.json().catch(() => ({})); throw new Error(e.error ?? 'DB xato') }
+
+        const { url } = await recordRes.json()
+        setUploadedUrls(prev => ({ ...prev, [selectedId]: url }))
+        setSelectedFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+
+      setMessage({ ok: true, text: 'Saqlandi!' })
     } catch (e) {
       setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
     } finally { setSaving(false) }
@@ -1821,6 +1839,22 @@ function ArticlesTab() {
 
       {selectedId && (
         <div className="card p-5 space-y-4">
+          {/* Title input */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+              Sarlavha
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              className="input-field w-full text-sm"
+              placeholder="Maqola sarlavhasi..."
+            />
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
           {/* is_premium toggle */}
           <div className="flex items-center justify-between py-1">
             <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Premium holati</span>
@@ -1939,10 +1973,15 @@ function ArticlesTab() {
             </div>
           )}
 
-          <button onClick={handleSave} disabled={!selectedFile || saving}
+          <button
+            onClick={handleSave}
+            disabled={saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title))}
             className="btn-primary w-full flex items-center justify-center gap-2"
-            style={{ opacity: !selectedFile || saving ? 0.5 : 1, cursor: !selectedFile || saving ? 'not-allowed' : 'pointer' }}>
-            {saving ? <><Loader2 size={16} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={16} /> Saqlash</>}
+            style={{
+              opacity: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 0.5 : 1,
+              cursor: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 'not-allowed' : 'pointer',
+            }}>
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Saqlanmoqda…</> : <><Upload size={16} /> Saqlash</>}
           </button>
         </div>
       )}
