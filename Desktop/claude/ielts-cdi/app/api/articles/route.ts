@@ -46,9 +46,12 @@ export async function POST(req: NextRequest) {
       is_premium: is_premium ?? false,
       is_published: true,
     })
-    .select('id, title, file_url, cover_image_url, is_premium, is_published, created_at')
+    .select('id, title, file_url, is_premium, is_published, created_at')
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data, { status: 201 })
+  if (error) {
+    console.log('[articles POST] Insert error:', error.message)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  return NextResponse.json({ ...data, cover_image_url: null }, { status: 201 })
 }
