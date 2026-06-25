@@ -1677,6 +1677,7 @@ interface ArticleItem {
   id: string
   title: string
   file_url: string | null
+  cover_image_url: string | null
   is_premium: boolean
   is_published: boolean
   created_at: string
@@ -1698,7 +1699,11 @@ function ArticlesTab() {
   const [creating, setCreating]           = useState(false)
   const [togglingPremium, setTogglingPremium] = useState(false)
   const [editTitle, setEditTitle]             = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null)
+  const [savingCover, setSavingCover]             = useState(false)
+  const [coverUrls, setCoverUrls]                 = useState<Record<string, string | null>>({})
+  const fileInputRef  = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/admin/articles')
@@ -1713,8 +1718,10 @@ function ArticlesTab() {
   function handleArticleChange(id: string) {
     setSelectedId(id)
     setEditTitle(articles.find(a => a.id === id)?.title ?? '')
-    setSelectedFile(null); setMessage(null); setShowDeleteConfirm(false)
+    setSelectedFile(null); setSelectedCoverFile(null)
+    setMessage(null); setShowDeleteConfirm(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+    if (coverInputRef.current) coverInputRef.current.value = ''
   }
 
   async function handleSave() {
@@ -1789,6 +1796,36 @@ function ArticlesTab() {
       })
       if (res.ok) setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, is_premium: !a.is_premium } : a))
     } finally { setTogglingPremium(false) }
+  }
+
+  async function handleSaveCover() {
+    if (!selectedId || !selectedCoverFile) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const urlRes = await fetch('/api/admin/article-cover-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ articleId: selectedId, fileName: selectedCoverFile.name }),
+      })
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL olishda xato') }
+      const { signedUrl, contentType, publicUrl } = await urlRes.json()
+
+      const uploadRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedCoverFile })
+      if (!uploadRes.ok) { const t = await uploadRes.text().catch(() => ''); throw new Error(`Storage xatosi ${uploadRes.status}${t ? ': '+t.slice(0,80) : ''}`) }
+
+      const patchRes = await fetch(`/api/articles/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_image_url: publicUrl }),
+      })
+      if (!patchRes.ok) { const e = await patchRes.json().catch(() => ({})); throw new Error(e.error ?? 'DB xato') }
+
+      setCoverUrls(prev => ({ ...prev, [selectedId]: publicUrl }))
+      setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, cover_image_url: publicUrl } : a))
+      setSelectedCoverFile(null)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+      setMessage({ ok: true, text: 'Muqova rasmi saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+    } finally { setSavingCover(false) }
   }
 
   async function handleCreate() {
@@ -1872,6 +1909,67 @@ function ArticlesTab() {
               {togglingPremium ? '...' : selectedArticle?.is_premium ? 'Premium' : 'Bepul'}
             </button>
           </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Cover image */}
+          {(() => {
+            const currentCover = selectedId in coverUrls ? coverUrls[selectedId] : (selectedArticle?.cover_image_url ?? null)
+            return (
+              <div className="space-y-2">
+                <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Muqova rasmi</p>
+                {currentCover && !selectedCoverFile && (
+                  <div className="rounded-xl overflow-hidden" style={{ height: 100, border: '1px solid var(--border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={currentCover} alt="cover" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div
+                  className="relative flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                  style={{
+                    border: `2px dashed ${selectedCoverFile ? 'var(--accent)' : 'var(--border)'}`,
+                    background: selectedCoverFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+                  }}
+                  onClick={() => coverInputRef.current?.click()}
+                >
+                  {selectedCoverFile ? (
+                    <>
+                      <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0"
+                        style={{ border: '1px solid var(--border)' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={URL.createObjectURL(selectedCoverFile)} alt="" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{selectedCoverFile.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(selectedCoverFile.size / 1024).toFixed(0)} KB</p>
+                      </div>
+                      <button type="button"
+                        onClick={e => { e.stopPropagation(); setSelectedCoverFile(null); if (coverInputRef.current) coverInputRef.current.value = '' }}
+                        className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1">
+                      <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {currentCover ? 'Rasmni almashtirish...' : 'JPG, PNG, WebP yuklash'}
+                      </span>
+                    </div>
+                  )}
+                  <input ref={coverInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden"
+                    onChange={e => setSelectedCoverFile(e.target.files?.[0] ?? null)} />
+                </div>
+                {selectedCoverFile && (
+                  <button onClick={handleSaveCover} disabled={savingCover}
+                    className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+                    style={{ opacity: savingCover ? 0.6 : 1 }}>
+                    {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
+                  </button>
+                )}
+              </div>
+            )
+          })()}
 
           <hr style={{ borderColor: 'var(--border)' }} />
 
