@@ -2167,6 +2167,7 @@ interface BookItem {
   author: string | null
   heyzine_url: string
   cover_image_url: string | null
+  recommendation: string | null
   is_premium: boolean
   is_published: boolean
   created_at: string
@@ -2182,6 +2183,7 @@ function BooksTab() {
   const [editTitle, setEditTitle]                   = useState('')
   const [editAuthor, setEditAuthor]                 = useState('')
   const [editUrl, setEditUrl]                       = useState('')
+  const [editRecommendation, setEditRecommendation] = useState('')
   const [saving, setSaving]                         = useState(false)
 
   // Cover image
@@ -2217,22 +2219,25 @@ function BooksTab() {
     setEditTitle(b?.title ?? '')
     setEditAuthor(b?.author ?? '')
     setEditUrl(b?.heyzine_url ?? '')
+    setEditRecommendation(b?.recommendation ?? '')
     setSelectedCoverFile(null); setMessage(null); setShowDeleteBook(false)
     if (coverInputRef.current) coverInputRef.current.value = ''
   }
 
   async function handleSave() {
     if (!selectedId) return
-    const titleChanged  = editTitle.trim() && editTitle.trim()  !== selectedBook?.title
-    const authorChanged = editAuthor.trim() !== (selectedBook?.author ?? '')
-    const urlChanged    = editUrl.trim()    && editUrl.trim()   !== selectedBook?.heyzine_url
-    if (!titleChanged && !authorChanged && !urlChanged) return
+    const titleChanged          = editTitle.trim() && editTitle.trim()          !== selectedBook?.title
+    const authorChanged         = editAuthor.trim()         !== (selectedBook?.author         ?? '')
+    const urlChanged            = editUrl.trim()    && editUrl.trim()           !== selectedBook?.heyzine_url
+    const recommendationChanged = editRecommendation.trim() !== (selectedBook?.recommendation ?? '')
+    if (!titleChanged && !authorChanged && !urlChanged && !recommendationChanged) return
     setSaving(true); setMessage(null)
     try {
       const body: Record<string, string> = {}
-      if (titleChanged)  body.title       = editTitle.trim()
-      if (authorChanged) body.author      = editAuthor.trim()
-      if (urlChanged)    body.heyzine_url = editUrl.trim()
+      if (titleChanged)          body.title          = editTitle.trim()
+      if (authorChanged)         body.author         = editAuthor.trim()
+      if (urlChanged)            body.heyzine_url    = editUrl.trim()
+      if (recommendationChanged) body.recommendation = editRecommendation.trim()
       const res = await fetch(`/api/books/${selectedId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -2376,6 +2381,16 @@ function BooksTab() {
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL</label>
               <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)} placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun o&apos;qish kerak)</label>
+              <textarea
+                value={editRecommendation}
+                onChange={e => setEditRecommendation(e.target.value)}
+                placeholder="Bu kitob IELTS Reading uchun ideal, chunki..."
+                rows={3}
+                className="input-field w-full text-sm resize-none"
+              />
             </div>
           </div>
 

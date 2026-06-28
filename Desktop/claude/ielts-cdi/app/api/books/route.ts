@@ -13,7 +13,7 @@ export async function GET() {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('books')
-      .select('id, title, author, heyzine_url, cover_image_url, is_premium, is_published, created_at')
+      .select('id, title, author, heyzine_url, cover_image_url, recommendation, is_premium, is_published, created_at')
       .eq('is_published', true)
       .order('created_at', { ascending: false })
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       is_premium: is_premium ?? false,
       is_published: true,
     })
-    .select('id, title, author, heyzine_url, cover_image_url, is_premium, is_published, created_at')
+    .select('id, title, author, heyzine_url, cover_image_url, recommendation, is_premium, is_published, created_at')
     .single()
 
   if (error) {

@@ -12,6 +12,7 @@ interface Book {
   author: string | null
   heyzine_url: string
   cover_image_url: string | null
+  recommendation: string | null
   is_premium: boolean
   is_published: boolean
   created_at: string
@@ -191,7 +192,23 @@ export default function BooksPage() {
                       {book.title}
                     </p>
                     {book.author && (
-                      <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>{book.author}</p>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--text-muted)' }}>{book.author}</p>
+                    )}
+                    {book.recommendation && (
+                      <div className="flex gap-1.5 mb-2">
+                        <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>💡</span>
+                        <p style={{
+                          fontSize: 11,
+                          color: '#ca8a04',
+                          lineHeight: 1.4,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}>
+                          {book.recommendation}
+                        </p>
+                      </div>
                     )}
                     {locked ? (
                       <button

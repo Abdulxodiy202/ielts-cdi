@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
-const SELECT = 'id, title, author, heyzine_url, cover_image_url, is_premium, is_published, created_at'
+const SELECT = 'id, title, author, heyzine_url, cover_image_url, recommendation, is_premium, is_published, created_at'
 
 export async function GET(
   _req: NextRequest,
@@ -37,7 +37,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await req.json()
-  const allowed = ['title', 'author', 'heyzine_url', 'cover_image_url', 'is_premium', 'is_published']
+  const allowed = ['title', 'author', 'heyzine_url', 'cover_image_url', 'recommendation', 'is_premium', 'is_published']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
