@@ -50,65 +50,64 @@ export default async function BookPage({ params }: Props) {
     )
   }
 
-  const TOPBAR_H = 52
-
   return (
-    <>
-      {/* Fixed top bar */}
-      <div style={{
-        position: 'fixed', top: 0, left: 0, right: 0,
-        height: TOPBAR_H, zIndex: 200,
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '0 16px',
-        background: 'var(--bg-card)',
-        borderBottom: '1px solid var(--border)',
-      }}>
-        <Link href="/books" style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-          background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-        }}>
-          <ArrowLeft size={16} />
+    <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      {/* Slim top bar — 48px, same pattern as ReadingTestClient */}
+      <div
+        className="flex items-center gap-3 px-4 shrink-0"
+        style={{
+          height: 48,
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <Link
+          href="/books"
+          className="btn-outline text-sm flex items-center gap-1.5 shrink-0"
+        >
+          <ArrowLeft size={14} />
+          <span className="hidden sm:inline">Orqaga</span>
         </Link>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <h1 style={{
-            fontSize: 14, fontWeight: 600,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            color: 'var(--text-primary)',
-          }}>
-            {book.title}
-          </h1>
-          {book.author && (
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{book.author}</p>
-          )}
-        </div>
+        <h1
+          className="font-bold text-sm sm:text-base truncate"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {book.title}
+        </h1>
+        {book.author && (
+          <span
+            className="text-xs hidden sm:block shrink-0"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {book.author}
+          </span>
+        )}
         {book.is_premium && (
-          <span style={{
-            fontSize: 11, fontWeight: 700, padding: '2px 10px',
-            borderRadius: 20, flexShrink: 0,
-            background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-            border: '1px solid rgba(245,158,11,0.3)',
-          }}>
+          <span
+            className="shrink-0 text-xs font-bold px-2.5 py-0.5 rounded-full"
+            style={{
+              background: 'rgba(245,158,11,0.12)',
+              color: '#f59e0b',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}
+          >
             Premium
           </span>
         )}
       </div>
 
-      {/* Full-screen Heyzine iframe */}
+      {/* Heyzine iframe — fills remaining height */}
       <iframe
         src={book.heyzine_url}
         title={book.title}
         allowFullScreen
         style={{
-          position: 'fixed',
-          top: TOPBAR_H, left: 0, right: 0, bottom: 0,
+          flex: 1,
           width: '100%',
-          height: `calc(100vh - ${TOPBAR_H}px)`,
           border: 'none',
-          zIndex: 200,
           display: 'block',
         }}
       />
-    </>
+    </div>
   )
 }
