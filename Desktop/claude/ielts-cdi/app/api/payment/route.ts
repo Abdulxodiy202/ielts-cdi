@@ -78,19 +78,23 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient()
     const { data: promoRow } = await admin
       .from('promo_codes')
-      .select('id')
+      .select('id, usage_type')
       .ilike('code', promoCode)
       .single()
     if (promoRow) {
-      // Only insert columns that exist in the current table schema.
-      // Extra columns (user_name, original_amount, etc.) live in payment_requests
-      // and are joined in the admin query, so we don't need them here.
       const { error: usageErr } = await admin.from('promo_code_usage').insert({
         promo_code_id: promoRow.id,
         user_id: user.id,
       })
       if (usageErr) {
         console.error('[promo_code_usage insert]', usageErr.code, usageErr.message)
+      }
+      // Mark one_time code as used
+      if (promoRow.usage_type === 'one_time') {
+        await admin
+          .from('promo_codes')
+          .update({ used_by: user.id, used_at: new Date().toISOString() })
+          .eq('id', promoRow.id)
       }
     }
   }

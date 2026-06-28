@@ -14,7 +14,7 @@ interface PaymentItem {
   created_at: string
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user || user.email !== ADMIN_EMAIL) {
@@ -22,6 +22,22 @@ export async function GET() {
   }
 
   const admin = createAdminClient()
+
+  // Email lookup mode: GET /api/admin/users?email=xxx
+  const { searchParams } = new URL(request.url)
+  const emailQuery = searchParams.get('email')?.trim()
+  if (emailQuery) {
+    const { data: profileRows } = await admin
+      .from('profiles')
+      .select('id, full_name, email')
+      .ilike('email', emailQuery)
+      .limit(1)
+    const profile = profileRows?.[0]
+    if (!profile) {
+      return NextResponse.json({ error: "Bunday email ro'yxatdan o'tmagan" }, { status: 404 })
+    }
+    return NextResponse.json({ id: profile.id, email: profile.email, full_name: profile.full_name })
+  }
 
   // All three fetches in parallel
   const [authRes, profilesRes, paymentsRes] = await Promise.all([

@@ -1256,6 +1256,12 @@ interface PromoCode {
   valid_until: string
   is_active: boolean
   created_at: string
+  usage_type?: 'unlimited' | 'one_time'
+  assigned_user_id?: string | null
+  assigned_user_email?: string | null
+  used_by?: string | null
+  used_by_email?: string | null
+  used_at?: string | null
   usage?: PromoUsage[]
 }
 
@@ -1291,14 +1297,26 @@ create policy "Auth users can insert own usage" on public.promo_code_usage
 
 alter table public.payment_requests
   add column if not exists promo_code text,
-  add column if not exists original_amount integer;`
+  add column if not exists original_amount integer;
+
+-- One-time promo code support (run if upgrading existing table)
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS usage_type TEXT DEFAULT 'unlimited';
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS assigned_user_id UUID REFERENCES auth.users(id);
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS used_by UUID REFERENCES auth.users(id);
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;`
 
 function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: PromoCode[]; dbMissing?: boolean }) {
   const [codes, setCodes] = useState<PromoCode[]>(initialPromoCodes)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ code: '', discount_percent: 10, valid_from: '', valid_until: '' })
+  const [form, setForm] = useState({
+    code: '', discount_percent: 10, valid_from: '', valid_until: '',
+    usage_type: 'unlimited' as 'unlimited' | 'one_time',
+    assigned_email: '',
+  })
+  const [assignedUserId, setAssignedUserId] = useState<string | null>(null)
+  const [emailLookupState, setEmailLookupState] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle')
   const [expandedUsage, setExpandedUsage] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
@@ -1311,17 +1329,45 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
     return { label: 'Faol', color: 'var(--success)', bg: 'rgba(34,197,94,0.1)' }
   }
 
-  const resetForm = () => { setForm({ code: '', discount_percent: 10, valid_from: '', valid_until: '' }); setFormError(''); setEditingId(null) }
+  const resetForm = () => {
+    setForm({ code: '', discount_percent: 10, valid_from: '', valid_until: '', usage_type: 'unlimited', assigned_email: '' })
+    setAssignedUserId(null)
+    setEmailLookupState('idle')
+    setFormError('')
+    setEditingId(null)
+  }
+
+  const lookupEmail = async (email: string) => {
+    if (!email.trim()) { setAssignedUserId(null); setEmailLookupState('idle'); return }
+    setEmailLookupState('loading')
+    const res = await fetch(`/api/admin/users?email=${encodeURIComponent(email.trim())}`)
+    if (res.ok) {
+      const json = await res.json()
+      setAssignedUserId(json.id)
+      setEmailLookupState('found')
+    } else {
+      setAssignedUserId(null)
+      setEmailLookupState('notfound')
+    }
+  }
 
   const handleSave = async () => {
+    if (form.usage_type === 'one_time' && form.assigned_email.trim() && emailLookupState !== 'found') {
+      setFormError("Foydalanuvchi email topilmadi. Avval emailni tekshiring.")
+      return
+    }
     setSaving(true); setFormError('')
     const method = editingId ? 'PATCH' : 'POST'
     const url = editingId ? `/api/admin/promo-codes/${editingId}` : '/api/admin/promo-codes'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    const payload = {
+      ...form,
+      assigned_user_id: form.usage_type === 'one_time' ? (assignedUserId ?? null) : null,
+    }
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const json = await res.json()
     if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
     if (editingId) {
-      setCodes(prev => prev.map(c => c.id === editingId ? json : c))
+      setCodes(prev => prev.map(c => c.id === editingId ? { ...c, ...json } : c))
     } else {
       setCodes(prev => [json, ...prev])
     }
@@ -1350,7 +1396,11 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       discount_percent: c.discount_percent,
       valid_from: c.valid_from.slice(0, 10),
       valid_until: c.valid_until.slice(0, 10),
+      usage_type: c.usage_type ?? 'unlimited',
+      assigned_email: c.assigned_user_email ?? '',
     })
+    setAssignedUserId(c.assigned_user_id ?? null)
+    setEmailLookupState(c.assigned_user_email ? 'found' : 'idle')
   }
 
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('uz-UZ')
@@ -1437,6 +1487,56 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
               onChange={e => setForm(f => ({ ...f, valid_until: e.target.value }))}
             />
           </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tur</label>
+            <select
+              className="input-field text-sm"
+              value={form.usage_type}
+              onChange={e => {
+                const val = e.target.value as 'unlimited' | 'one_time'
+                setForm(f => ({ ...f, usage_type: val, assigned_email: '' }))
+                setAssignedUserId(null)
+                setEmailLookupState('idle')
+              }}
+            >
+              <option value="unlimited">Ko&apos;p marta (unlimited)</option>
+              <option value="one_time">1 martalik (one-time)</option>
+            </select>
+          </div>
+          {form.usage_type === 'one_time' && (
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Foydalanuvchi email <span style={{ color: 'var(--text-muted)' }}>(ixtiyoriy)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className="input-field text-sm flex-1"
+                  placeholder="user@example.com"
+                  value={form.assigned_email}
+                  onChange={e => {
+                    setForm(f => ({ ...f, assigned_email: e.target.value }))
+                    setEmailLookupState('idle')
+                    setAssignedUserId(null)
+                  }}
+                  onBlur={e => lookupEmail(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => lookupEmail(form.assigned_email)}
+                  className="btn-outline text-xs px-3"
+                  disabled={!form.assigned_email.trim() || emailLookupState === 'loading'}
+                >
+                  {emailLookupState === 'loading' ? '...' : 'Tekshir'}
+                </button>
+              </div>
+              {emailLookupState === 'found' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>✓ Foydalanuvchi topildi</p>
+              )}
+              {emailLookupState === 'notfound' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>✗ Bunday email ro&apos;yxatdan o&apos;tmagan</p>
+              )}
+            </div>
+          )}
         </div>
         {formError && (
           <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>
@@ -1460,19 +1560,37 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       ) : codes.length > 0 ? (
         <div className="card overflow-hidden">
           <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 80px 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-            <span>Kod</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Ishlatildi</span><span>Holat</span><span className="text-right">Amal</span>
+            style={{ gridTemplateColumns: '1fr 70px 80px 1fr 1fr 80px 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Kod</span><span>Tur</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Ishlatildi</span><span>Holat</span><span className="text-right">Amal</span>
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {codes.map(c => {
               const st = statusOf(c)
               const usageList = c.usage ?? []
               const isUsageOpen = expandedUsage === c.id
+              const isOneTime = c.usage_type === 'one_time'
+              const isUsed = isOneTime && !!c.used_by
               return (
                 <div key={c.id}>
                   <div className="grid items-center px-4 py-3 text-sm"
-                    style={{ gridTemplateColumns: '1fr 80px 1fr 1fr 80px 100px 90px', gap: 8 }}>
-                    <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
+                    style={{ gridTemplateColumns: '1fr 70px 80px 1fr 1fr 80px 100px 90px', gap: 8 }}>
+                    <div>
+                      <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
+                      {isOneTime && c.assigned_user_email && (
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>→ {c.assigned_user_email}</div>
+                      )}
+                      {isUsed && c.used_by_email && (
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>✓ {c.used_by_email}</div>
+                      )}
+                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium text-center"
+                      style={{
+                        background: isOneTime ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)',
+                        color: isOneTime ? 'var(--warning)' : 'var(--success)',
+                        border: `1px solid ${isOneTime ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                      }}>
+                      {isOneTime ? '1x' : '∞'}
+                    </span>
                     <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
                     <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
                     <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_until)}</span>
@@ -1483,7 +1601,18 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                     >
                       {usageList.length}x {usageList.length > 0 && (isUsageOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
                     </button>
-                    <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                      {isOneTime && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: isUsed ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)',
+                            color: isUsed ? 'var(--warning)' : 'var(--success)',
+                          }}>
+                          {isUsed ? 'Ishlatilgan' : 'Faol'}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1.5 justify-end">
                       <button onClick={() => startEdit(c)} title="Tahrirlash"
                         className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"

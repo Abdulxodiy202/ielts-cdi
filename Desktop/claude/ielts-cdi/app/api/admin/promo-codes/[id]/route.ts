@@ -25,6 +25,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if ('valid_from' in body) allowed.valid_from = body.valid_from
   if ('valid_until' in body) allowed.valid_until = body.valid_until
   if ('code' in body) allowed.code = String(body.code).toUpperCase()
+  if ('usage_type' in body) allowed.usage_type = body.usage_type
+  if ('assigned_user_id' in body) allowed.assigned_user_id = body.assigned_user_id || null
 
   const { data, error } = await admin
     .from('promo_codes')
