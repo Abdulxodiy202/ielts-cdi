@@ -379,22 +379,24 @@ export function PaymentModal({
                   </div>
                 )}
 
-                {/* Referral code */}
-                <div className="mb-4">
-                  <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                    Referral kod (ixtiyoriy)
-                  </label>
-                  <div className="relative">
-                    <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                      className="input-field pl-9 text-sm uppercase"
-                      placeholder="Masalan: CDI-4X7K"
-                      value={referralInput}
-                      onChange={e => setReferralInput(e.target.value.toUpperCase())}
-                      style={{ letterSpacing: '0.05em' }}
-                    />
+                {/* Referral code — premium only */}
+                {type === 'premium' && (
+                  <div className="mb-4">
+                    <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
+                      Referral kod (ixtiyoriy)
+                    </label>
+                    <div className="relative">
+                      <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
+                      <input
+                        className="input-field pl-9 text-sm uppercase"
+                        placeholder="Masalan: CDI-4X7K"
+                        value={referralInput}
+                        onChange={e => setReferralInput(e.target.value.toUpperCase())}
+                        style={{ letterSpacing: '0.05em' }}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Inputs */}
                 <div className="space-y-3 mb-4">
