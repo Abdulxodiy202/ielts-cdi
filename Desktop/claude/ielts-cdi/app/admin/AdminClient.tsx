@@ -2160,6 +2160,422 @@ function ArticlesTab() {
   )
 }
 
+/* ── Books Tab ───────────────────────────────────────────────────────── */
+interface BookItem {
+  id: string
+  title: string
+  author: string | null
+  heyzine_url: string
+  cover_image_url: string | null
+  is_premium: boolean
+  is_published: boolean
+  created_at: string
+}
+
+function BooksTab() {
+  const [books, setBooks]                           = useState<BookItem[]>([])
+  const [loading, setLoading]                       = useState(true)
+  const [selectedId, setSelectedId]                 = useState('')
+  const [message, setMessage]                       = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Edit fields
+  const [editTitle, setEditTitle]                   = useState('')
+  const [editAuthor, setEditAuthor]                 = useState('')
+  const [editUrl, setEditUrl]                       = useState('')
+  const [saving, setSaving]                         = useState(false)
+
+  // Cover image
+  const [selectedCoverFile, setSelectedCoverFile]   = useState<File | null>(null)
+  const [savingCover, setSavingCover]               = useState(false)
+  const [coverUrls, setCoverUrls]                   = useState<Record<string, string | null>>({})
+  const coverInputRef                               = useRef<HTMLInputElement>(null)
+
+  // Delete book
+  const [showDeleteBook, setShowDeleteBook]         = useState(false)
+  const [deletingBook, setDeletingBook]             = useState(false)
+
+  // Create modal
+  const [showCreate, setShowCreate]                 = useState(false)
+  const [newTitle, setNewTitle]                     = useState('')
+  const [newAuthor, setNewAuthor]                   = useState('')
+  const [newUrl, setNewUrl]                         = useState('')
+  const [newPremium, setNewPremium]                 = useState(false)
+  const [creating, setCreating]                     = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/books')
+      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setBooks(d) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const selectedBook = books.find(b => b.id === selectedId) ?? null
+  const currentCover = selectedId in coverUrls ? coverUrls[selectedId] : (selectedBook?.cover_image_url ?? null)
+
+  function handleBookChange(id: string) {
+    const b = books.find(x => x.id === id)
+    setSelectedId(id)
+    setEditTitle(b?.title ?? '')
+    setEditAuthor(b?.author ?? '')
+    setEditUrl(b?.heyzine_url ?? '')
+    setSelectedCoverFile(null); setMessage(null); setShowDeleteBook(false)
+    if (coverInputRef.current) coverInputRef.current.value = ''
+  }
+
+  async function handleSave() {
+    if (!selectedId) return
+    const titleChanged  = editTitle.trim() && editTitle.trim()  !== selectedBook?.title
+    const authorChanged = editAuthor.trim() !== (selectedBook?.author ?? '')
+    const urlChanged    = editUrl.trim()    && editUrl.trim()   !== selectedBook?.heyzine_url
+    if (!titleChanged && !authorChanged && !urlChanged) return
+    setSaving(true); setMessage(null)
+    try {
+      const body: Record<string, string> = {}
+      if (titleChanged)  body.title       = editTitle.trim()
+      if (authorChanged) body.author      = editAuthor.trim()
+      if (urlChanged)    body.heyzine_url = editUrl.trim()
+      const res = await fetch(`/api/books/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Saqlashda xato') }
+      const updated = await res.json()
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, ...updated } : b))
+      setMessage({ ok: true, text: 'Saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggle(field: 'is_premium' | 'is_published') {
+    if (!selectedBook) return
+    const res = await fetch(`/api/books/${selectedId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: !selectedBook[field] }),
+    })
+    if (res.ok) setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, [field]: !b[field] } : b))
+  }
+
+  async function handleSaveCover() {
+    if (!selectedId || !selectedCoverFile) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const urlRes = await fetch('/api/admin/book-cover-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: selectedId, fileName: selectedCoverFile.name }),
+      })
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xato') }
+      const { signedUrl, contentType, publicUrl } = await urlRes.json()
+
+      const upRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedCoverFile })
+      if (!upRes.ok) throw new Error(`Storage xatosi ${upRes.status}`)
+
+      await fetch(`/api/books/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_image_url: publicUrl }),
+      })
+      setCoverUrls(prev => ({ ...prev, [selectedId]: publicUrl }))
+      setArticlesLike(publicUrl)
+      setSelectedCoverFile(null)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+      setMessage({ ok: true, text: 'Muqova saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSavingCover(false) }
+
+    function setArticlesLike(url: string) {
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, cover_image_url: url } : b))
+    }
+  }
+
+  async function handleDeleteCover() {
+    if (!selectedId) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const res = await fetch('/api/admin/book-cover-url', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: selectedId }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+      setCoverUrls(prev => ({ ...prev, [selectedId]: null }))
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, cover_image_url: null } : b))
+      setMessage({ ok: true, text: "Muqova o'chirildi!" })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSavingCover(false) }
+  }
+
+  async function handleDeleteBook() {
+    if (!selectedId) return
+    setDeletingBook(true); setMessage(null)
+    try {
+      const res = await fetch(`/api/books/${selectedId}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+      setBooks(prev => prev.filter(b => b.id !== selectedId))
+      setSelectedId(''); setShowDeleteBook(false); setMessage(null)
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setDeletingBook(false) }
+  }
+
+  async function handleCreate() {
+    if (!newTitle.trim() || !newUrl.trim()) return
+    setCreating(true)
+    try {
+      const res = await fetch('/api/books', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle.trim(), author: newAuthor.trim() || null, heyzine_url: newUrl.trim(), is_premium: newPremium }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setBooks(prev => [created, ...prev])
+        setSelectedId(created.id); handleBookChange(created.id)
+        setShowCreate(false); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false)
+      }
+    } finally { setCreating(false) }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center p-12">
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{books.length} ta kitob</span>
+        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false) }}
+          className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} /> Yangi kitob
+        </button>
+      </div>
+
+      <div className="card p-4">
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
+        <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field">
+          <option value="">— Kitob tanlang —</option>
+          {books.map(b => (
+            <option key={b.id} value={b.id}>{b.title}{!b.is_published ? ' (Draft)' : ''}</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedId && selectedBook && (
+        <div className="card p-5 space-y-4">
+          {/* Edit fields */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha</label>
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Muallif</label>
+              <input type="text" value={editAuthor} onChange={e => setEditAuthor(e.target.value)} placeholder="Muallif ismi..." className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL</label>
+              <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)} placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Toggles */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+              <button onClick={() => handleToggle('is_premium')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedBook.is_premium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedBook.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                {selectedBook.is_premium ? 'Premium' : 'Bepul'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nashr holati</span>
+              <button onClick={() => handleToggle('is_published')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedBook.is_published ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedBook.is_published ? <CheckCircle size={13} /> : <ToggleLeft size={13} />}
+                {selectedBook.is_published ? 'Published' : 'Draft'}
+              </button>
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Cover image */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Muqova rasmi</p>
+            {currentCover && !selectedCoverFile && (
+              <div className="relative rounded-xl overflow-hidden" style={{ height: 100, border: '1px solid var(--border)' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentCover} alt="cover" className="w-full h-full object-cover" />
+                <button type="button" onClick={handleDeleteCover} disabled={savingCover}
+                  className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                  style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                  {savingCover ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                  O&apos;chirish
+                </button>
+              </div>
+            )}
+            <div className="relative flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+              style={{
+                border: `2px dashed ${selectedCoverFile ? 'var(--accent)' : 'var(--border)'}`,
+                background: selectedCoverFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+              }}
+              onClick={() => coverInputRef.current?.click()}>
+              {selectedCoverFile ? (
+                <>
+                  <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={URL.createObjectURL(selectedCoverFile)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{selectedCoverFile.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(selectedCoverFile.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <button type="button"
+                    onClick={e => { e.stopPropagation(); setSelectedCoverFile(null); if (coverInputRef.current) coverInputRef.current.value = '' }}
+                    className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <X size={14} />
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 py-1">
+                  <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {currentCover ? 'Rasmni almashtirish' : 'JPG, PNG, WebP yuklash'}
+                  </span>
+                </div>
+              )}
+              <input ref={coverInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden"
+                onChange={e => setSelectedCoverFile(e.target.files?.[0] ?? null)} />
+            </div>
+            {selectedCoverFile && (
+              <button onClick={handleSaveCover} disabled={savingCover}
+                className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+                style={{ opacity: savingCover ? 0.6 : 1 }}>
+                {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
+              </button>
+            )}
+          </div>
+
+          {message && (
+            <div className="p-3 rounded-xl text-sm font-medium"
+              style={{
+                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: message.ok ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {message.ok ? '✅' : '❌'} {message.text}
+            </div>
+          )}
+
+          {/* Save / Delete book */}
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
+              style={{ opacity: saving ? 0.6 : 1 }}>
+              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
+            </button>
+            <button onClick={() => setShowDeleteBook(true)}
+              className="px-3 py-2 rounded-xl text-sm font-medium"
+              style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+
+          {showDeleteBook && (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>Kitobni o&apos;chirishni tasdiqlaysizmi?</p>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setShowDeleteBook(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  Bekor
+                </button>
+                <button onClick={handleDeleteBook} disabled={deletingBook}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--error)', color: '#fff', opacity: deletingBook ? 0.7 : 1 }}>
+                  {deletingBook ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Ha, o&apos;chirish
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedId && (
+        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+          Yuqoridan kitob tanlang
+        </div>
+      )}
+
+      {/* Create modal */}
+      <AnimatePresence>
+        {showCreate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowCreate(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm space-y-4"
+              style={{ zIndex: 51 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi kitob</h3>
+                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
+                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                  <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                    placeholder="Kitob nomi..." className="input-field w-full text-sm" autoFocus />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Muallif</label>
+                  <input type="text" value={newAuthor} onChange={e => setNewAuthor(e.target.value)}
+                    placeholder="Muallif ismi..." className="input-field w-full text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL *</label>
+                  <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                    placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+                  <button type="button" onClick={() => setNewPremium(p => !p)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={newPremium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {newPremium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                    {newPremium ? 'Premium' : 'Bepul'}
+                  </button>
+                </div>
+              </div>
+              <button onClick={handleCreate} disabled={creating || !newTitle.trim() || !newUrl.trim()}
+                className="btn-primary w-full text-sm disabled:opacity-50">
+                {creating ? 'Yaratilyapti...' : 'Yaratish'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function FeedbackTab() {
   const [items, setItems] = useState<FeedbackItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -2405,6 +2821,7 @@ const TABS = [
   { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
   { id: 'referrals', label: 'Referrallar',      Icon: Users },
   { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
+  { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
   { id: 'feedback',  label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
@@ -2484,6 +2901,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       )}
       {activeTab === 'referrals' && <ReferralsTab />}
       {activeTab === 'articles' && <ArticlesTab />}
+      {activeTab === 'books'    && <BooksTab />}
       {activeTab === 'feedback' && <FeedbackTab />}
     </div>
   )
