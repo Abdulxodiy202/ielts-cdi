@@ -5,7 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { isActivePremium } from '@/lib/utils/premium'
 import Link from 'next/link'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
+import { BackButton } from '@/components/ui/BackButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -78,16 +79,7 @@ export default async function ArticlePage({ params }: Props) {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <Link
-          href="/articles"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-            background: 'var(--bg-secondary)', color: 'var(--text-muted)',
-          }}
-        >
-          <ArrowLeft size={16} />
-        </Link>
+        <BackButton href="/articles" />
         <h1
           style={{
             fontSize: 14, fontWeight: 600, flex: 1,

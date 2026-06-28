@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Lock, ChevronRight, BookOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Article {
   id: string
@@ -31,6 +32,7 @@ function getGradient(id: string) {
 
 export default function ArticlesPage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const [articles, setArticles]   = useState<Article[]>([])
   const [loading, setLoading]     = useState(true)
   const [isPremium, setIsPremium] = useState(false)
@@ -59,14 +61,14 @@ export default function ArticlesPage() {
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Maqolalar</h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS uchun foydali inglizcha maqolalar</p>
+        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('articles.title')}</h1>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('articles.subtitle')}</p>
       </div>
 
       {articles.length === 0 ? (
         <div className="py-20 flex flex-col items-center gap-4" style={{ color: 'var(--text-muted)' }}>
           <BookOpen size={48} className="opacity-20" />
-          <p className="font-medium">Hali maqolalar qo&apos;shilmagan</p>
+          <p className="font-medium">{t('articles.empty')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -109,12 +111,12 @@ export default function ArticlesPage() {
                   {article.is_premium ? (
                     <span className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold"
                       style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', whiteSpace: 'nowrap' }}>
-                      👑 Premium
+                      👑 {t('common.premium')}
                     </span>
                   ) : (
                     <span className="shrink-0 px-2.5 py-1 rounded-full text-xs font-bold"
                       style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)', whiteSpace: 'nowrap' }}>
-                      Bepul
+                      {t('common.free')}
                     </span>
                   )}
                 </div>
@@ -139,7 +141,7 @@ export default function ArticlesPage() {
                         style={{ background: 'rgba(255,255,255,0.15)', border: '1.5px solid rgba(255,255,255,0.3)' }}>
                         <Lock size={20} color="white" />
                       </div>
-                      <span className="text-xs font-semibold text-white opacity-90">Premium kerak</span>
+                      <span className="text-xs font-semibold text-white opacity-90">{t('common.premiumRequired')}</span>
                     </div>
                   )}
                 </div>
@@ -152,19 +154,19 @@ export default function ArticlesPage() {
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     >
-                      <Lock size={13} /> Premium olish
+                      <Lock size={13} /> {t('articles.premium')}
                     </button>
                   ) : !article.file_url ? (
                     <div className="w-full py-2.5 text-center text-sm rounded-xl"
                       style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                      Tez kunda
+                      {t('articles.soon')}
                     </div>
                   ) : (
                     <button
                       className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'var(--accent)', color: 'white' }}
                     >
-                      O&apos;qish <ChevronRight size={15} />
+                      {t('articles.read')} <ChevronRight size={15} />
                     </button>
                   )}
                 </div>

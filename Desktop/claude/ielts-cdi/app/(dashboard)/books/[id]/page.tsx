@@ -5,7 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { isActivePremium } from '@/lib/utils/premium'
 import Link from 'next/link'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { Lock } from 'lucide-react'
+import { BackButton } from '@/components/ui/BackButton'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -61,13 +62,7 @@ export default async function BookPage({ params }: Props) {
           borderBottom: '1px solid var(--border)',
         }}
       >
-        <Link
-          href="/books"
-          className="btn-outline text-sm flex items-center gap-1.5 shrink-0"
-        >
-          <ArrowLeft size={14} />
-          <span className="hidden sm:inline">Orqaga</span>
-        </Link>
+        <BackButton href="/books" />
         <h1
           className="font-bold text-sm sm:text-base truncate"
           style={{ color: 'var(--text-primary)' }}

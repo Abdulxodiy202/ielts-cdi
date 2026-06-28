@@ -8,7 +8,9 @@
     "freePlan": "Bepul tarif",
     "premiumBadge": "Premium",
     "vocabulary": "Lug'at",
-    "community": "Jamiyat"
+    "community": "Jamiyat",
+    "books": "Kitoblar",
+    "articles": "Maqolalar"
   },
   "dashboard": {
     "hello": "Salom",
@@ -224,6 +226,28 @@
     "dark": "Qoʻngʻir",
     "light": "Och",
     "cyber": "Cyber",
-    "language": "Til"
+    "language": "Til",
+    "free": "Bepul",
+    "premium": "Premium",
+    "back": "Orqaga",
+    "premiumRequired": "Premium kerak"
+  },
+  "books": {
+    "title": "Kitoblar",
+    "subtitle": "IELTS uchun foydali inglizcha kitoblar",
+    "read": "O'qish",
+    "empty": "Hali kitoblar qo'shilmagan",
+    "premium": "Premium olish"
+  },
+  "articles": {
+    "title": "Maqolalar",
+    "subtitle": "IELTS uchun foydali inglizcha maqolalar",
+    "read": "O'qish",
+    "empty": "Hali maqolalar qo'shilmagan",
+    "premium": "Premium olish",
+    "soon": "Tez kunda",
+    "premiumContent": "Premium kontent",
+    "premiumDesc": "Bu maqolani o'qish uchun Premium obuna kerak",
+    "noFile": "Maqola fayli hali yuklanmagan"
   }
 }

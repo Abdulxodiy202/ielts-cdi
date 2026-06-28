@@ -111,8 +111,8 @@ export function Sidebar() {
       label: 'RESURSLAR',
       items: [
         { href: '/vocabulary',    label: 'Vocabulary',   icon: Library,     badge: null },
-        { href: '/books',          label: 'Kitoblar',     icon: BookOpen,    badge: null },
-        { href: '/articles',       label: 'Articles',     icon: FileText,    badge: null },
+        { href: '/books',          label: t('nav.books'),    icon: BookOpen,    badge: null },
+        { href: '/articles',       label: t('nav.articles'), icon: FileText,    badge: null },
         { href: '/coming-soon',   label: 'Video darslar', icon: Video,      badge: 'pro' },
       ],
     },

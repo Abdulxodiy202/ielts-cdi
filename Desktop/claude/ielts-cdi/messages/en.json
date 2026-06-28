@@ -8,7 +8,9 @@
     "freePlan": "Free Plan",
     "premiumBadge": "Premium",
     "vocabulary": "Vocabulary",
-    "community": "Community"
+    "community": "Community",
+    "books": "Books",
+    "articles": "Articles"
   },
   "dashboard": {
     "hello": "Hello",
@@ -224,6 +226,28 @@
     "dark": "Dark",
     "light": "Light",
     "cyber": "Cyber",
-    "language": "Language"
+    "language": "Language",
+    "free": "Free",
+    "premium": "Premium",
+    "back": "Back",
+    "premiumRequired": "Premium required"
+  },
+  "books": {
+    "title": "Books",
+    "subtitle": "Useful English books for IELTS",
+    "read": "Read",
+    "empty": "No books added yet",
+    "premium": "Get Premium"
+  },
+  "articles": {
+    "title": "Articles",
+    "subtitle": "Useful English articles for IELTS",
+    "read": "Read",
+    "empty": "No articles added yet",
+    "premium": "Get Premium",
+    "soon": "Coming soon",
+    "premiumContent": "Premium content",
+    "premiumDesc": "Premium subscription required to read this article",
+    "noFile": "Article file not uploaded yet"
   }
 }

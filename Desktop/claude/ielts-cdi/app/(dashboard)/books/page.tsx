@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Lock, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Book {
   id: string
@@ -36,6 +37,7 @@ function bookColor(id: string, arr: string[]) {
 
 export default function BooksPage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const [books, setBooks]       = useState<Book[]>([])
   const [loading, setLoading]   = useState(true)
   const [isPremium, setIsPremium] = useState(false)
@@ -67,15 +69,15 @@ export default function BooksPage() {
       {/* shelf background strip */}
       <div className="max-w-5xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Kitoblar</h1>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS uchun foydali inglizcha kitoblar</p>
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('books.title')}</h1>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('books.subtitle')}</p>
         </div>
 
         {books.length === 0 ? (
           <div className="py-20 text-center rounded-2xl"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📚</div>
-            <p className="font-medium">Hali kitoblar qo&apos;shilmagan</p>
+            <p className="font-medium">{t('books.empty')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -160,7 +162,7 @@ export default function BooksPage() {
                               fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 20,
                               background: 'rgba(245,158,11,0.92)', color: 'white', whiteSpace: 'nowrap',
                             }}>
-                              👑 Premium
+                              👑 {t('common.premium')}
                             </span>
                           </div>
                         )}
@@ -216,7 +218,7 @@ export default function BooksPage() {
                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold"
                         style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                       >
-                        <Lock size={11} /> Premium
+                        <Lock size={11} /> {t('books.premium')}
                       </button>
                     ) : (
                       <button
@@ -224,7 +226,7 @@ export default function BooksPage() {
                         className="w-full flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold"
                         style={{ background: 'var(--accent)', color: 'white' }}
                       >
-                        O&apos;qish <ChevronRight size={13} />
+                        {t('books.read')} <ChevronRight size={13} />
                       </button>
                     )}
                   </div>
