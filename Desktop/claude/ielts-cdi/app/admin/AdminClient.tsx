@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X,
+  Loader2, Upload, FileText, X, Music,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -2954,6 +2954,219 @@ function FeedbackTab() {
   )
 }
 
+/* ── Music tab ───────────────────────────────────────────────────────── */
+interface MusicTrack {
+  id: string
+  title: string
+  youtube_url: string
+  order_index: number
+  is_active: boolean
+  created_at: string
+}
+
+function MusicTab() {
+  const [tracks, setTracks] = useState<MusicTrack[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ title: '', youtube_url: '', order_index: 0, is_active: true })
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/music')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) { const data = await res.json(); setTracks(Array.isArray(data) ? data : []) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const resetForm = () => {
+    setForm({ title: '', youtube_url: '', order_index: tracks.length, is_active: true })
+    setFormError('')
+    setShowForm(false)
+  }
+
+  const handleAdd = async () => {
+    if (!form.title.trim()) { setFormError('Nomi kiritilishi shart'); return }
+    if (!form.youtube_url.trim()) { setFormError('YouTube URL kiritilishi shart'); return }
+    setSaving(true); setFormError('')
+    const res = await fetch('/api/admin/music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    const json = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    setTracks(prev => [...prev, json])
+    resetForm()
+    setSaving(false)
+  }
+
+  const handleToggle = async (t: MusicTrack) => {
+    const res = await fetch(`/api/admin/music/${t.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !t.is_active }),
+    })
+    if (res.ok) setTracks(prev => prev.map(x => x.id === t.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Musiqani o'chirishni tasdiqlaysizmi?")) return
+    const res = await fetch(`/api/admin/music/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setTracks(prev => prev.filter(x => x.id !== id))
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) return (
+    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ background_music jadvali topilmadi</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
+      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+{`CREATE TABLE IF NOT EXISTS background_music (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  youtube_url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE background_music ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Music readable by authenticated" ON background_music
+  FOR SELECT TO authenticated USING (true);`}
+      </pre>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {/* Add form */}
+      {showForm ? (
+        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>➕ Yangi musiqa</h3>
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Nomi</label>
+              <input
+                className="input-field text-sm w-full"
+                placeholder="Lo-fi Study Beat"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>YouTube URL</label>
+              <input
+                className="input-field text-sm w-full"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={form.youtube_url}
+                onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib (order)</label>
+              <input
+                className="input-field text-sm"
+                type="number"
+                min={0}
+                value={form.order_index}
+                onChange={e => setForm(f => ({ ...f, order_index: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+                  className="rounded"
+                />
+                Faol
+              </label>
+            </div>
+          </div>
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+          <div className="flex gap-2">
+            <button onClick={handleAdd} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : 'Qo\'shish'}
+            </button>
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => { setShowForm(true); setForm(f => ({ ...f, order_index: tracks.length })) }}
+          className="btn-primary text-sm flex items-center gap-2"
+        >
+          <Plus size={14} /> Yangi musiqa qo&apos;shish
+        </button>
+      )}
+
+      {/* List */}
+      {tracks.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Music size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali musiqalar qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '40px 1fr 1fr 80px 80px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>#</span><span>Nomi</span><span>YouTube URL</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {tracks.map(t => (
+              <div key={t.id} className="grid items-center px-4 py-3 text-sm"
+                style={{ gridTemplateColumns: '40px 1fr 1fr 80px 80px', gap: 8 }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{t.order_index}</span>
+                <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.title}</span>
+                <a
+                  href={t.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs truncate hover:underline"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {t.youtube_url}
+                </a>
+                <span
+                  className="text-xs px-2 py-1 rounded-full font-medium text-center"
+                  style={{
+                    background: t.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
+                    color: t.is_active ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                >
+                  {t.is_active ? 'Faol' : 'O\'chiq'}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button
+                    onClick={() => handleToggle(t)}
+                    title={t.is_active ? "O'chirish" : 'Yoqish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: t.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: t.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {t.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button
+                    onClick={() => handleDelete(t.id)}
+                    title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
@@ -2966,6 +3179,7 @@ const TABS = [
   { id: 'referrals', label: 'Referrallar',      Icon: Users },
   { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
   { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
+  { id: 'music',     label: 'Musiqa',            Icon: Music },
   { id: 'feedback',  label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
@@ -3046,6 +3260,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'referrals' && <ReferralsTab />}
       {activeTab === 'articles' && <ArticlesTab />}
       {activeTab === 'books'    && <BooksTab />}
+      {activeTab === 'music'    && <MusicTab />}
       {activeTab === 'feedback' && <FeedbackTab />}
     </div>
   )
