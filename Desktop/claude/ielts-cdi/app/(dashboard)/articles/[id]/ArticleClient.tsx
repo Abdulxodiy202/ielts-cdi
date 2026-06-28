@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Clock, Lock, Crown } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Article {
   id: string
@@ -24,6 +25,7 @@ const LEVEL_COLORS: Record<string, { bg: string; color: string }> = {
 
 export function ArticleClient({ article, isPremium }: { article: Article; isPremium: boolean }) {
   const router = useRouter()
+  const { t } = useLanguage()
   const locked = article.is_premium && !isPremium
   const lvlStyle = LEVEL_COLORS[article.level] ?? LEVEL_COLORS.intermediate
 
@@ -35,7 +37,7 @@ export function ArticleClient({ article, isPremium }: { article: Article; isPrem
         className="flex items-center gap-1.5 text-sm mb-6 transition-opacity hover:opacity-70"
         style={{ color: 'var(--text-muted)' }}
       >
-        <ArrowLeft size={16} /> Maqolalarga qaytish
+        <ArrowLeft size={16} /> {t('premium.backToArticles')}
       </button>
 
       {/* Meta */}
@@ -88,17 +90,17 @@ export function ArticleClient({ article, isPremium }: { article: Article; isPrem
                 <Crown size={28} style={{ color: '#f59e0b' }} />
               </div>
               <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text-primary)' }}>
-                Bu maqola Premium
+                {t('premium.articleLockTitle')}
               </h3>
               <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                To&apos;liq o&apos;qish uchun Premium obuna kerak
+                {t('premium.articleLockDesc')}
               </p>
               <button
                 onClick={() => router.push('/premium')}
                 className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl font-bold text-white text-sm"
                 style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}
               >
-                <Lock size={14} /> Premium olish
+                <Lock size={14} /> {t('premium.getBtn')}
               </button>
             </div>
           </div>
@@ -108,7 +110,7 @@ export function ArticleClient({ article, isPremium }: { article: Article; isPrem
           className="text-sm leading-8 whitespace-pre-wrap"
           style={{ color: 'var(--text-secondary)' }}
         >
-          {article.content ?? 'Kontent hali qo\'shilmagan.'}
+          {article.content ?? t('premium.noContent')}
         </div>
       )}
     </div>

@@ -317,7 +317,7 @@ export default function LibraryPage() {
             className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
             style={{ color: 'var(--text-muted)' }}
           >
-            <ChevronLeft size={16} /> Vocabulary ga qaytish
+            <ChevronLeft size={16} /> {t('vocabulary.backToVocab')}
           </button>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>📖 {t('vocabulary.library')}</h1>
         </div>
@@ -370,7 +370,7 @@ export default function LibraryPage() {
           className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}
         >
-          <ChevronLeft size={16} /> Vocabulary ga qaytish
+          <ChevronLeft size={16} /> {t('vocabulary.backToVocab')}
         </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>📖 {t('vocabulary.library')}</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.libraryDesc')}</p>
@@ -674,14 +674,14 @@ export default function LibraryPage() {
                               {editSaving
                                 ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                 : <Check size={13} />}
-                              Saqlash
+                              {t('vocabulary.save')}
                             </button>
                             <button
                               onClick={() => { setEditingId(null); setEditError(null) }}
                               className="text-xs px-3 py-1.5 rounded-lg font-medium"
                               style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
                             >
-                              Bekor qilish
+                              {t('vocabulary.cancel')}
                             </button>
                           </div>
                         </div>

@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { MessageSquarePlus, Send, CheckCircle } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function FeedbackPage() {
+  const { t } = useLanguage()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -47,10 +49,10 @@ export default function FeedbackPage() {
             <MessageSquarePlus size={26} style={{ color: 'var(--accent)' }} />
           </div>
           <h1 className="text-3xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
-            Feedback bering, chegirma oling
+            {t('feedback.title')}
           </h1>
           <p className="text-base leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Foydali fikr yoki xatoliklarni ayting — chegirma yutib oling
+            {t('feedback.subtitle')}
           </p>
         </div>
 
@@ -64,7 +66,7 @@ export default function FeedbackPage() {
           }}
         >
           <label className="block text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
-            Adminga xat
+            {t('feedback.label')}
           </label>
 
           <textarea
@@ -73,16 +75,14 @@ export default function FeedbackPage() {
             onKeyDown={e => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit()
             }}
-            placeholder="Sayt haqidagi fikringizni, topgan xatolaringizni yoki takliflaringizni shu yerga yozing..."
+            placeholder={t('feedback.placeholder')}
             rows={6}
             className="input-field w-full resize-none text-sm leading-relaxed"
             disabled={sending}
           />
 
           {error && (
-            <p className="text-sm" style={{ color: 'var(--error)' }}>
-              ❌ {error}
-            </p>
+            <p className="text-sm" style={{ color: 'var(--error)' }}>❌ {error}</p>
           )}
 
           {sent && (
@@ -91,7 +91,7 @@ export default function FeedbackPage() {
               style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', color: 'var(--success)' }}
             >
               <CheckCircle size={16} />
-              Yuborildi! Admin 24 soat ichida javob beradi.
+              {t('feedback.sent')}
             </div>
           )}
 
@@ -103,35 +103,35 @@ export default function FeedbackPage() {
             {sending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Yuborilmoqda...
+                {t('feedback.submitting')}
               </>
             ) : (
               <>
                 <Send size={15} />
-                Yuborish
+                {t('feedback.submit')}
               </>
             )}
           </button>
 
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            Ctrl + Enter bilan ham yuborish mumkin
+            {t('feedback.hint')}
           </p>
         </div>
 
         {/* Info cards */}
         <div className="grid grid-cols-2 gap-3 mt-6">
           {[
-            { emoji: '🐛', title: 'Xato topding?', desc: 'Test, audio yoki saytdagi muammo haqida yozing' },
-            { emoji: '💡', title: 'Taklif bor?', desc: 'Yangi funksiya yoki yaxshilash g\'oyalarini ulashing' },
+            { emoji: '🐛', titleKey: 'feedback.bugTitle', descKey: 'feedback.bugDesc' },
+            { emoji: '💡', titleKey: 'feedback.ideaTitle', descKey: 'feedback.ideaDesc' },
           ].map(item => (
             <div
-              key={item.title}
+              key={item.titleKey}
               className="rounded-xl p-4"
               style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
             >
               <div className="text-2xl mb-2">{item.emoji}</div>
-              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{item.title}</div>
-              <div className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.desc}</div>
+              <div className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t(item.titleKey)}</div>
+              <div className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{t(item.descKey)}</div>
             </div>
           ))}
         </div>

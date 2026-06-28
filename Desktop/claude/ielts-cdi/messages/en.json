@@ -1,8 +1,8 @@
 {
   "nav": {
     "dashboard": "Dashboard",
-    "reading": "Reading Tests",
-    "listening": "Listening Tests",
+    "reading": "Reading",
+    "listening": "Listening",
     "mockTest": "Mock Test",
     "signOut": "Sign Out",
     "freePlan": "Free Plan",
@@ -10,7 +10,15 @@
     "vocabulary": "Vocabulary",
     "community": "Community",
     "books": "Books",
-    "articles": "Articles"
+    "articles": "Articles",
+    "writing": "Writing",
+    "speaking": "Speaking",
+    "feedback": "Feedback",
+    "videoCourses": "Video Lessons",
+    "skillsGroup": "SKILLS",
+    "examGroup": "EXAM",
+    "resourcesGroup": "RESOURCES",
+    "otherGroup": "OTHER"
   },
   "dashboard": {
     "hello": "Hello",
@@ -210,7 +218,9 @@
     "wordUz": "O'zbekcha tarjima (required)",
     "wordDef": "Ta'rif (optional)",
     "wordEx": "Misol jumla (optional)",
-    "aiKeyMissing": "ANTHROPIC_API_KEY is not set in environment variables. Add it to Vercel → Settings → Environment Variables, then redeploy."
+    "aiKeyMissing": "ANTHROPIC_API_KEY is not set in environment variables. Add it to Vercel → Settings → Environment Variables, then redeploy.",
+    "backToVocab": "Back to Vocabulary",
+    "cancelBtn": "Cancel"
   },
   "common": {
     "save": "Save",
@@ -249,5 +259,34 @@
     "premiumContent": "Premium content",
     "premiumDesc": "Premium subscription required to read this article",
     "noFile": "Article file not uploaded yet"
+  },
+  "feedback": {
+    "title": "Share Feedback, Win Discounts",
+    "subtitle": "Report useful feedback or bugs — win a discount",
+    "label": "Message to Admin",
+    "placeholder": "Write your thoughts, bugs you found, or suggestions here...",
+    "submit": "Submit",
+    "submitting": "Submitting...",
+    "hint": "You can also submit with Ctrl + Enter",
+    "sent": "Sent! Admin will reply within 24 hours.",
+    "bugTitle": "Found a bug?",
+    "bugDesc": "Write about issues in tests, audio, or the site",
+    "ideaTitle": "Have a suggestion?",
+    "ideaDesc": "Share ideas for new features or improvements"
+  },
+  "premium": {
+    "contentTitle": "Premium content",
+    "bookDesc": "Premium subscription required to read this book",
+    "articleDesc": "Premium subscription required to read this article",
+    "getBtn": "Get Premium",
+    "articleLockTitle": "Premium Article",
+    "articleLockDesc": "Premium subscription required to read in full",
+    "noContent": "Content not added yet.",
+    "badge": "Premium",
+    "backToArticles": "Back to articles"
+  },
+  "community": {
+    "title": "Community",
+    "soon": "Coming soon..."
   }
 }

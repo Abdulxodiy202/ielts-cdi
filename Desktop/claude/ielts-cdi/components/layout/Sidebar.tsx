@@ -89,38 +89,38 @@ export function Sidebar() {
     {
       label: '',
       items: [
-        { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, badge: null },
+        { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, badge: null },
       ],
     },
     {
-      label: "KO'NIKMALAR",
+      label: t('nav.skillsGroup'),
       items: [
-        { href: '/reading',   label: 'Reading',  icon: BookOpen,   badge: null },
-        { href: '/listening', label: 'Listening', icon: Headphones, badge: null },
-        { href: '/writing',   label: 'Writing',  icon: PenLine,    badge: 'ai' },
-        { href: '/speaking',  label: 'Speaking', icon: Mic,        badge: 'ai' },
+        { href: '/reading',   label: t('nav.reading'),   icon: BookOpen,   badge: null },
+        { href: '/listening', label: t('nav.listening'), icon: Headphones, badge: null },
+        { href: '/writing',   label: t('nav.writing'),   icon: PenLine,    badge: 'ai' },
+        { href: '/speaking',  label: t('nav.speaking'),  icon: Mic,        badge: 'ai' },
       ],
     },
     {
-      label: 'IMTIHON',
+      label: t('nav.examGroup'),
       items: [
-        { href: '/mock-test', label: 'Mock Test', icon: Calendar, badge: 'book' },
+        { href: '/mock-test', label: t('nav.mockTest'), icon: Calendar, badge: 'book' },
       ],
     },
     {
-      label: 'RESURSLAR',
+      label: t('nav.resourcesGroup'),
       items: [
-        { href: '/vocabulary',    label: 'Vocabulary',   icon: Library,     badge: null },
-        { href: '/books',          label: t('nav.books'),    icon: BookOpen,    badge: null },
-        { href: '/articles',       label: t('nav.articles'), icon: FileText,    badge: null },
-        { href: '/coming-soon',   label: 'Video darslar', icon: Video,      badge: 'pro' },
+        { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,     badge: null },
+        { href: '/books',       label: t('nav.books'),        icon: BookOpen,    badge: null },
+        { href: '/articles',    label: t('nav.articles'),     icon: FileText,    badge: null },
+        { href: '/coming-soon', label: t('nav.videoCourses'), icon: Video,       badge: 'pro' },
       ],
     },
     {
-      label: 'BOSHQA',
+      label: t('nav.otherGroup'),
       items: [
-        { href: '/community', label: 'Community', icon: Users,             badge: null },
-        { href: '/feedback',  label: 'Feedback',  icon: MessageSquarePlus, badge: null },
+        { href: '/community', label: t('nav.community'), icon: Users,             badge: null },
+        { href: '/feedback',  label: t('nav.feedback'),  icon: MessageSquarePlus, badge: null },
       ],
     },
   ]

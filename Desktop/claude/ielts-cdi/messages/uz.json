@@ -1,8 +1,8 @@
 {
   "nav": {
     "dashboard": "Bosh sahifa",
-    "reading": "Reading Testlar",
-    "listening": "Listening Testlar",
+    "reading": "Reading",
+    "listening": "Listening",
     "mockTest": "Mock Test",
     "signOut": "Chiqish",
     "freePlan": "Bepul tarif",
@@ -10,7 +10,15 @@
     "vocabulary": "Lug'at",
     "community": "Jamiyat",
     "books": "Kitoblar",
-    "articles": "Maqolalar"
+    "articles": "Maqolalar",
+    "writing": "Writing",
+    "speaking": "Speaking",
+    "feedback": "Feedback",
+    "videoCourses": "Video darslar",
+    "skillsGroup": "KO'NIKMALAR",
+    "examGroup": "IMTIHON",
+    "resourcesGroup": "RESURSLAR",
+    "otherGroup": "BOSHQA"
   },
   "dashboard": {
     "hello": "Salom",
@@ -210,7 +218,9 @@
     "wordUz": "O'zbekcha tarjima (majburiy)",
     "wordDef": "Ta'rif (ixtiyoriy)",
     "wordEx": "Misol jumla (ixtiyoriy)",
-    "aiKeyMissing": "ANTHROPIC_API_KEY muhit o'zgaruvchisi sozlanmagan. Vercel → Settings → Environment Variables ga qo'shing va qayta deploy qiling."
+    "aiKeyMissing": "ANTHROPIC_API_KEY muhit o'zgaruvchisi sozlanmagan. Vercel → Settings → Environment Variables ga qo'shing va qayta deploy qiling.",
+    "backToVocab": "Vocabulary ga qaytish",
+    "cancelBtn": "Bekor qilish"
   },
   "common": {
     "save": "Saqlash",
@@ -249,5 +259,34 @@
     "premiumContent": "Premium kontent",
     "premiumDesc": "Bu maqolani o'qish uchun Premium obuna kerak",
     "noFile": "Maqola fayli hali yuklanmagan"
+  },
+  "feedback": {
+    "title": "Feedback bering, chegirma oling",
+    "subtitle": "Foydali fikr yoki xatoliklarni ayting — chegirma yutib oling",
+    "label": "Adminga xat",
+    "placeholder": "Sayt haqidagi fikringizni, topgan xatolaringizni yoki takliflaringizni shu yerga yozing...",
+    "submit": "Yuborish",
+    "submitting": "Yuborilmoqda...",
+    "hint": "Ctrl + Enter bilan ham yuborish mumkin",
+    "sent": "Yuborildi! Admin 24 soat ichida javob beradi.",
+    "bugTitle": "Xato topding?",
+    "bugDesc": "Test, audio yoki saytdagi muammo haqida yozing",
+    "ideaTitle": "Taklif bor?",
+    "ideaDesc": "Yangi funksiya yoki yaxshilash g'oyalarini ulashing"
+  },
+  "premium": {
+    "contentTitle": "Premium kontent",
+    "bookDesc": "Bu kitobni o’qish uchun Premium obuna kerak",
+    "articleDesc": "Bu maqolani o’qish uchun Premium obuna kerak",
+    "getBtn": "Premium olish",
+    "articleLockTitle": "Bu maqola Premium",
+    "articleLockDesc": "To’liq o’qish uchun Premium obuna kerak",
+    "noContent": "Kontent hali qo’shilmagan.",
+    "badge": "Premium",
+    "backToArticles": "Maqolalarga qaytish"
+  },
+  "community": {
+    "title": "Community",
+    "soon": "Tez kunda..."
   }
 }

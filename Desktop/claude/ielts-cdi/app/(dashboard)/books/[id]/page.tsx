@@ -5,8 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { isActivePremium } from '@/lib/utils/premium'
 import Link from 'next/link'
-import { Lock } from 'lucide-react'
 import { BackButton } from '@/components/ui/BackButton'
+import { PremiumLockScreen } from '@/components/ui/PremiumLockScreen'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -33,23 +33,7 @@ export default async function BookPage({ params }: Props) {
   const isPremium = isActivePremium(profileRes.data)
   const locked = book.is_premium && !isPremium
 
-  if (locked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center gap-6">
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}>
-          <Lock size={28} style={{ color: '#f59e0b' }} />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Premium kontent</h2>
-          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-            Bu kitobni o&apos;qish uchun Premium obuna kerak
-          </p>
-        </div>
-        <Link href="/pricing" className="btn-primary px-6 py-2.5 text-sm font-semibold">Premium olish</Link>
-      </div>
-    )
-  }
+  if (locked) return <PremiumLockScreen descKey="premium.bookDesc" />
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>

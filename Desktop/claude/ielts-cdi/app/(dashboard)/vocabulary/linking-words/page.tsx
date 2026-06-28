@@ -21,7 +21,7 @@ export default function LinkingWordsPage() {
           className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}
         >
-          <ChevronLeft size={16} /> Vocabulary ga qaytish
+          <ChevronLeft size={16} /> {t('vocabulary.backToVocab')}
         </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>🔗 {t('vocabulary.linkingWords')}</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.linkingWordsSubtitle')}</p>
