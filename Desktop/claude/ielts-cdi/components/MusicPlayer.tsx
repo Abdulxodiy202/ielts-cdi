@@ -20,6 +20,11 @@ interface Track {
   order_index: number
 }
 
+interface Props {
+  autoPlay?: boolean
+  defaultMinimized?: boolean
+}
+
 function extractVideoId(url: string): string | null {
   const patterns = [/[?&]v=([^&#]+)/, /youtu\.be\/([^?&#]+)/, /youtube\.com\/embed\/([^?&#]+)/]
   for (const p of patterns) {
@@ -36,33 +41,48 @@ function fmtTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export function MusicPlayer() {
+const PILL_KEYFRAMES = `
+@keyframes musicNote {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50% { transform: translateY(-3px) rotate(6deg); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+`
+
+export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Props) {
   const [tracks, setTracks] = useState<Track[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [volume, setVolume] = useState(50)
   const [isLooping, setIsLooping] = useState(false)
-  const [isMinimized, setIsMinimized] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(defaultMinimized)
   const [showPlaylist, setShowPlaylist] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playerReady, setPlayerReady] = useState(false)
+  const [autoPlayBlocked, setAutoPlayBlocked] = useState(false)
 
   const playerRef = useRef<any>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Always-current refs so event callbacks don't capture stale closures
   const currentIndexRef = useRef(0)
   const isLoopingRef = useRef(false)
   const tracksRef = useRef<Track[]>([])
   const volumeRef = useRef(50)
   const isMutedRef = useRef(false)
+  const isPlayingRef = useRef(false)
 
   currentIndexRef.current = currentIndex
   isLoopingRef.current = isLooping
   tracksRef.current = tracks
   volumeRef.current = volume
   isMutedRef.current = isMuted
+  isPlayingRef.current = isPlaying
 
   // ── Load tracks ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -117,6 +137,8 @@ export function MusicPlayer() {
     if (!YT) return
     if (event.data === YT.PlayerState.PLAYING) {
       setIsPlaying(true)
+      setAutoPlayBlocked(false)
+      if (autoPlayTimerRef.current) { clearTimeout(autoPlayTimerRef.current); autoPlayTimerRef.current = null }
       startPolling()
     } else if (event.data === YT.PlayerState.PAUSED) {
       setIsPlaying(false)
@@ -142,9 +164,10 @@ export function MusicPlayer() {
   // ── Init YouTube IFrame API (once tracks are loaded) ───────────────────
   useEffect(() => {
     if (tracks.length === 0) return
+    const shouldAutoPlay = autoPlay
 
     const initPlayer = () => {
-      if (playerRef.current) return // already initialized
+      if (playerRef.current) return
       const videoId = extractVideoId(tracks[currentIndexRef.current]?.youtube_url ?? '') ?? ''
       playerRef.current = new window.YT.Player('yt-player-host', {
         height: '1', width: '1',
@@ -155,6 +178,12 @@ export function MusicPlayer() {
             e.target.setVolume(volumeRef.current)
             if (isMutedRef.current) e.target.mute()
             setPlayerReady(true)
+            if (shouldAutoPlay) {
+              e.target.playVideo()
+              autoPlayTimerRef.current = setTimeout(() => {
+                if (!isPlayingRef.current) setAutoPlayBlocked(true)
+              }, 1500)
+            }
           },
           onStateChange,
         },
@@ -173,7 +202,10 @@ export function MusicPlayer() {
       }
     }
 
-    return () => stopPolling()
+    return () => {
+      stopPolling()
+      if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks.length === 0 ? 0 : 1]) // run once when tracks become available
 
@@ -246,21 +278,48 @@ export function MusicPlayer() {
 
   const track = tracks[currentIndex]
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0
+  const truncTitle = track?.title
+    ? (track.title.length > 15 ? track.title.slice(0, 15) + '…' : track.title)
+    : 'Musiqa'
 
   // ── Minimized pill ────────────────────────────────────────────────────
   if (isMinimized) {
     return (
       <>
+        <style>{PILL_KEYFRAMES}</style>
         <div id="yt-player-host" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', top: -9999 }} />
         <button
           onClick={() => setIsMinimized(false)}
-          className="fixed bottom-6 right-6 z-[200] w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-          style={{ background: 'var(--accent)', color: 'white' }}
+          className="fixed bottom-6 right-6 z-[300] flex items-center gap-2 px-3 rounded-full shadow-xl transition-transform hover:scale-105 active:scale-95"
+          style={{
+            width: 180, height: 40,
+            background: 'rgba(0,0,0,0.72)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            color: 'white',
+          }}
           title={track?.title}
         >
-          {isPlaying
-            ? <span className="text-lg" style={{ animation: 'pulse 1s infinite' }}>♪</span>
-            : <Music size={20} />}
+          <span
+            className="text-base shrink-0"
+            style={{
+              display: 'inline-block',
+              animation: autoPlayBlocked
+                ? 'blink 0.8s step-end infinite'
+                : isPlaying
+                  ? 'musicNote 1.2s ease-in-out infinite'
+                  : 'none',
+            }}
+          >
+            {autoPlayBlocked ? '▶' : '♪'}
+          </span>
+          <span
+            className="text-xs font-medium flex-1 text-left"
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '0.01em' }}
+          >
+            {truncTitle}
+          </span>
         </button>
       </>
     )
@@ -274,7 +333,7 @@ export function MusicPlayer() {
 
       {/* Player card */}
       <div
-        className="fixed bottom-6 right-6 z-[200] rounded-2xl shadow-2xl overflow-hidden"
+        className="fixed bottom-6 right-6 z-[300] rounded-2xl shadow-2xl overflow-hidden"
         style={{
           width: 280,
           background: 'var(--bg-card)',

@@ -7,6 +7,7 @@ import { isActivePremium } from '@/lib/utils/premium'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
 import { PremiumLockScreen } from '@/components/ui/PremiumLockScreen'
+import { MusicPlayer } from '@/components/MusicPlayer'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -87,6 +88,7 @@ export default async function BookPage({ params }: Props) {
           display: 'block',
         }}
       />
+      <MusicPlayer autoPlay defaultMinimized />
     </div>
   )
 }
