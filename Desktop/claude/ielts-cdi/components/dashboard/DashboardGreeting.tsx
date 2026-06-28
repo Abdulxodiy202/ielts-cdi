@@ -16,12 +16,12 @@ export function DashboardGreeting({ firstName, totalTests, isPremium }: Dashboar
     <div className="mb-8 flex items-start justify-between">
       <div>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-          {t('dashboard.hello')}, {firstName} 👋
+          {t('dashboard.hello')} {firstName} 👋
         </h1>
         <p style={{ color: 'var(--text-muted)' }}>
           {totalTests === 0
             ? t('dashboard.readyToStart')
-            : t('dashboard.testsCompleted', { count: totalTests })}
+            : t('dashboard.completedTests', { count: totalTests })}
         </p>
       </div>
       {!isPremium && (

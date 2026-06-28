@@ -21,14 +21,20 @@
     "otherGroup": "OTHER"
   },
   "dashboard": {
-    "hello": "Hello",
+    "hello": "Hello,",
     "readyToStart": "Ready to start your IELTS journey?",
-    "testsCompleted": "You've completed {count} tests so far.",
+    "completedTests": "You've completed {count} tests so far.",
     "upgradeToPremium": "Upgrade to Premium",
     "recentTests": "Recent Tests",
     "readingTests": "Reading Tests",
     "listeningTests": "Listening Tests",
-    "testsFree": "{total} tests · {free} free"
+    "testsFree": "{total} tests · {free} free",
+    "myReferralCode": "My Referral ID:",
+    "premiumConverted": "Premium users:",
+    "referralText": "Invite 5 friends — when they go Premium with your code, you get 100% discount!",
+    "copied": "Copied!",
+    "referralSetupTitle": "Table missing — Referral system",
+    "retryReferral": "Retry"
   },
   "stats": {
     "testsTaken": "Tests Taken",

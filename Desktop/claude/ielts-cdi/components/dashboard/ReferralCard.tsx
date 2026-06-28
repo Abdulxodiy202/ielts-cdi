@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Copy, CheckCircle, Gift } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface ReferralEntry {
   id: string
@@ -24,6 +25,7 @@ CREATE POLICY "Anyone can insert referral" ON referrals FOR INSERT WITH CHECK (t
 ALTER TABLE payment_requests ADD COLUMN IF NOT EXISTS referral_code text;`
 
 export function ReferralCard() {
+  const { t } = useLanguage()
   const [referralCode, setReferralCode] = useState<string | null>(null)
   const [convertedCount, setConvertedCount] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -63,12 +65,12 @@ export function ReferralCard() {
       <div className="card p-5 mb-8" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
         <div className="flex items-center gap-2 mb-3">
           <Gift size={18} style={{ color: 'var(--warning)' }} />
-          <h3 className="font-bold text-sm" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
+          <h3 className="font-bold text-sm" style={{ color: 'var(--warning)' }}>{t('dashboard.referralSetupTitle')}</h3>
         </div>
         <pre className="text-xs p-3 rounded-lg overflow-x-auto mb-3" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
           {SETUP_SQL}
         </pre>
-        <button onClick={load} className="btn-outline text-xs">Qayta urinish</button>
+        <button onClick={load} className="btn-outline text-xs">{t('dashboard.retryReferral')}</button>
       </div>
     )
   }
@@ -78,14 +80,14 @@ export function ReferralCard() {
   return (
     <div className="card p-4 mb-8 flex flex-col gap-3">
       <p className="text-xs leading-relaxed" style={{ color: 'var(--accent)', opacity: 0.85 }}>
-        🎁 <strong>5 do&#39;stingizni taklif qiling</strong> — ular sizning kodingiz bilan Premium olsa, siz <strong>100% chegirma</strong> yutib olasiz!
+        🎁 {t('dashboard.referralText')}
       </p>
 
       <div className="flex items-center gap-4 flex-wrap">
       <Gift size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
 
       <div className="flex items-center gap-2">
-        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Mening referral kodim:</span>
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dashboard.myReferralCode')}</span>
         <span className="font-mono font-bold text-base tracking-widest" style={{ color: 'var(--accent)' }}>
           {referralCode ?? '...'}
         </span>
@@ -96,11 +98,11 @@ export function ReferralCard() {
         >
           {copied ? <CheckCircle size={13} /> : <Copy size={13} />}
         </button>
-        {copied && <span className="text-xs" style={{ color: 'var(--success)' }}>Nusxalandi!</span>}
+        {copied && <span className="text-xs" style={{ color: 'var(--success)' }}>{t('dashboard.copied')}</span>}
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 text-sm">
-        <span style={{ color: 'var(--text-muted)' }}>Premium olganlar:</span>
+        <span style={{ color: 'var(--text-muted)' }}>{t('dashboard.premiumConverted')}</span>
         <span className="font-bold" style={{ color: 'var(--warning)' }}>{convertedCount}</span>
       </div>
       </div>

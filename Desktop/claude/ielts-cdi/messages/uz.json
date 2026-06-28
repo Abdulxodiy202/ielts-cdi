@@ -21,20 +21,26 @@
     "otherGroup": "BOSHQA"
   },
   "dashboard": {
-    "hello": "Salom",
+    "hello": "Salom,",
     "readyToStart": "IELTS yo'lingizni boshlashga tayyormisiz?",
-    "testsCompleted": "{count} ta test topshirdingiz.",
+    "completedTests": "Siz jami {count} ta test yechdingiz.",
     "upgradeToPremium": "Premiumga o'tish",
-    "recentTests": "So'nggi Testlar",
-    "readingTests": "Reading Testlar",
-    "listeningTests": "Listening Testlar",
-    "testsFree": "{total} ta test · {free} ta bepul"
+    "recentTests": "So'nggi testlar",
+    "readingTests": "Reading testlar",
+    "listeningTests": "Listening testlar",
+    "testsFree": "{total} ta test · {free} ta bepul",
+    "myReferralCode": "Mening referral kodim:",
+    "premiumConverted": "Premium olganlar:",
+    "referralText": "5 do'stingizni taklif qiling — ular kodingiz bilan Premium olsa, siz 100% chegirma yutib olasiz!",
+    "copied": "Nusxalandi!",
+    "referralSetupTitle": "Jadval topilmadi — Referral tizimi",
+    "retryReferral": "Qayta urinish"
   },
   "stats": {
-    "testsTaken": "Testlar",
-    "averageBand": "O'rtacha Ball",
-    "highestBand": "Eng Yuqori Ball",
-    "thisWeek": "Bu Hafta"
+    "testsTaken": "Yechilgan testlar",
+    "averageBand": "O'rtacha ball",
+    "highestBand": "Eng yuqori ball",
+    "thisWeek": "Bu hafta"
   },
   "history": {
     "empty": "Hali test topshirilmagan. Birinchi testingizni boshlang!",
