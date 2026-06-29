@@ -8,6 +8,16 @@ export default function VocabularyPage() {
 
   const CATEGORIES = [
     {
+      href: '/vocabulary/games',
+      emoji: '🎮',
+      title: 'O\'yinlar',
+      desc:  '100 darajali so\'z o\'yini — har darajada 5 ta savol',
+      count: '100 daraja',
+      color: '#8b5cf6',
+      bg:    'rgba(139,92,246,0.08)',
+      border:'rgba(139,92,246,0.25)',
+    },
+    {
       href: '/vocabulary/irregular-verbs',
       emoji: '🔄',
       titleKey: 'vocabulary.irregularVerbs',
@@ -88,10 +98,10 @@ export default function VocabularyPage() {
               </span>
             </div>
             <h2 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
-              {t(cat.titleKey)}
+              {(cat as any).title ?? t((cat as any).titleKey)}
             </h2>
             <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              {t(cat.descKey)}
+              {(cat as any).desc ?? t((cat as any).descKey)}
             </p>
             <div className="mt-4 flex items-center gap-1 text-sm font-medium" style={{ color: cat.color }}>
               {t('vocabulary.open')} <span className="transition-transform group-hover:translate-x-1">→</span>
