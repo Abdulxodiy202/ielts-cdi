@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Heart, ChevronLeft } from 'lucide-react'
+import { Heart, ChevronLeft, Pencil } from 'lucide-react'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Word {
@@ -57,22 +57,29 @@ export default function LinkingWordsPage() {
   const [words,    setWords]    = useState<Word[]>([])
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [loading,  setLoading]  = useState(true)
-  const [levelTab, setLevelTab] = useState('Barchasi')
-  const [catTab,   setCatTab]   = useState('Barchasi')
+  const [levelTab,   setLevelTab]   = useState('Barchasi')
+  const [catTab,     setCatTab]     = useState('Barchasi')
+  const [notes,      setNotes]      = useState<Record<string, string>>({})
+  const [openNoteId, setOpenNoteId] = useState<string | null>(null)
+  const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'saving' | 'idle'>>({})
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const LEVEL_ORDER: Record<string, number> = { beginner: 1, elementary: 2, intermediate: 3, advanced: 4 }
 
   useEffect(() => {
-    fetch('/api/vocabulary/linking-words')
-      .then(r => r.ok ? r.json() : { words: [], savedIds: [] })
-      .then(d => {
-        const raw: Word[] = Array.isArray(d) ? d : (d.words ?? [])
-        raw.sort((a, b) => (LEVEL_ORDER[a.level] ?? 9) - (LEVEL_ORDER[b.level] ?? 9))
-        setWords(raw)
-        setSavedIds(Array.isArray(d.savedIds) ? d.savedIds : [])
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch('/api/vocabulary/linking-words').then(r => r.ok ? r.json() : { words: [], savedIds: [] }),
+      fetch('/api/vocabulary/notes?word_type=linking').then(r => r.ok ? r.json() : { notes: [] }),
+    ]).then(([d, n]) => {
+      const raw: Word[] = Array.isArray(d) ? d : (d.words ?? [])
+      raw.sort((a, b) => (LEVEL_ORDER[a.level] ?? 9) - (LEVEL_ORDER[b.level] ?? 9))
+      setWords(raw)
+      setSavedIds(Array.isArray(d.savedIds) ? d.savedIds : [])
+      const map: Record<string, string> = {}
+      ;(n.notes ?? []).forEach((item: { word_id: string; note: string }) => { map[item.word_id] = item.note })
+      setNotes(map)
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
 
   const toggleSave = async (wordId: string) => {
@@ -94,6 +101,25 @@ export default function LinkingWordsPage() {
       /* Revert */
       setSavedIds(prev => wasSaved ? [...prev, wordId] : prev.filter(id => id !== wordId))
     }
+  }
+
+  const handleNoteChange = (wordId: string, value: string) => {
+    setNotes(prev => ({ ...prev, [wordId]: value }))
+    if (saveTimers.current[wordId]) clearTimeout(saveTimers.current[wordId])
+    saveTimers.current[wordId] = setTimeout(async () => {
+      setSaveStatus(prev => ({ ...prev, [wordId]: 'saving' }))
+      try {
+        await fetch('/api/vocabulary/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word_id: wordId, word_type: 'linking', note: value }),
+        })
+        setSaveStatus(prev => ({ ...prev, [wordId]: 'saved' }))
+        setTimeout(() => setSaveStatus(prev => ({ ...prev, [wordId]: 'idle' })), 2000)
+      } catch {
+        setSaveStatus(prev => ({ ...prev, [wordId]: 'idle' }))
+      }
+    }, 800)
   }
 
   const isSavedTab = levelTab === 'saved'
@@ -242,13 +268,26 @@ export default function LinkingWordsPage() {
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full capitalize"
                       style={{ background: lc.bg, color: lc.color }}>{w.level}</span>
                   </div>
-                  <button onClick={() => toggleSave(w.id)}
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110"
-                    style={{ background: isSaved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                    <Heart size={15}
-                      fill={isSaved ? '#ef4444' : 'none'}
-                      style={{ color: isSaved ? '#ef4444' : 'var(--text-muted)', transition: 'color .15s, fill .15s' }} />
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button onClick={() => setOpenNoteId(openNoteId === w.id ? null : w.id)}
+                      className="relative w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                      style={{
+                        background: notes[w.id] ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)',
+                        border: '1px solid var(--border)',
+                      }}>
+                      <Pencil size={13} style={{ color: notes[w.id] ? 'var(--accent)' : 'var(--text-muted)', transition: 'color .15s' }} />
+                      {notes[w.id] && (
+                        <span style={{ position: 'absolute', top: 2, right: 2, width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+                      )}
+                    </button>
+                    <button onClick={() => toggleSave(w.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                      style={{ background: isSaved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                      <Heart size={15}
+                        fill={isSaved ? '#ef4444' : 'none'}
+                        style={{ color: isSaved ? '#ef4444' : 'var(--text-muted)', transition: 'color .15s, fill .15s' }} />
+                    </button>
+                  </div>
                 </div>
                 <div className="grid sm:grid-cols-2 gap-2 mb-3">
                   <div>
@@ -265,6 +304,38 @@ export default function LinkingWordsPage() {
                   <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
                     &ldquo;<HighlightedSentence sentence={w.example_sentence} word={w.word} />&rdquo;
                   </p>
+                </div>
+
+                {/* Note accordion */}
+                <div style={{ overflow: 'hidden', maxHeight: openNoteId === w.id ? 260 : 0, transition: 'max-height 0.25s ease' }}>
+                  <div style={{ borderTop: '1px dashed var(--border)', marginTop: 12, paddingTop: 10 }}>
+                    <textarea
+                      value={notes[w.id] ?? ''}
+                      onChange={e => handleNoteChange(w.id, e.target.value)}
+                      onInput={e => {
+                        const el = e.currentTarget
+                        el.style.height = 'auto'
+                        el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+                      }}
+                      placeholder="Bu so'z haqida eslatma yozing... (misollar, qoidalar, o'zingizning jumlalaringiz)"
+                      rows={3}
+                      style={{
+                        width: '100%', minHeight: 80, maxHeight: 200,
+                        background: 'transparent', border: 'none', outline: 'none',
+                        resize: 'none', fontSize: 13, lineHeight: 1.6,
+                        color: 'var(--text-secondary)', fontFamily: 'inherit',
+                      }}
+                    />
+                    <div className="flex items-center justify-between" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      <button onClick={() => setOpenNoteId(null)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}>
+                        × Yopish
+                      </button>
+                      <span style={{ color: saveStatus[w.id] === 'saved' ? '#22c55e' : 'var(--text-muted)' }}>
+                        {saveStatus[w.id] === 'saving' ? 'Saqlanmoqda...' : saveStatus[w.id] === 'saved' ? '✓ Saqlandi' : ''}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )
