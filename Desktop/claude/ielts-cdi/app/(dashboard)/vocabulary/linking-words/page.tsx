@@ -59,7 +59,6 @@ export default function LinkingWordsPage() {
   const [loading,  setLoading]  = useState(true)
   const [levelTab, setLevelTab] = useState('Barchasi')
   const [catTab,   setCatTab]   = useState('Barchasi')
-  const [showSaved, setShowSaved] = useState(false)
 
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
@@ -93,15 +92,15 @@ export default function LinkingWordsPage() {
     }
   }
 
+  const isSavedTab = levelTab === 'saved'
+
   const filtered = useMemo(() => {
     let list = words
-    if (showSaved) list = list.filter(w => savedIds.includes(w.id))
-    if (!showSaved) {
-      if (levelTab !== 'Barchasi') list = list.filter(w => w.level.toLowerCase() === levelTab.toLowerCase())
-      if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
-    }
+    if (isSavedTab) return list.filter(w => savedIds.includes(w.id))
+    if (levelTab !== 'Barchasi') list = list.filter(w => w.level.toLowerCase() === levelTab.toLowerCase())
+    if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
     return list
-  }, [words, savedIds, showSaved, levelTab, catTab])
+  }, [words, savedIds, isSavedTab, levelTab, catTab])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -157,65 +156,52 @@ export default function LinkingWordsPage() {
         </div>
       </div>
 
-      {/* ── Saved tab row ─── */}
-      <div className="flex items-center gap-2 mb-3">
-        <button onClick={() => setShowSaved(false)}
-          className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
-          style={{
-            background: !showSaved ? 'var(--accent)' : 'var(--bg-secondary)',
-            color:      !showSaved ? '#fff' : 'var(--text-secondary)',
-            border:     !showSaved ? 'none' : '1px solid var(--border)',
-          }}>
-          Barchasi
-        </button>
-        <button onClick={() => setShowSaved(true)}
+      {/* ── Row 1: Level + Saqlangan tab ─── */}
+      <div className="flex flex-wrap gap-1.5 mb-3">
+        {LEVELS.map(lv => (
+          <button key={lv} onClick={() => setLevelTab(lv)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+            style={{
+              background: levelTab === lv ? 'var(--accent)' : 'var(--bg-secondary)',
+              color:      levelTab === lv ? '#fff' : 'var(--text-secondary)',
+              border:     levelTab === lv ? 'none' : '1px solid var(--border)',
+            }}>
+            {lv}
+          </button>
+        ))}
+        <button onClick={() => setLevelTab('saved')}
           className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
           style={{
-            background: showSaved ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
-            color:      showSaved ? '#ef4444' : 'var(--text-secondary)',
-            border:     showSaved ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
+            background: isSavedTab ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
+            color:      isSavedTab ? '#ef4444' : 'var(--text-secondary)',
+            border:     isSavedTab ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
           }}>
-          <Heart size={11} fill={showSaved ? '#ef4444' : 'none'} />
-          Saqlangan {savedIds.length > 0 && `(${savedIds.length})`}
+          <Heart size={11} fill={isSavedTab ? '#ef4444' : 'none'} />
+          Saqlangan{savedIds.length > 0 ? ` (${savedIds.length})` : ''}
         </button>
       </div>
 
-      {/* ── Level + Category filters (hidden in saved mode) ─── */}
-      {!showSaved && (
-        <>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {LEVELS.map(lv => (
-              <button key={lv} onClick={() => setLevelTab(lv)}
+      {/* ── Row 2: Category filter (hidden when Saqlangan active) ─── */}
+      {!isSavedTab && (
+        <div className="flex flex-wrap gap-1.5 mb-6">
+          {CATEGORIES.map(cat => {
+            const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+            const active = catTab === cat
+            return (
+              <button key={cat} onClick={() => setCatTab(cat)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
                 style={{
-                  background: levelTab === lv ? 'var(--accent)' : 'var(--bg-secondary)',
-                  color:      levelTab === lv ? '#fff' : 'var(--text-secondary)',
-                  border:     levelTab === lv ? 'none' : '1px solid var(--border)',
+                  background: active ? (cc?.bg ?? 'var(--accent)') : 'var(--bg-secondary)',
+                  color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
+                  border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
                 }}>
-                {lv}
+                {cat}
               </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1.5 mb-6">
-            {CATEGORIES.map(cat => {
-              const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
-              const active = catTab === cat
-              return (
-                <button key={cat} onClick={() => setCatTab(cat)}
-                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
-                  style={{
-                    background: active ? (cc?.bg ?? 'var(--accent)') : 'var(--bg-secondary)',
-                    color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
-                    border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
-                  }}>
-                  {cat}
-                </button>
-              )
-            })}
-          </div>
-        </>
+            )
+          })}
+        </div>
       )}
-      {showSaved && <div className="mb-6" />}
+      {isSavedTab && <div className="mb-6" />}
 
       {/* ── Word cards ─── */}
       {loading ? (
@@ -228,9 +214,9 @@ export default function LinkingWordsPage() {
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center rounded-2xl"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <div className="text-4xl mb-3">{showSaved ? '❤️' : '🔍'}</div>
+          <div className="text-4xl mb-3">{isSavedTab ? '❤️' : '🔍'}</div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-            {showSaved
+            {isSavedTab
               ? "Hali saqlangan so'zlar yo'q — yurak tugmasini bosing"
               : words.length === 0 ? "Hali so'zlar qo'shilmagan" : 'Bu filtrlarga mos so\'z topilmadi'}
           </p>
