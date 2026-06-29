@@ -31,7 +31,7 @@ const LVL_COLORS: Record<string, { bg: string; color: string }> = {
 }
 
 const LEVELS     = ['Barchasi', 'Beginner', 'Elementary', 'Intermediate', 'Advanced']
-const CATEGORIES = ['Barchasi', 'Task 1', 'Task 2', 'Both']
+const CATEGORIES = ['Barchasi', 'Task 1', 'Task 2']
 
 function HighlightedSentence({ sentence, word }: { sentence: string; word: string }) {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -101,6 +101,12 @@ export default function WritingCollocationPage() {
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
     words.forEach(w => { c[w.level] = (c[w.level] ?? 0) + 1 })
+    return c
+  }, [words])
+
+  const catCounts = useMemo(() => {
+    const c: Record<string, number> = {}
+    words.forEach(w => { c[w.category] = (c[w.category] ?? 0) + 1 })
     return c
   }, [words])
 
@@ -183,6 +189,7 @@ export default function WritingCollocationPage() {
           {CATEGORIES.map(cat => {
             const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
             const active = catTab === cat
+            const n      = cat === 'Barchasi' ? words.length : (catCounts[cat] ?? 0)
             return (
               <button key={cat} onClick={() => setCatTab(cat)}
                 className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
@@ -191,7 +198,7 @@ export default function WritingCollocationPage() {
                   color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
                   border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
                 }}>
-                {cat}
+                {cat}{n > 0 ? ` (${n})` : ''}
               </button>
             )
           })}
