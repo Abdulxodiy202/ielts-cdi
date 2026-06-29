@@ -33,7 +33,6 @@ const LVL_COLORS: Record<string, { bg: string; color: string }> = {
 const LEVELS     = ['Barchasi', 'Beginner', 'Elementary', 'Intermediate', 'Advanced']
 const CATEGORIES = ['Barchasi', 'Task 1', 'Task 2', 'Both']
 
-/* ── Highlight collocation phrase in sentence ────────────────────── */
 function HighlightedSentence({ sentence, word }: { sentence: string; word: string }) {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const parts   = sentence.split(new RegExp(`(${escaped})`, 'i'))
@@ -50,59 +49,55 @@ function HighlightedSentence({ sentence, word }: { sentence: string; word: strin
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function WritingCollocationPage() {
-  const router   = useRouter()
-  const [words,    setWords]    = useState<Word[]>([])
-  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
-  const [loading,  setLoading]  = useState(true)
-  const [levelTab, setLevelTab] = useState('Barchasi')
-  const [catTab,   setCatTab]   = useState('Barchasi')
+  const router = useRouter()
+  const [words,     setWords]     = useState<Word[]>([])
+  const [savedIds,  setSavedIds]  = useState<string[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [levelTab,  setLevelTab]  = useState('Barchasi')
+  const [catTab,    setCatTab]    = useState('Barchasi')
+  const [showSaved, setShowSaved] = useState(false)
 
   useEffect(() => {
     fetch('/api/vocabulary/writing-collocations')
       .then(r => r.ok ? r.json() : { words: [], savedIds: [] })
       .then(d => {
         setWords(Array.isArray(d) ? d : (d.words ?? []))
-        setSavedIds(new Set(d.savedIds ?? []))
+        setSavedIds(Array.isArray(d.savedIds) ? d.savedIds : [])
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
 
-  /* Optimistic heart toggle */
   const toggleSave = async (wordId: string) => {
-    const wasSaved = savedIds.has(wordId)
-    setSavedIds(prev => {
-      const next = new Set(prev)
-      wasSaved ? next.delete(wordId) : next.add(wordId)
-      return next
-    })
+    const wasSaved = savedIds.includes(wordId)
+    /* Optimistic */
+    setSavedIds(prev => wasSaved ? prev.filter(id => id !== wordId) : [...prev, wordId])
+
     try {
       const res = await fetch('/api/vocabulary/writing-collocations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word_id: wordId }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) throw new Error(await res.text())
       const { saved } = await res.json()
-      setSavedIds(prev => {
-        const next = new Set(prev)
-        saved ? next.add(wordId) : next.delete(wordId)
-        return next
-      })
-    } catch {
-      setSavedIds(prev => {
-        const next = new Set(prev)
-        wasSaved ? next.add(wordId) : next.delete(wordId)
-        return next
-      })
+      setSavedIds(prev => saved ? [...prev.filter(id => id !== wordId), wordId] : prev.filter(id => id !== wordId))
+    } catch (err) {
+      console.error('[WC] toggleSave error:', err)
+      /* Revert */
+      setSavedIds(prev => wasSaved ? [...prev, wordId] : prev.filter(id => id !== wordId))
     }
   }
 
-  const filtered = useMemo(() => words.filter(w => {
-    const lvlOk = levelTab === 'Barchasi' || w.level.toLowerCase() === levelTab.toLowerCase()
-    const catOk = catTab   === 'Barchasi' || w.category === catTab
-    return lvlOk && catOk
-  }), [words, levelTab, catTab])
+  const filtered = useMemo(() => {
+    let list = words
+    if (showSaved) list = list.filter(w => savedIds.includes(w.id))
+    if (!showSaved) {
+      if (levelTab !== 'Barchasi') list = list.filter(w => w.level.toLowerCase() === levelTab.toLowerCase())
+      if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+    }
+    return list
+  }, [words, savedIds, showSaved, levelTab, catTab])
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {}
@@ -113,22 +108,19 @@ export default function WritingCollocationPage() {
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
 
-      {/* ── Back button + breadcrumb ─── */}
+      {/* ── Header ─── */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
           <Link href="/vocabulary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Lug'at</Link>
           <span>/</span>
           <span style={{ color: 'var(--text-primary)' }}>Writing Collocations</span>
         </div>
-        <button
-          onClick={() => router.push('/vocabulary')}
+        <button onClick={() => router.push('/vocabulary')}
           className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
-          style={{ color: 'var(--text-muted)' }}
-        >
+          style={{ color: 'var(--text-muted)' }}>
           <ChevronLeft size={16} /> Lug'at ga qaytish
         </button>
 
-        {/* Title row */}
         <div className="flex items-start gap-4 mb-5">
           <div style={{
             width: 52, height: 52, borderRadius: 14, flexShrink: 0,
@@ -136,17 +128,13 @@ export default function WritingCollocationPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
           }}>✍️</div>
           <div>
-            <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-              Writing Collocations
-            </h1>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              IELTS Writing Task 1 va Task 2 uchun muhim collocation va iboralar
-            </p>
+            <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Writing Collocations</h1>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS Writing Task 1 va Task 2 uchun muhim collocation va iboralar</p>
           </div>
         </div>
 
         {/* Stat bar */}
-        <div className="flex flex-wrap items-center gap-2 mb-1">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium px-3 py-1.5 rounded-full"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
             Jami: <strong style={{ color: 'var(--text-primary)' }}>{words.length}</strong> so'z
@@ -165,39 +153,65 @@ export default function WritingCollocationPage() {
         </div>
       </div>
 
-      {/* ── Level filter tabs ─── */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {LEVELS.map(lv => (
-          <button key={lv} onClick={() => setLevelTab(lv)}
-            className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
-            style={{
-              background: levelTab === lv ? 'var(--accent)' : 'var(--bg-secondary)',
-              color:      levelTab === lv ? '#fff' : 'var(--text-secondary)',
-              border:     levelTab === lv ? 'none' : '1px solid var(--border)',
-            }}>
-            {lv}
-          </button>
-        ))}
+      {/* ── Saved tab row ─── */}
+      <div className="flex items-center gap-2 mb-3">
+        <button onClick={() => setShowSaved(false)}
+          className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+          style={{
+            background: !showSaved ? 'var(--accent)' : 'var(--bg-secondary)',
+            color:      !showSaved ? '#fff' : 'var(--text-secondary)',
+            border:     !showSaved ? 'none' : '1px solid var(--border)',
+          }}>
+          Barchasi
+        </button>
+        <button onClick={() => setShowSaved(true)}
+          className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+          style={{
+            background: showSaved ? 'rgba(239,68,68,0.1)' : 'var(--bg-secondary)',
+            color:      showSaved ? '#ef4444' : 'var(--text-secondary)',
+            border:     showSaved ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
+          }}>
+          <Heart size={11} fill={showSaved ? '#ef4444' : 'none'} />
+          Saqlangan {savedIds.length > 0 && `(${savedIds.length})`}
+        </button>
       </div>
 
-      {/* ── Category filter tabs ─── */}
-      <div className="flex flex-wrap gap-1.5 mb-6">
-        {CATEGORIES.map(cat => {
-          const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
-          const active = catTab === cat
-          return (
-            <button key={cat} onClick={() => setCatTab(cat)}
-              className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
-              style={{
-                background: active ? (cc?.bg ?? 'var(--accent)') : 'var(--bg-secondary)',
-                color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
-                border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
-              }}>
-              {cat}
-            </button>
-          )
-        })}
-      </div>
+      {/* ── Level + Category filters (hidden in saved mode) ─── */}
+      {!showSaved && (
+        <>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {LEVELS.map(lv => (
+              <button key={lv} onClick={() => setLevelTab(lv)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                style={{
+                  background: levelTab === lv ? 'var(--accent)' : 'var(--bg-secondary)',
+                  color:      levelTab === lv ? '#fff' : 'var(--text-secondary)',
+                  border:     levelTab === lv ? 'none' : '1px solid var(--border)',
+                }}>
+                {lv}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-6">
+            {CATEGORIES.map(cat => {
+              const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+              const active = catTab === cat
+              return (
+                <button key={cat} onClick={() => setCatTab(cat)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                  style={{
+                    background: active ? (cc?.bg ?? 'var(--accent)') : 'var(--bg-secondary)',
+                    color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
+                    border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
+                  }}>
+                  {cat}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+      {showSaved && <div className="mb-6" />}
 
       {/* ── Word cards ─── */}
       {loading ? (
@@ -210,9 +224,11 @@ export default function WritingCollocationPage() {
       ) : filtered.length === 0 ? (
         <div className="py-20 text-center rounded-2xl"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-          <div className="text-4xl mb-3">🔍</div>
+          <div className="text-4xl mb-3">{showSaved ? '❤️' : '🔍'}</div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-            {words.length === 0 ? "Hali so'zlar qo'shilmagan" : 'Bu filtrlarga mos so\'z topilmadi'}
+            {showSaved
+              ? "Hali saqlangan so'zlar yo'q — yurak tugmasini bosing"
+              : words.length === 0 ? "Hali so'zlar qo'shilmagan" : "Bu filtrlarga mos so'z topilmadi"}
           </p>
         </div>
       ) : (
@@ -220,57 +236,38 @@ export default function WritingCollocationPage() {
           {filtered.map(w => {
             const cc      = CAT_COLORS[w.category] ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
             const lc      = LVL_COLORS[w.level]    ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
-            const isSaved = savedIds.has(w.id)
+            const isSaved = savedIds.includes(w.id)
             return (
               <div key={w.id} className="rounded-2xl p-5 transition-all hover:shadow-md"
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-
-                {/* Top row */}
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex items-center flex-wrap gap-2">
-                    <span className="font-bold" style={{ fontSize: 17, color: 'var(--text-primary)' }}>
-                      {w.word}
-                    </span>
+                    <span className="font-bold" style={{ fontSize: 17, color: 'var(--text-primary)' }}>{w.word}</span>
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: cc.bg, color: cc.color }}>
-                      {w.category}
-                    </span>
+                      style={{ background: cc.bg, color: cc.color }}>{w.category}</span>
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full capitalize"
-                      style={{ background: lc.bg, color: lc.color }}>
-                      {w.level}
-                    </span>
+                      style={{ background: lc.bg, color: lc.color }}>{w.level}</span>
                   </div>
-                  <button
-                    onClick={() => toggleSave(w.id)}
+                  <button onClick={() => toggleSave(w.id)}
                     className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110"
-                    style={{
-                      background: isSaved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)',
-                      border: '1px solid var(--border)',
-                    }}>
+                    style={{ background: isSaved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                     <Heart size={15}
                       fill={isSaved ? '#ef4444' : 'none'}
                       style={{ color: isSaved ? '#ef4444' : 'var(--text-muted)', transition: 'color .15s, fill .15s' }} />
                   </button>
                 </div>
-
-                {/* Translations / definition */}
                 <div className="grid sm:grid-cols-2 gap-2 mb-3">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block"
-                      style={{ color: 'var(--text-muted)' }}>O'zbekcha</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>O'zbekcha</span>
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{w.uzbek_translation}</span>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block"
-                      style={{ color: 'var(--text-muted)' }}>Ta'rif</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>Ta'rif</span>
                     <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{w.english_definition}</span>
                   </div>
                 </div>
-
-                {/* Example sentence */}
                 <div style={{ borderLeft: `3px solid ${cc.color}`, paddingLeft: 12, paddingTop: 4, paddingBottom: 4 }}>
-                  <span className="text-xs font-semibold uppercase tracking-wide mb-1 block"
-                    style={{ color: 'var(--text-muted)' }}>Misol</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>Misol</span>
                   <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
                     &ldquo;<HighlightedSentence sentence={w.example_sentence} word={w.word} />&rdquo;
                   </p>

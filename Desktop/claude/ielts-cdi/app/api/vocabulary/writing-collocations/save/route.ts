@@ -8,23 +8,44 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { word_id } = await req.json()
+  let body: { word_id?: string }
+  try { body = await req.json() } catch { return Response.json({ error: 'Invalid JSON' }, { status: 400 }) }
+
+  const { word_id } = body
   if (!word_id) return Response.json({ error: 'word_id required' }, { status: 400 })
 
   const admin = createAdminClient()
 
-  const { data: existing } = await admin
+  const { data: existing, error: selectErr } = await admin
     .from('user_saved_writing_words')
     .select('id')
     .eq('user_id', user.id)
     .eq('word_id', word_id)
     .maybeSingle()
 
+  if (selectErr) {
+    console.error('[WC save] select error:', selectErr.message)
+    return Response.json({ error: selectErr.message }, { status: 500 })
+  }
+
   if (existing) {
-    await admin.from('user_saved_writing_words').delete().eq('id', existing.id)
+    const { error: delErr } = await admin
+      .from('user_saved_writing_words')
+      .delete()
+      .eq('id', existing.id)
+    if (delErr) {
+      console.error('[WC save] delete error:', delErr.message)
+      return Response.json({ error: delErr.message }, { status: 500 })
+    }
     return Response.json({ saved: false })
   } else {
-    await admin.from('user_saved_writing_words').insert({ user_id: user.id, word_id })
+    const { error: insErr } = await admin
+      .from('user_saved_writing_words')
+      .insert({ user_id: user.id, word_id })
+    if (insErr) {
+      console.error('[WC save] insert error:', insErr.message)
+      return Response.json({ error: insErr.message }, { status: 500 })
+    }
     return Response.json({ saved: true })
   }
 }
