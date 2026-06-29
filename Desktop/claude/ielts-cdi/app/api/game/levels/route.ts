@@ -11,7 +11,7 @@ export async function GET() {
   const admin = createAdminClient()
 
   const [levelsRes, progressRes] = await Promise.all([
-    admin.from('game_levels').select('level_number, title, description, difficulty').eq('is_active', true).order('level_number'),
+    admin.from('game_levels').select('level_number, title, description, difficulty, category').eq('is_active', true).order('level_number'),
     admin.from('game_progress').select('level_number, score, max_score, is_completed').eq('user_id', user.id),
   ])
 
@@ -37,6 +37,7 @@ export async function GET() {
       title: meta?.title ?? `Level ${num}`,
       description: meta?.description ?? null,
       difficulty: meta?.difficulty ?? 'medium',
+      category: meta?.category ?? null,
       status,
       score: prog?.score ?? 0,
       max_score: prog?.max_score ?? 5,

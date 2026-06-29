@@ -9,6 +9,7 @@ interface Level {
   level_number: number
   title: string
   difficulty: string
+  category: string | null
   status: 'completed' | 'current' | 'locked'
   score: number
   max_score: number
@@ -17,17 +18,15 @@ interface Level {
 /* ── Layout constants ─────────────────────────────────────────────── */
 const COLS = 5
 const ROWS = 20
-const SW   = 56     // stone width/height
+const SW   = 72     // stone width/height
 const BR   = 14     // border-radius
-const CSP  = 86     // col spacing center-to-center
-const RSP  = 96     // row spacing
-const PX   = 52     // padding to first stone center
-const PY   = 72
+const CSP  = 94     // col spacing center-to-center (72+22 gap)
+const RSP  = 100    // row spacing
+const PX   = 56     // padding to first stone center
+const PY   = 80
 
-const CW = PX * 2 + (COLS - 1) * CSP   // 448
-const CH = PY * 2 + (ROWS - 1) * RSP + SW  // 2024
-
-const MILESTONES: Record<number, string> = { 10: '🌟', 20: '🏆', 50: '💎', 100: '👑' }
+const CW = PX * 2 + (COLS - 1) * CSP   // 488
+const CH = PY * 2 + (ROWS - 1) * RSP + SW  // 2072
 
 /* ── Position (level 1 at bottom) ────────────────────────────────── */
 function stonePos(n: number) {
@@ -51,7 +50,7 @@ function buildPath(pts: { x: number; y: number }[]): string {
     const p1 = pts[i]
     if (i % COLS === 0) {
       const vRow0 = ROWS - 1 - Math.floor((i - 1) / COLS)
-      const bump  = vRow0 % 2 === 1 ? -36 : 36
+      const bump  = vRow0 % 2 === 1 ? -40 : 40
       const midY  = (p0.y + p1.y) / 2
       d += ` Q${p0.x + bump},${midY} ${p1.x},${p1.y}`
     } else {
@@ -125,6 +124,8 @@ export default function GamesPage() {
     const pts = Array.from({ length: doneN }, (_, i) => stonePos(i + 1))
     return buildPath(pts)
   }, [doneN])
+
+  const half = SW / 2
 
   return (
     <>
@@ -226,7 +227,7 @@ export default function GamesPage() {
 
               {/* Track (full) */}
               <path d={FULL_D} fill="none"
-                stroke="rgba(255,255,255,0.05)" strokeWidth={14}
+                stroke="rgba(255,255,255,0.05)" strokeWidth={16}
                 strokeLinejoin="round" strokeLinecap="round" />
               <path d={FULL_D} fill="none"
                 stroke="rgba(255,255,255,0.1)" strokeWidth={2}
@@ -237,7 +238,7 @@ export default function GamesPage() {
               {greenD && (
                 <>
                   <path d={greenD} fill="none"
-                    stroke="rgba(34,197,94,0.22)" strokeWidth={14}
+                    stroke="rgba(34,197,94,0.22)" strokeWidth={16}
                     strokeLinejoin="round" strokeLinecap="round" />
                   <path d={greenD} fill="none"
                     stroke="#22c55e" strokeWidth={2.5}
@@ -256,8 +257,7 @@ export default function GamesPage() {
               const isDone   = st === 'completed'
               const isCur    = st === 'current'
               const isLocked = st === 'locked'
-              const ms       = MILESTONES[n]
-              const half     = SW / 2
+              const cat      = lvl?.category ?? null
 
               let bg      = ''
               let bord    = ''
@@ -279,6 +279,9 @@ export default function GamesPage() {
                 opacity = 0.55
               }
 
+              const numColor  = isDone ? '#fff' : isCur ? '#e0e7ff' : 'rgba(255,255,255,0.35)'
+              const catColor  = isDone ? 'rgba(255,255,255,0.75)' : isCur ? 'rgba(224,231,255,0.8)' : 'rgba(255,255,255,0.2)'
+
               return (
                 <div
                   key={n}
@@ -295,14 +298,17 @@ export default function GamesPage() {
                     cursor: isLocked ? 'default' : 'pointer',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
+                    gap: 2,
+                    padding: '0 5px',
                     zIndex: isCur ? 20 : 10,
                     transition: 'transform .15s, opacity .15s',
                     userSelect: 'none',
+                    boxSizing: 'border-box',
                   }}
                   onMouseEnter={e => {
                     if (!isLocked) {
                       const el = e.currentTarget as HTMLDivElement
-                      el.style.transform = 'scale(1.1)'
+                      el.style.transform = 'scale(1.08)'
                       el.style.opacity   = '1'
                     }
                   }}
@@ -312,53 +318,24 @@ export default function GamesPage() {
                     el.style.opacity   = String(opacity)
                   }}
                 >
-                  {/* Inner content */}
-                  {isDone ? (
-                    ms
-                      ? <span style={{ fontSize: 22, lineHeight: 1 }}>{ms}</span>
-                      : <svg width="18" height="14" viewBox="0 0 18 14" fill="none">
-                          <path d="M1 7L6 12L17 1" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                  ) : isCur ? (
-                    ms
-                      ? <span style={{ fontSize: 22, lineHeight: 1 }}>{ms}</span>
-                      : <svg width="14" height="16" viewBox="0 0 14 16" fill="none">
-                          <path d="M1 1L13 8L1 15V1Z" fill="white" />
-                        </svg>
-                  ) : (
-                    ms
-                      ? <span style={{ fontSize: 20, opacity: 0.3, lineHeight: 1 }}>{ms}</span>
-                      : <svg width="14" height="17" viewBox="0 0 14 17" fill="none">
-                          <rect x="1" y="7" width="12" height="9" rx="2" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
-                          <path d="M4 7V5a3 3 0 0 1 6 0v2" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                  )}
-
-                  {/* Level number above node */}
-                  <div style={{
-                    position: 'absolute', top: -17,
-                    fontSize: 11, fontWeight: 700, letterSpacing: '-.2px',
-                    color: isDone ? '#4ade80' : isCur ? '#a5b4fc' : 'rgba(255,255,255,0.2)',
-                    textShadow: '0 1px 4px rgba(0,0,0,.95)',
-                    whiteSpace: 'nowrap',
+                  {/* Level number */}
+                  <span style={{
+                    fontSize: 13, fontWeight: 800, lineHeight: 1,
+                    color: numColor, letterSpacing: '-.3px',
                   }}>
                     {n}
-                  </div>
+                  </span>
 
-                  {/* Score dots for completed */}
-                  {isDone && lvl && !ms && (
-                    <div style={{
-                      position: 'absolute', bottom: -14,
-                      display: 'flex', gap: 2,
-                    }}>
-                      {Array.from({ length: lvl.max_score }, (_, k) => (
-                        <div key={k} style={{
-                          width: 4, height: 4, borderRadius: '50%',
-                          background: k < lvl.score ? '#fbbf24' : 'rgba(255,255,255,0.15)',
-                        }} />
-                      ))}
-                    </div>
-                  )}
+                  {/* Category name */}
+                  <span style={{
+                    fontSize: 9, fontWeight: 600, lineHeight: 1,
+                    color: catColor, letterSpacing: '.1px',
+                    maxWidth: SW - 10,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    textAlign: 'center',
+                  }}>
+                    {cat ?? (isDone ? '✓' : isCur ? '▶' : '🔒')}
+                  </span>
                 </div>
               )
             })}
@@ -368,7 +345,7 @@ export default function GamesPage() {
               <div style={{
                 position: 'absolute',
                 left: curPos.x - 14,
-                top:  curPos.y - SW / 2 - 38,
+                top:  curPos.y - half - 40,
                 fontSize: 24, width: 28, textAlign: 'center', lineHeight: '28px',
                 zIndex: 30,
                 animation: 'studentBounce .85s ease-in-out infinite',
