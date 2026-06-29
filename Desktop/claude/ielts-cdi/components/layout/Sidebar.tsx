@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
-  PenLine, Mic, BookMarked, FileText, Video, Sparkles,
+  PenLine, Mic, BookMarked, FileText, Video, Sparkles, Globe, Palette,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -43,7 +43,6 @@ function fmtMsgTime(iso: string): string {
   return `${d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })} ${hhmm}`
 }
 
-/** "09 Jun 2026" */
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-GB', {
@@ -59,9 +58,7 @@ function displayPremiumSince(profile: Profile): string {
   return fmtDate(d.toISOString())
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-   Sidebar
-   в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* ── Sidebar ─────────────────────────────────────────────────────── */
 export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
@@ -69,7 +66,7 @@ export function Sidebar() {
   const { t, lang, setLang } = useLanguage()
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [upgradeOpen,     setUpgradeOpen]      = useState(false)
-  const [profileOpen,     setProfileOpen]      = useState(false)
+  const [settingsOpen,    setSettingsOpen]     = useState(false)
   const [profile,         setProfile]          = useState<Profile | null>(null)
   const [toasts,          setToasts]           = useState<ToastData[]>([])
   const [nameInput,       setNameInput]        = useState('')
@@ -79,7 +76,6 @@ export function Sidebar() {
   const [messages,        setMessages]         = useState<AdminMessage[]>([])
   const [msgsOpen,        setMsgsOpen]         = useState(false)
   const [msgTableMissing, setMsgTableMissing]  = useState(false)
-  const msgsRef = useRef<HTMLDivElement>(null)
 
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const profileRef    = useRef<Profile | null>(null)
@@ -125,12 +121,11 @@ export function Sidebar() {
     },
   ]
 
-  /* в”Ђв”Ђ Initial profile fetch в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Initial profile fetch ─────────────────────────────────────── */
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
 
-    // Try with premium_since first; fall back if column not yet migrated (pg 42703)
     supabase
       .from('profiles')
       .select('full_name, avatar_url, is_premium, premium_since, premium_until')
@@ -151,12 +146,7 @@ export function Sidebar() {
       })
   }, [user?.id])
 
-  // Sync name input whenever popup opens
-  useEffect(() => {
-    if (profileOpen) setNameInput(profile?.full_name ?? '')
-  }, [profileOpen, profile?.full_name])
-
-  /* в”Ђв”Ђ Toast helpers в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Toast helpers ─────────────────────────────────────────────── */
   const addToast = useCallback((message: string, type: ToastData['type']) => {
     const id = `${Date.now()}-${Math.random()}`
     setToasts(prev => [...prev, { id, message, type }])
@@ -166,7 +156,7 @@ export function Sidebar() {
     setToasts(prev => prev.filter(toast => toast.id !== id))
   }, [])
 
-  /* в”Ђв”Ђ Realtime subscriptions в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Realtime subscriptions ────────────────────────────────────── */
   useEffect(() => {
     if (!user?.id) return
     const supabase = createClient()
@@ -199,7 +189,7 @@ export function Sidebar() {
         (payload) => {
           const row = payload.new as { status: string; booking_date: string; time_slot: string }
           if (row.status === 'confirmed') {
-            addToast(`вњ… Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
+            addToast(`✅ Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
           }
         }
       )
@@ -211,7 +201,7 @@ export function Sidebar() {
     }
   }, [user?.id, addToast])
 
-  /* ── Admin messages: fetch + 10-second polling ───────────────────────── */
+  /* ── Admin messages: fetch + 10-second polling ─────────────────── */
   useEffect(() => {
     if (!user?.id) return
 
@@ -228,18 +218,6 @@ export function Sidebar() {
     return () => clearInterval(interval)
   }, [user?.id])
 
-  // Close messages panel on outside click
-  useEffect(() => {
-    if (!msgsOpen) return
-    const handler = (e: MouseEvent) => {
-      if (msgsRef.current && !msgsRef.current.contains(e.target as Node)) {
-        setMsgsOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [msgsOpen])
-
   const handleMsgsOpen = async () => {
     const willOpen = !msgsOpen
     setMsgsOpen(willOpen)
@@ -252,12 +230,11 @@ export function Sidebar() {
     }
   }
 
-  /* в”Ђв”Ђ Avatar upload в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Avatar upload ─────────────────────────────────────────────── */
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
 
-    // Instant local preview
     setAvatarUploading(true)
     setLocalAvatarUrl(URL.createObjectURL(file))
 
@@ -283,7 +260,7 @@ export function Sidebar() {
     }
   }, [user, addToast])
 
-  /* в”Ђв”Ђ Save name в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Save name ─────────────────────────────────────────────────── */
   const handleSaveName = useCallback(async () => {
     if (!nameInput.trim()) return
     setNameSaving(true)
@@ -301,13 +278,14 @@ export function Sidebar() {
     setNameSaving(false)
   }, [nameInput, addToast])
 
-  /* в”Ђв”Ђ Derived values в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Derived values ────────────────────────────────────────────── */
   const displayName  = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || 'User'
   const avatarLetter = displayName[0].toUpperCase()
   const isPremium    = isActivePremium(profile)
   const avatarUrl    = localAvatarUrl ?? profile?.avatar_url ?? null
+  const unreadCount  = messages.filter(m => !m.is_read).length
 
-  /* в”Ђв”Ђ Sidebar markup в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  /* ── Sidebar markup ────────────────────────────────────────────── */
   const sidebarContent = (
     <div
       style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
@@ -373,48 +351,107 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Theme switcher */}
+      {/* ── Bottom section ─── */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-        <div className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>{t('common.theme')}</div>
-        <div className="flex gap-2">
-          {([
-            { id: 'dark'  as const, color: '#6366f1', label: t('common.dark')  },
-            { id: 'light' as const, color: '#94a3b8', label: t('common.light') },
-            { id: 'cyber' as const, color: '#10b981', label: t('common.cyber') },
-          ]).map(thm => (
-            <button
-              key={thm.id}
-              onClick={() => setTheme(thm.id)}
-              title={thm.label}
-              className="w-7 h-7 rounded-full border-2 transition-all"
-              style={{
-                background: thm.color,
-                borderColor: theme === thm.id ? 'white' : 'transparent',
-                transform: theme === thm.id ? 'scale(1.15)' : 'scale(1)',
-              }}
-            />
-          ))}
-        </div>
-      </div>
+        {user && (
+          <div className="relative">
 
-      {/* User section */}
-      <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
-        {user && !msgTableMissing && (
-          <div ref={msgsRef} className="relative mb-3">
-            <button
-              onClick={handleMsgsOpen}
-              className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-colors"
-              style={{ background: msgsOpen ? 'rgba(99,102,241,0.1)' : 'transparent', color: 'var(--text-secondary)' }}
-            >
-              <Bell size={16} />
-              <span>Xabarlar</span>
-              {messages.filter(m => !m.is_read).length > 0 && (
-                <span className="ml-auto flex items-center justify-center rounded-full text-white font-bold"
-                  style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 11 }}>
-                  {messages.filter(m => !m.is_read).length > 99 ? '99+' : messages.filter(m => !m.is_read).length}
-                </span>
+            {/* Hidden file input for avatar (wired but not shown inline) */}
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+
+            {/* ── Settings popover ─── */}
+            <AnimatePresence>
+              {settingsOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setSettingsOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute bottom-full left-0 z-20 mb-2"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '0.5px solid var(--border)',
+                      borderRadius: 12,
+                      padding: 12,
+                      width: 220,
+                      boxShadow: '0 -8px 24px rgba(0,0,0,0.25)',
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* Theme */}
+                    <div className="mb-3">
+                      <div className="flex items-center gap-1.5 mb-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                        <Palette size={12} /> {t('common.theme')}
+                      </div>
+                      <div className="flex gap-2">
+                        {([
+                          { id: 'dark'  as const, color: '#6366f1', label: t('common.dark')  },
+                          { id: 'light' as const, color: '#94a3b8', label: t('common.light') },
+                          { id: 'cyber' as const, color: '#10b981', label: t('common.cyber') },
+                        ]).map(thm => (
+                          <button key={thm.id} onClick={() => setTheme(thm.id)} title={thm.label}
+                            className="w-7 h-7 rounded-full border-2 transition-all"
+                            style={{
+                              background: thm.color,
+                              borderColor: theme === thm.id ? 'white' : 'transparent',
+                              transform: theme === thm.id ? 'scale(1.15)' : 'scale(1)',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Notifications */}
+                    {!msgTableMissing && (
+                      <button
+                        onClick={() => { setSettingsOpen(false); handleMsgsOpen() }}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80 mb-1"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        <Bell size={14} />
+                        <span>Xabarlar</span>
+                        {unreadCount > 0 && (
+                          <span className="ml-auto flex items-center justify-center rounded-full text-white font-bold"
+                            style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 11 }}>
+                            {unreadCount > 99 ? '99+' : unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Language */}
+                    <div className="mt-1 mb-1">
+                      <div className="flex items-center gap-1.5 mb-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                        <Globe size={12} /> Til
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setLang('en')} style={{ width: 48, height: 32, border: lang === 'en' ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', padding: 0, opacity: lang === 'en' ? 1 : 0.5, transition: 'all 0.2s' }}>
+                          <img src="https://flagcdn.com/w80/us.png" alt="English" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                        <button onClick={() => setLang('uz')} style={{ width: 48, height: 32, border: lang === 'uz' ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', padding: 0, opacity: lang === 'uz' ? 1 : 0.5, transition: 'all 0.2s' }}>
+                          <img src="https://flagcdn.com/w80/uz.png" alt="Uzbek" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ borderTop: '1px solid var(--border)', margin: '10px 0' }} />
+
+                    {/* Logout */}
+                    <button onClick={signOut}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
+                      style={{ color: '#ef4444' }}
+                    >
+                      <LogOut size={14} /> Chiqish
+                    </button>
+                  </motion.div>
+                </>
               )}
-            </button>
+            </AnimatePresence>
+
+            {/* ── Messages popup ─── */}
             <AnimatePresence>
               {msgsOpen && (
                 <>
@@ -440,7 +477,8 @@ export function Sidebar() {
                       ) : (
                         <div>
                           {messages.map((msg, i) => (
-                            <div key={msg.id} className="px-4 py-2.5" style={{ background: !msg.is_read ? 'rgba(99,102,241,0.05)' : 'transparent', borderBottom: i < messages.length - 1 ? '1px solid var(--border)' : 'none', opacity: !msg.is_read ? 1 : 0.75 }}>
+                            <div key={msg.id} className="px-4 py-2.5"
+                              style={{ background: !msg.is_read ? 'rgba(99,102,241,0.05)' : 'transparent', borderBottom: i < messages.length - 1 ? '1px solid var(--border)' : 'none', opacity: !msg.is_read ? 1 : 0.75 }}>
                               <div className="flex items-center gap-1.5 mb-1">
                                 <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Admin</span>
                                 {!msg.is_read && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#ef4444' }} />}
@@ -456,23 +494,22 @@ export function Sidebar() {
                 </>
               )}
             </AnimatePresence>
-          </div>
-        )}
 
-        {user && (
-          <div className="relative">
-            {/* Avatar row вЂ” click to open popup */}
+            {/* ── Avatar row (always visible) ─── */}
             <button
               type="button"
-              onClick={() => setProfileOpen(o => !o)}
-              className="flex items-center gap-3 w-full mb-3 rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:opacity-80"
-              style={{ background: profileOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
+              onClick={() => setSettingsOpen(o => !o)}
+              className="flex items-center gap-3 w-full rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:opacity-80"
+              style={{ background: settingsOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
             >
               <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 relative flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'var(--accent)' }}>
                 {avatarUrl
                   ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                   : avatarLetter}
+                {unreadCount > 0 && (
+                  <span style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid var(--bg-secondary)' }} />
+                )}
               </div>
               <div className="flex-1 min-w-0 text-left">
                 <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
@@ -492,193 +529,20 @@ export function Sidebar() {
                 </div>
               </div>
             </button>
-
-            {/* Profile settings popup */}
-            <AnimatePresence>
-              {profileOpen && (
-                <>
-                  {/* Click-outside backdrop */}
-                  <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
-
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-2xl overflow-hidden shadow-2xl"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 -8px 32px rgba(0,0,0,0.3)',
-                    }}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {/* Hidden file input */}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleAvatarUpload}
-                    />
-
-                    <div className="p-4 space-y-4">
-                      {/* Avatar upload */}
-                      <div className="flex justify-center pt-1">
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={avatarUploading}
-                          className="relative group"
-                          title={lang === 'uz' ? "Rasm o'zgartirish" : 'Change photo'}
-                        >
-                          <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center text-xl font-bold text-white"
-                            style={{ background: 'var(--accent)' }}>
-                            {avatarUrl
-                              ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                              : avatarLetter}
-                          </div>
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            {avatarUploading
-                              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              : <Camera size={16} className="text-white" />}
-                          </div>
-                        </button>
-                      </div>
-
-                      {/* Name field */}
-                      <div>
-                        <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                          {t('common.name')}
-                        </label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={nameInput}
-                            onChange={e => setNameInput(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-                            placeholder={lang === 'uz' ? 'Ismingiz' : 'Your name'}
-                            className="input-field text-sm flex-1 py-2"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleSaveName}
-                            disabled={nameSaving || !nameInput.trim()}
-                            className="btn-primary text-xs px-3 py-2 shrink-0 disabled:opacity-50"
-                          >
-                            {nameSaving ? '...' : t('common.save')}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Subscription info */}
-                      <div className="rounded-xl px-3 py-2.5 text-xs"
-                        style={{
-                          background: isPremium ? 'rgba(245,158,11,0.08)' : 'var(--bg-secondary)',
-                          border: `1px solid ${isPremium ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`,
-                        }}>
-                        {isPremium ? (
-                          <div className="space-y-1.5">
-                            <div className="flex items-center gap-1.5 font-semibold text-sm" style={{ color: 'var(--warning)' }}>
-                              <Crown size={13} /> {t('common.premiumActive')}
-                            </div>
-                            <div className="flex justify-between pt-0.5" style={{ color: 'var(--text-muted)' }}>
-                              <span>{t('common.premiumSince')}</span>
-                              <span style={{ color: 'var(--text-secondary)' }}>{profile ? displayPremiumSince(profile) : '—'}</span>
-                            </div>
-                            <div className="flex justify-between" style={{ color: 'var(--text-muted)' }}>
-                              <span>{t('common.premiumUntil')}</span>
-                              <span style={{ color: 'var(--text-secondary)' }}>{fmtDate(profile?.premium_until ?? null)}</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-1.5 font-medium" style={{ color: 'var(--text-muted)' }}>
-                              <Zap size={12} /> {t('common.normalUser')}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => { setProfileOpen(false); setUpgradeOpen(true) }}
-                              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white hover:opacity-90 transition-opacity"
-                              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
-                            >
-                              <Crown size={12} /> {t('common.upgradeToPremium')}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
           </div>
         )}
 
-        {/* Upgrade button вЂ” always visible for non-premium */}
+        {/* Upgrade button — only for free users */}
         {!isPremium && (
           <button
             type="button"
             onClick={() => setUpgradeOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mb-3 transition-all hover:opacity-90 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mt-3 transition-all hover:opacity-90 active:scale-95"
             style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}
           >
             <Crown size={15} /> {t('common.upgradeToPremium')}
           </button>
         )}
-
-        {/* Language switcher */}
-        <div style={{ display: 'flex', gap: '8px', padding: '8px 0' }}>
-          <button
-            onClick={() => setLang('en')}
-            style={{
-              width: '48px',
-              height: '32px',
-              border: lang === 'en' ? '2px solid #6366f1' : '2px solid transparent',
-              borderRadius: '6px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              padding: 0,
-              opacity: lang === 'en' ? 1 : 0.5,
-              transition: 'all 0.2s',
-            }}
-          >
-            <img
-              src="https://flagcdn.com/w80/us.png"
-              alt="English"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </button>
-          <button
-            onClick={() => setLang('uz')}
-            style={{
-              width: '48px',
-              height: '32px',
-              border: lang === 'uz' ? '2px solid #6366f1' : '2px solid transparent',
-              borderRadius: '6px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              padding: 0,
-              opacity: lang === 'uz' ? 1 : 0.5,
-              transition: 'all 0.2s',
-            }}
-          >
-            <img
-              src="https://flagcdn.com/w80/uz.png"
-              alt="Uzbek"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </button>
-        </div>
-
-        <button
-          onClick={signOut}
-          className="flex items-center gap-2 w-full text-sm px-3 py-2 rounded-lg transition-all"
-          style={{ color: 'var(--error)' }}
-        >
-          <LogOut size={16} /> {t('nav.signOut')}
-        </button>
       </div>
     </div>
   )
@@ -734,4 +598,3 @@ export function Sidebar() {
     </>
   )
 }
-
