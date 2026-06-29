@@ -67,6 +67,8 @@ export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Prop
   const [autoPlayBlocked, setAutoPlayBlocked] = useState(false)
 
   const playerRef = useRef<any>(null)
+  // Stable ref for the hidden YT host element — never conditionally rendered
+  const playerHostRef = useRef<HTMLDivElement>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Always-current refs so event callbacks don't capture stale closures
@@ -168,26 +170,32 @@ export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Prop
 
     const initPlayer = () => {
       if (playerRef.current) return
+      const el = playerHostRef.current
+      if (!el) return // guard: host element must be in DOM
       const videoId = extractVideoId(tracks[currentIndexRef.current]?.youtube_url ?? '') ?? ''
-      playerRef.current = new window.YT.Player('yt-player-host', {
-        height: '1', width: '1',
-        videoId,
-        playerVars: { autoplay: 0, controls: 0, rel: 0, modestbranding: 1 },
-        events: {
-          onReady: (e: any) => {
-            e.target.setVolume(volumeRef.current)
-            if (isMutedRef.current) e.target.mute()
-            setPlayerReady(true)
-            if (shouldAutoPlay) {
-              e.target.playVideo()
-              autoPlayTimerRef.current = setTimeout(() => {
-                if (!isPlayingRef.current) setAutoPlayBlocked(true)
-              }, 1500)
-            }
+      try {
+        playerRef.current = new window.YT.Player(el, {
+          height: '1', width: '1',
+          videoId,
+          playerVars: { autoplay: 0, controls: 0, rel: 0, modestbranding: 1 },
+          events: {
+            onReady: (e: any) => {
+              e.target.setVolume(volumeRef.current)
+              if (isMutedRef.current) e.target.mute()
+              setPlayerReady(true)
+              if (shouldAutoPlay) {
+                e.target.playVideo()
+                autoPlayTimerRef.current = setTimeout(() => {
+                  if (!isPlayingRef.current) setAutoPlayBlocked(true)
+                }, 1500)
+              }
+            },
+            onStateChange,
           },
-          onStateChange,
-        },
-      })
+        })
+      } catch (err) {
+        console.warn('[MusicPlayer] YT.Player init failed:', err)
+      }
     }
 
     if (window.YT?.Player) {
@@ -205,6 +213,7 @@ export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Prop
     return () => {
       stopPolling()
       if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current)
+      try { playerRef.current?.destroy(); playerRef.current = null } catch {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks.length === 0 ? 0 : 1]) // run once when tracks become available
@@ -282,12 +291,21 @@ export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Prop
     ? (track.title.length > 15 ? track.title.slice(0, 15) + '…' : track.title)
     : 'Musiqa'
 
+  // Hidden YT host is always rendered at top level so it's never unmounted
+  // when isMinimized toggles — this prevents the 'insertBefore' DOM error.
+  const ytHost = (
+    <div
+      ref={playerHostRef}
+      style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', top: -9999, left: -9999 }}
+    />
+  )
+
   // ── Minimized pill ────────────────────────────────────────────────────
   if (isMinimized) {
     return (
       <>
         <style>{PILL_KEYFRAMES}</style>
-        <div id="yt-player-host" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', top: -9999 }} />
+        {ytHost}
         <button
           onClick={() => setIsMinimized(false)}
           className="fixed bottom-6 right-6 z-[300] flex items-center gap-2 px-3 rounded-full shadow-xl transition-transform hover:scale-105 active:scale-95"
@@ -328,8 +346,7 @@ export function MusicPlayer({ autoPlay = false, defaultMinimized = false }: Prop
   // ── Full player ───────────────────────────────────────────────────────
   return (
     <>
-      {/* Hidden YouTube player host */}
-      <div id="yt-player-host" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, pointerEvents: 'none', top: -9999 }} />
+      {ytHost}
 
       {/* Player card */}
       <div
