@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Gamepad2,
+  Loader2, Upload, FileText, X, Music, Gamepad2, Link2,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -3451,6 +3451,243 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
 }
 
 /* ── Tab definitions ─────────────────────────────────────────────────── */
+/* ── LinkingWordsTab ─────────────────────────────────────────────────── */
+const LW_CATEGORIES = ['Addition','Contrast','Cause/Effect','Sequence','Emphasis','Example','Concession']
+const LW_LEVELS     = ['beginner','elementary','intermediate','advanced']
+
+interface LinkingWord {
+  id: string
+  word: string
+  uzbek_translation: string
+  english_definition: string
+  example_sentence: string
+  category: string
+  level: string
+  is_active: boolean
+  created_at: string
+}
+
+const EMPTY_LW_FORM = {
+  word: '', uzbek_translation: '', english_definition: '',
+  example_sentence: '', category: 'Addition', level: 'beginner', is_active: true,
+}
+
+function LinkingWordsTab() {
+  const [words,     setWords]     = useState<LinkingWord[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [showForm,  setShowForm]  = useState(false)
+  const [editId,    setEditId]    = useState<string | null>(null)
+  const [form,      setForm]      = useState({ ...EMPTY_LW_FORM })
+  const [formError, setFormError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/linking-words')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) { const d = await res.json(); setWords(Array.isArray(d) ? d : []) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const resetForm = () => { setForm({ ...EMPTY_LW_FORM }); setFormError(''); setShowForm(false); setEditId(null) }
+
+  const openEdit = (w: LinkingWord) => {
+    setForm({ word: w.word, uzbek_translation: w.uzbek_translation, english_definition: w.english_definition, example_sentence: w.example_sentence, category: w.category, level: w.level, is_active: w.is_active })
+    setEditId(w.id); setShowForm(true); setFormError('')
+  }
+
+  const handleSave = async () => {
+    if (!form.word.trim()) { setFormError('Word kiritilishi shart'); return }
+    if (!form.uzbek_translation.trim()) { setFormError('O\'zbekcha tarjima kiritilishi shart'); return }
+    if (!form.english_definition.trim()) { setFormError('Ta\'rif kiritilishi shart'); return }
+    if (!form.example_sentence.trim()) { setFormError('Misol jumla kiritilishi shart'); return }
+    setSaving(true); setFormError('')
+    const url    = editId ? `/api/admin/linking-words/${editId}` : '/api/admin/linking-words'
+    const method = editId ? 'PATCH' : 'POST'
+    const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    const json   = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    if (editId) {
+      setWords(prev => prev.map(x => x.id === editId ? json : x))
+    } else {
+      setWords(prev => [...prev, json])
+    }
+    resetForm(); setSaving(false)
+  }
+
+  const handleToggle = async (w: LinkingWord) => {
+    const res = await fetch(`/api/admin/linking-words/${w.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !w.is_active }),
+    })
+    if (res.ok) setWords(prev => prev.map(x => x.id === w.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Bu so\'zni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/admin/linking-words/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setWords(prev => prev.filter(x => x.id !== id))
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) return (
+    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ linking_words jadvali topilmadi</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da bajaring:</p>
+      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+{`CREATE TABLE IF NOT EXISTS linking_words (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  word TEXT NOT NULL,
+  uzbek_translation TEXT NOT NULL,
+  english_definition TEXT NOT NULL,
+  example_sentence TEXT NOT NULL,
+  category TEXT NOT NULL,
+  level TEXT NOT NULL DEFAULT 'beginner',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE linking_words ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Linking words readable by authenticated" ON linking_words
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Linking words manageable by admin" ON linking_words FOR ALL TO authenticated
+  USING (auth.jwt() ->> 'email' IN ('abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com'));
+
+CREATE TABLE IF NOT EXISTS user_saved_linking_words (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  word_id UUID REFERENCES linking_words(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, word_id)
+);
+ALTER TABLE user_saved_linking_words ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Saved words by owner" ON user_saved_linking_words
+  FOR ALL TO authenticated USING (auth.uid() = user_id);`}
+      </pre>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {/* Add/Edit form */}
+      {showForm ? (
+        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            {editId ? '✏️ So\'zni tahrirlash' : '➕ Yangi so\'z qo\'shish'}
+          </h3>
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Word *</label>
+              <input className="input-field text-sm w-full" placeholder="Furthermore"
+                value={form.word} onChange={e => setForm(f => ({ ...f, word: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>O'zbekcha tarjima *</label>
+              <input className="input-field text-sm w-full" placeholder="Bundan tashqari"
+                value={form.uzbek_translation} onChange={e => setForm(f => ({ ...f, uzbek_translation: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Inglizcha ta'rif *</label>
+              <textarea className="input-field text-sm w-full" rows={2} placeholder="Used to add more information..."
+                value={form.english_definition} onChange={e => setForm(f => ({ ...f, english_definition: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Misol jumla * (so'z o'z nomida bo'lishi kerak)</label>
+              <textarea className="input-field text-sm w-full" rows={2}
+                placeholder="The results were impressive. Furthermore, the cost was lower."
+                value={form.example_sentence} onChange={e => setForm(f => ({ ...f, example_sentence: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kategoriya</label>
+              <select className="input-field text-sm w-full" value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {LW_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Daraja</label>
+              <select className="input-field text-sm w-full capitalize" value={form.level}
+                onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
+                {LW_LEVELS.map(l => <option key={l} value={l} className="capitalize">{l}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={form.is_active}
+                  onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} className="rounded" />
+                Faol
+              </label>
+            </div>
+          </div>
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : editId ? 'Saqlash' : 'Qo\'shish'}
+            </button>
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_LW_FORM }) }}
+          className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi so&apos;z qo&apos;shish
+        </button>
+      )}
+
+      {/* List */}
+      {words.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Link2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali so&apos;zlar qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ display: 'grid', gridTemplateColumns: '1fr 120px 100px 70px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>So'z</span><span>Kategoriya</span><span>Daraja</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {words.map(w => (
+              <div key={w.id} className="px-4 py-3 text-sm items-center"
+                style={{ display: 'grid', gridTemplateColumns: '1fr 120px 100px 70px 90px', gap: 8 }}>
+                <span className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{w.word}</span>
+                <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{w.category}</span>
+                <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>{w.level}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center"
+                  style={{
+                    background: w.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
+                    color: w.is_active ? 'var(--success)' : 'var(--text-muted)',
+                  }}>
+                  {w.is_active ? 'Faol' : 'O\'chiq'}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button onClick={() => openEdit(w)} title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button onClick={() => handleToggle(w)} title={w.is_active ? "O'chirish" : 'Yoqish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: w.is_active ? 'rgba(34,197,94,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: w.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {w.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button onClick={() => handleDelete(w.id)} title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -3463,8 +3700,9 @@ const TABS = [
   { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
   { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
   { id: 'music',     label: 'Musiqa',            Icon: Music },
-  { id: 'games',     label: 'O\'yinlar',         Icon: Gamepad2 },
-  { id: 'feedback',  label: 'Feedback',         Icon: MessageSquare },
+  { id: 'games',         label: 'O\'yinlar',         Icon: Gamepad2 },
+  { id: 'linking-words', label: 'Linking Words',    Icon: Link2 },
+  { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -3544,9 +3782,10 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'referrals' && <ReferralsTab />}
       {activeTab === 'articles' && <ArticlesTab />}
       {activeTab === 'books'    && <BooksTab />}
-      {activeTab === 'music'    && <MusicTab />}
-      {activeTab === 'games'    && <GamesTab />}
-      {activeTab === 'feedback' && <FeedbackTab />}
+      {activeTab === 'music'         && <MusicTab />}
+      {activeTab === 'games'         && <GamesTab />}
+      {activeTab === 'linking-words' && <LinkingWordsTab />}
+      {activeTab === 'feedback'      && <FeedbackTab />}
     </div>
   )
 }

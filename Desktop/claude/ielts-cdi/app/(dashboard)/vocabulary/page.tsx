@@ -1,10 +1,19 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function VocabularyPage() {
   const { t } = useLanguage()
+  const [lwCount, setLwCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    fetch('/api/vocabulary/linking-words')
+      .then(r => r.ok ? r.json() : [])
+      .then((d: unknown[]) => Array.isArray(d) && setLwCount(d.length))
+      .catch(() => {})
+  }, [])
 
   const CATEGORIES = [
     {
@@ -62,7 +71,7 @@ export default function VocabularyPage() {
       emoji: '🔗',
       titleKey: 'vocabulary.linkingWords',
       descKey:  'vocabulary.linkingWordsDesc',
-      count:    t('vocabulary.comingSoon'),
+      count:    lwCount !== null ? `${lwCount} so'z` : '...',
       color: '#14b8a6',
       bg:    'rgba(20,184,166,0.08)',
       border:'rgba(20,184,166,0.25)',
