@@ -60,11 +60,15 @@ export default function LinkingWordsPage() {
   const [levelTab, setLevelTab] = useState('Barchasi')
   const [catTab,   setCatTab]   = useState('Barchasi')
 
+  const LEVEL_ORDER: Record<string, number> = { beginner: 1, elementary: 2, intermediate: 3, advanced: 4 }
+
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
       .then(r => r.ok ? r.json() : { words: [], savedIds: [] })
       .then(d => {
-        setWords(Array.isArray(d) ? d : (d.words ?? []))
+        const raw: Word[] = Array.isArray(d) ? d : (d.words ?? [])
+        raw.sort((a, b) => (LEVEL_ORDER[a.level] ?? 9) - (LEVEL_ORDER[b.level] ?? 9))
+        setWords(raw)
         setSavedIds(Array.isArray(d.savedIds) ? d.savedIds : [])
         setLoading(false)
       })
