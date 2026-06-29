@@ -146,6 +146,7 @@ export function PaymentModal({
         setLoading(false)
         return
       }
+      setLoading(false)
       setDone(true)
       setTimeout(() => {
         onSuccess()
