@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Heart } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Heart, ChevronLeft } from 'lucide-react'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Word {
@@ -13,7 +14,6 @@ interface Word {
   example_sentence: string
   category: string
   level: string
-  is_saved: boolean
 }
 
 /* ── Badge config ─────────────────────────────────────────────────── */
@@ -37,7 +37,7 @@ const LVL_COLORS: Record<string, { bg: string; color: string }> = {
 const LEVELS     = ['Barchasi', 'Beginner', 'Elementary', 'Intermediate', 'Advanced']
 const CATEGORIES = ['Barchasi', 'Addition', 'Contrast', 'Cause/Effect', 'Sequence', 'Emphasis', 'Example', 'Concession']
 
-/* ── Highlight word in sentence ──────────────────────────────────── */
+/* ── Highlight linking word in sentence ──────────────────────────── */
 function HighlightedSentence({ sentence, word }: { sentence: string; word: string }) {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const parts   = sentence.split(new RegExp(`(${escaped})`, 'i'))
@@ -54,18 +54,56 @@ function HighlightedSentence({ sentence, word }: { sentence: string; word: strin
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function LinkingWordsPage() {
+  const router   = useRouter()
   const [words,    setWords]    = useState<Word[]>([])
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
   const [loading,  setLoading]  = useState(true)
   const [levelTab, setLevelTab] = useState('Barchasi')
   const [catTab,   setCatTab]   = useState('Barchasi')
-  const [saving,   setSaving]   = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
-      .then(r => r.json())
-      .then(d => { setWords(Array.isArray(d) ? d : []); setLoading(false) })
+      .then(r => r.ok ? r.json() : { words: [], savedIds: [] })
+      .then(d => {
+        setWords(Array.isArray(d) ? d : (d.words ?? []))
+        setSavedIds(new Set(d.savedIds ?? []))
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
+
+  /* Optimistic heart toggle */
+  const toggleSave = async (wordId: string) => {
+    const wasSaved = savedIds.has(wordId)
+    /* Optimistic update */
+    setSavedIds(prev => {
+      const next = new Set(prev)
+      wasSaved ? next.delete(wordId) : next.add(wordId)
+      return next
+    })
+    try {
+      const res = await fetch('/api/vocabulary/linking-words/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word_id: wordId }),
+      })
+      if (!res.ok) throw new Error()
+      const { saved } = await res.json()
+      /* Sync with server truth */
+      setSavedIds(prev => {
+        const next = new Set(prev)
+        saved ? next.add(wordId) : next.delete(wordId)
+        return next
+      })
+    } catch {
+      /* Revert on error */
+      setSavedIds(prev => {
+        const next = new Set(prev)
+        wasSaved ? next.add(wordId) : next.delete(wordId)
+        return next
+      })
+    }
+  }
 
   const filtered = useMemo(() => words.filter(w => {
     const lvlOk = levelTab === 'Barchasi' || w.level.toLowerCase() === levelTab.toLowerCase()
@@ -79,32 +117,25 @@ export default function LinkingWordsPage() {
     return c
   }, [words])
 
-  const toggleSave = async (w: Word) => {
-    if (saving === w.id) return
-    setSaving(w.id)
-    const res = await fetch('/api/vocabulary/linking-words/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word_id: w.id }),
-    })
-    if (res.ok) {
-      const { saved } = await res.json()
-      setWords(prev => prev.map(x => x.id === w.id ? { ...x, is_saved: saved } : x))
-    }
-    setSaving(null)
-  }
-
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
 
-      {/* ── Header ─── */}
+      {/* ── Back button + breadcrumb ─── */}
       <div className="mb-6">
-        <div className="flex items-center gap-2 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+        <div className="flex items-center gap-2 text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
           <Link href="/vocabulary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Lug'at</Link>
           <span>/</span>
           <span style={{ color: 'var(--text-primary)' }}>Linking Words</span>
         </div>
+        <button
+          onClick={() => router.push('/vocabulary')}
+          className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronLeft size={16} /> Lug'at ga qaytish
+        </button>
 
+        {/* Title row */}
         <div className="flex items-start gap-4 mb-5">
           <div style={{
             width: 52, height: 52, borderRadius: 14, flexShrink: 0,
@@ -159,7 +190,7 @@ export default function LinkingWordsPage() {
       {/* ── Category filter tabs ─── */}
       <div className="flex flex-wrap gap-1.5 mb-6">
         {CATEGORIES.map(cat => {
-          const cc = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+          const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
           const active = catTab === cat
           return (
             <button key={cat} onClick={() => setCatTab(cat)}
@@ -188,14 +219,15 @@ export default function LinkingWordsPage() {
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="text-4xl mb-3">🔍</div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-            {words.length === 0 ? 'Hali so\'zlar qo\'shilmagan' : 'Bu filtrlarga mos so\'z topilmadi'}
+            {words.length === 0 ? "Hali so'zlar qo'shilmagan" : 'Bu filtrlarga mos so\'z topilmadi'}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtered.map(w => {
-            const cc = CAT_COLORS[w.category] ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
-            const lc = LVL_COLORS[w.level] ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
+            const cc      = CAT_COLORS[w.category] ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
+            const lc      = LVL_COLORS[w.level]    ?? { bg: 'var(--bg-secondary)', color: 'var(--text-secondary)' }
+            const isSaved = savedIds.has(w.id)
             return (
               <div key={w.id} className="rounded-2xl p-5 transition-all hover:shadow-md"
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
@@ -216,13 +248,15 @@ export default function LinkingWordsPage() {
                     </span>
                   </div>
                   <button
-                    onClick={() => toggleSave(w)}
-                    disabled={saving === w.id}
-                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110 disabled:opacity-50"
-                    style={{ background: w.is_saved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    onClick={() => toggleSave(w.id)}
+                    className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                    style={{
+                      background: isSaved ? 'rgba(239,68,68,0.08)' : 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                    }}>
                     <Heart size={15}
-                      fill={w.is_saved ? '#ef4444' : 'none'}
-                      style={{ color: w.is_saved ? '#ef4444' : 'var(--text-muted)', transition: 'all .2s' }} />
+                      fill={isSaved ? '#ef4444' : 'none'}
+                      style={{ color: isSaved ? '#ef4444' : 'var(--text-muted)', transition: 'color .15s, fill .15s' }} />
                   </button>
                 </div>
 
@@ -241,14 +275,11 @@ export default function LinkingWordsPage() {
                 </div>
 
                 {/* Example sentence */}
-                <div style={{
-                  borderLeft: `3px solid ${cc.color}`,
-                  paddingLeft: 12, paddingTop: 4, paddingBottom: 4,
-                }}>
+                <div style={{ borderLeft: `3px solid ${cc.color}`, paddingLeft: 12, paddingTop: 4, paddingBottom: 4 }}>
                   <span className="text-xs font-semibold uppercase tracking-wide mb-1 block"
                     style={{ color: 'var(--text-muted)' }}>Misol</span>
                   <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
-                    "<HighlightedSentence sentence={w.example_sentence} word={w.word} />"
+                    &ldquo;<HighlightedSentence sentence={w.example_sentence} word={w.word} />&rdquo;
                   </p>
                 </div>
               </div>

@@ -7,11 +7,16 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 export default function VocabularyPage() {
   const { t } = useLanguage()
   const [lwCount, setLwCount] = useState<number | null>(null)
+  const [wcCount, setWcCount] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
-      .then(r => r.ok ? r.json() : [])
-      .then((d: unknown[]) => Array.isArray(d) && setLwCount(d.length))
+      .then(r => r.ok ? r.json() : {})
+      .then((d: { words?: unknown[] }) => setLwCount(d.words?.length ?? 0))
+      .catch(() => {})
+    fetch('/api/vocabulary/writing-collocations')
+      .then(r => r.ok ? r.json() : {})
+      .then((d: { words?: unknown[] }) => setWcCount(d.words?.length ?? 0))
       .catch(() => {})
   }, [])
 
@@ -61,7 +66,7 @@ export default function VocabularyPage() {
       emoji: '✍️',
       titleKey: 'vocabulary.writingCollocations',
       descKey:  'vocabulary.writingCollocationsDesc',
-      count:    t('vocabulary.comingSoon'),
+      count:    wcCount !== null ? `${wcCount} so'z` : '...',
       color: '#ec4899',
       bg:    'rgba(236,72,153,0.08)',
       border:'rgba(236,72,153,0.25)',

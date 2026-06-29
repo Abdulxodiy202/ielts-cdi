@@ -12,13 +12,13 @@ export async function GET() {
 
   const [wordsRes, savedRes] = await Promise.all([
     admin
-      .from('linking_words')
+      .from('writing_collocations')
       .select('id, word, uzbek_translation, english_definition, example_sentence, category, level')
       .eq('is_active', true)
       .order('category')
       .order('word'),
     admin
-      .from('user_saved_linking_words')
+      .from('user_saved_writing_words')
       .select('word_id')
       .eq('user_id', user.id),
   ])
