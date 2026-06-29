@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
-  PenLine, Mic, BookMarked, FileText, Video, Sparkles, Globe, Palette,
+  PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -43,43 +43,43 @@ function fmtMsgTime(iso: string): string {
   return `${d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })} ${hhmm}`
 }
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  })
-}
-
-function displayPremiumSince(profile: Profile): string {
-  if (profile.premium_since) return fmtDate(profile.premium_since)
-  if (!profile.premium_until) return '—'
-  const d = new Date(profile.premium_until)
-  d.setDate(d.getDate() - 30)
-  return fmtDate(d.toISOString())
-}
-
 /* ── Sidebar ─────────────────────────────────────────────────────── */
 export function Sidebar() {
   const pathname = usePathname()
   const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t, lang, setLang } = useLanguage()
+
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [upgradeOpen,     setUpgradeOpen]      = useState(false)
-  const [settingsOpen,    setSettingsOpen]     = useState(false)
-  const [profile,         setProfile]          = useState<Profile | null>(null)
-  const [toasts,          setToasts]           = useState<ToastData[]>([])
+  const [dropdownOpen,    setDropdownOpen]     = useState(false)
+  const [editingName,     setEditingName]      = useState(false)
   const [nameInput,       setNameInput]        = useState('')
   const [nameSaving,      setNameSaving]       = useState(false)
   const [avatarUploading, setAvatarUploading]  = useState(false)
   const [localAvatarUrl,  setLocalAvatarUrl]   = useState<string | null>(null)
+  const [profile,         setProfile]          = useState<Profile | null>(null)
+  const [toasts,          setToasts]           = useState<ToastData[]>([])
   const [messages,        setMessages]         = useState<AdminMessage[]>([])
   const [msgsOpen,        setMsgsOpen]         = useState(false)
   const [msgTableMissing, setMsgTableMissing]  = useState(false)
 
   const fileInputRef  = useRef<HTMLInputElement>(null)
   const profileRef    = useRef<Profile | null>(null)
+  const dropdownRef   = useRef<HTMLDivElement>(null)
   useEffect(() => { profileRef.current = profile }, [profile])
+
+  /* ── Outside click closes dropdown ─── */
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+        setEditingName(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const navGroups = [
     {
@@ -106,10 +106,10 @@ export function Sidebar() {
     {
       label: t('nav.resourcesGroup'),
       items: [
-        { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,     badge: null },
-        { href: '/books',       label: t('nav.books'),        icon: BookOpen,    badge: null },
-        { href: '/articles',    label: t('nav.articles'),     icon: FileText,    badge: null },
-        { href: '/coming-soon', label: t('nav.videoCourses'), icon: Video,       badge: 'pro' },
+        { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null },
+        { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null },
+        { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null },
+        { href: '/coming-soon', label: t('nav.videoCourses'), icon: Video,               badge: 'pro' },
       ],
     },
     {
@@ -121,7 +121,7 @@ export function Sidebar() {
     },
   ]
 
-  /* ── Initial profile fetch ─────────────────────────────────────── */
+  /* ── Profile fetch ─────────────────────────────────────────────── */
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
@@ -153,7 +153,7 @@ export function Sidebar() {
   }, [])
 
   const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id))
+    setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
   /* ── Realtime subscriptions ────────────────────────────────────── */
@@ -161,50 +161,37 @@ export function Sidebar() {
     if (!user?.id) return
     const supabase = createClient()
 
-    const profileChannel = supabase
+    const profileCh = supabase
       .channel(`profile-${user.id}`)
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
         (payload) => {
           const updated = payload.new as Profile
-          const merged: Profile = {
-            ...updated,
-            premium_since: (payload.new as Profile).premium_since ?? null,
-          }
+          const merged: Profile = { ...updated, premium_since: (payload.new as Profile).premium_since ?? null }
           const wasPremium = isActivePremium(profileRef.current)
           setProfile(merged)
-          if (isActivePremium(updated) && !wasPremium) {
+          if (isActivePremium(updated) && !wasPremium)
             addToast('🎉 Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
-          }
         }
-      )
-      .subscribe()
+      ).subscribe()
 
-    const bookingChannel = supabase
+    const bookingCh = supabase
       .channel(`bookings-${user.id}`)
-      .on(
-        'postgres_changes',
+      .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'mock_bookings', filter: `user_id=eq.${user.id}` },
         (payload) => {
           const row = payload.new as { status: string; booking_date: string; time_slot: string }
-          if (row.status === 'confirmed') {
+          if (row.status === 'confirmed')
             addToast(`✅ Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
-          }
         }
-      )
-      .subscribe()
+      ).subscribe()
 
-    return () => {
-      supabase.removeChannel(profileChannel)
-      supabase.removeChannel(bookingChannel)
-    }
+    return () => { supabase.removeChannel(profileCh); supabase.removeChannel(bookingCh) }
   }, [user?.id, addToast])
 
-  /* ── Admin messages: fetch + 10-second polling ─────────────────── */
+  /* ── Admin messages ────────────────────────────────────────────── */
   useEffect(() => {
     if (!user?.id) return
-
     const fetchMsgs = () =>
       fetch('/api/messages')
         .then(res => {
@@ -212,10 +199,9 @@ export function Sidebar() {
           if (res.ok) res.json().then((data: AdminMessage[]) => setMessages(data))
         })
         .catch(() => null)
-
     fetchMsgs()
-    const interval = setInterval(fetchMsgs, 10000)
-    return () => clearInterval(interval)
+    const iv = setInterval(fetchMsgs, 10000)
+    return () => clearInterval(iv)
   }, [user?.id])
 
   const handleMsgsOpen = async () => {
@@ -234,19 +220,14 @@ export function Sidebar() {
   const handleAvatarUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !user) return
-
     setAvatarUploading(true)
     setLocalAvatarUrl(URL.createObjectURL(file))
-
     try {
       const fd = new FormData()
       fd.append('file', file)
-
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
+      const res  = await fetch('/api/profile/avatar', { method: 'POST', body: fd })
       const json = await res.json()
-
       if (!res.ok) throw new Error(json.error ?? 'Upload failed')
-
       setProfile(prev => prev ? { ...prev, avatar_url: json.publicUrl } : prev)
       setLocalAvatarUrl(json.publicUrl)
       addToast('✅ Rasm yangilandi', 'success')
@@ -262,7 +243,7 @@ export function Sidebar() {
 
   /* ── Save name ─────────────────────────────────────────────────── */
   const handleSaveName = useCallback(async () => {
-    if (!nameInput.trim()) return
+    if (!nameInput.trim()) { setEditingName(false); return }
     setNameSaving(true)
     const res = await fetch('/api/profile', {
       method: 'PATCH',
@@ -276,6 +257,7 @@ export function Sidebar() {
       addToast('Saqlashda xatolik', 'error')
     }
     setNameSaving(false)
+    setEditingName(false)
   }, [nameInput, addToast])
 
   /* ── Derived values ────────────────────────────────────────────── */
@@ -287,10 +269,9 @@ export function Sidebar() {
 
   /* ── Sidebar markup ────────────────────────────────────────────── */
   const sidebarContent = (
-    <div
-      style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
-      className="flex flex-col h-full w-[260px]"
-    >
+    <div style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
+      className="flex flex-col h-full w-[260px]">
+
       {/* Logo */}
       <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0' }}>
@@ -322,27 +303,14 @@ export function Sidebar() {
               {group.items.map(({ href, label, icon: Icon, badge }) => {
                 const active = pathname === href || (href !== '/coming-soon' && pathname.startsWith(href + '/'))
                 return (
-                  <Link
-                    key={label}
-                    href={href}
-                    onClick={() => setMobileOpen(false)}
+                  <Link key={label} href={href} onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
-                    style={{
-                      background: active ? 'var(--accent)' : 'transparent',
-                      color: active ? 'white' : 'var(--text-secondary)',
-                    }}
-                  >
+                    style={{ background: active ? 'var(--accent)' : 'transparent', color: active ? 'white' : 'var(--text-secondary)' }}>
                     <Icon size={16} style={{ flexShrink: 0 }} />
                     <span className="flex-1">{label}</span>
-                    {badge === 'ai' && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>
-                    )}
-                    {badge === 'book' && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>
-                    )}
-                    {badge === 'pro' && !isPremium && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)', lineHeight: '16px' }}>Pro</span>
-                    )}
+                    {badge === 'ai' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>}
+                    {badge === 'book' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>}
+                    {badge === 'pro' && !isPremium && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)', lineHeight: '16px' }}>Pro</span>}
                   </Link>
                 )
               })}
@@ -351,103 +319,151 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* ── Bottom section ─── */}
+      {/* ── Bottom section ─────────────────────────────────────────── */}
       <div className="p-4 border-t" style={{ borderColor: 'var(--border)' }}>
         {user && (
-          <div className="relative">
+          <div className="relative" ref={dropdownRef}>
 
-            {/* Hidden file input for avatar (wired but not shown inline) */}
+            {/* Hidden file input */}
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
-            {/* ── Settings popover ─── */}
+            {/* ── Dropdown ─── */}
             <AnimatePresence>
-              {settingsOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setSettingsOpen(false)} />
-                  <motion.div
-                    initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 6, scale: 0.97 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 z-20 mb-2"
-                    style={{
-                      background: 'var(--bg-card)',
-                      border: '0.5px solid var(--border)',
-                      borderRadius: 12,
-                      padding: 12,
-                      width: 220,
-                      boxShadow: '0 -8px 24px rgba(0,0,0,0.25)',
-                    }}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {/* Theme */}
-                    <div className="mb-3">
-                      <div className="flex items-center gap-1.5 mb-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        <Palette size={12} /> {t('common.theme')}
-                      </div>
-                      <div className="flex gap-2">
-                        {([
-                          { id: 'dark'  as const, color: '#6366f1', label: t('common.dark')  },
-                          { id: 'light' as const, color: '#94a3b8', label: t('common.light') },
-                          { id: 'cyber' as const, color: '#10b981', label: t('common.cyber') },
-                        ]).map(thm => (
-                          <button key={thm.id} onClick={() => setTheme(thm.id)} title={thm.label}
-                            className="w-7 h-7 rounded-full border-2 transition-all"
-                            style={{
-                              background: thm.color,
-                              borderColor: theme === thm.id ? 'white' : 'transparent',
-                              transform: theme === thm.id ? 'scale(1.15)' : 'scale(1)',
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
+              {dropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 6, scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute bottom-full left-0 right-0 z-50 mb-2"
+                  style={{
+                    background: 'var(--bg-card)',
+                    border: '0.5px solid var(--border)',
+                    borderRadius: 12,
+                    padding: '10px 10px 8px',
+                    boxShadow: '0 -8px 24px rgba(0,0,0,0.25)',
+                  }}
+                >
+                  {/* ── PROFIL section ─── */}
+                  <div className="mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '2px 4px 6px' }}>
+                    Profil
+                  </div>
 
-                    {/* Notifications */}
-                    {!msgTableMissing && (
-                      <button
-                        onClick={() => { setSettingsOpen(false); handleMsgsOpen() }}
-                        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80 mb-1"
-                        style={{ color: 'var(--text-secondary)' }}
+                  {/* Name row */}
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    <Pencil size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    {editingName ? (
+                      <input
+                        autoFocus
+                        value={nameInput}
+                        onChange={e => setNameInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveName()
+                          if (e.key === 'Escape') { setEditingName(false); setNameInput(displayName) }
+                        }}
+                        onBlur={handleSaveName}
+                        className="flex-1 text-sm bg-transparent border-none outline-none"
+                        style={{ color: 'var(--text-primary)', minWidth: 0 }}
+                        placeholder="Ismingiz"
+                      />
+                    ) : (
+                      <span
+                        className="flex-1 text-sm truncate cursor-text"
+                        style={{ color: 'var(--text-primary)' }}
+                        onClick={() => { setEditingName(true); setNameInput(displayName) }}
                       >
-                        <Bell size={14} />
-                        <span>Xabarlar</span>
-                        {unreadCount > 0 && (
-                          <span className="ml-auto flex items-center justify-center rounded-full text-white font-bold"
-                            style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 11 }}>
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                          </span>
-                        )}
-                      </button>
+                        {displayName}
+                      </span>
                     )}
+                    {nameSaving && <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" style={{ color: 'var(--text-muted)' }} />}
+                  </div>
 
-                    {/* Language */}
-                    <div className="mt-1 mb-1">
-                      <div className="flex items-center gap-1.5 mb-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-                        <Globe size={12} /> Til
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => setLang('en')} style={{ width: 48, height: 32, border: lang === 'en' ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', padding: 0, opacity: lang === 'en' ? 1 : 0.5, transition: 'all 0.2s' }}>
-                          <img src="https://flagcdn.com/w80/us.png" alt="English" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </button>
-                        <button onClick={() => setLang('uz')} style={{ width: 48, height: 32, border: lang === 'uz' ? '2px solid #6366f1' : '2px solid transparent', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', padding: 0, opacity: lang === 'uz' ? 1 : 0.5, transition: 'all 0.2s' }}>
-                          <img src="https://flagcdn.com/w80/uz.png" alt="Uzbek" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </button>
-                      </div>
+                  {/* Avatar upload row */}
+                  <button onClick={() => fileInputRef.current?.click()} disabled={avatarUploading}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors hover:opacity-80 mb-2"
+                    style={{ color: 'var(--text-secondary)' }}>
+                    <Camera size={13} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                    <span>{avatarUploading ? 'Yuklanmoqda...' : 'Rasm yuklash'}</span>
+                  </button>
+
+                  {/* Divider */}
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
+
+                  {/* ── SOZLAMALAR section ─── */}
+                  <div className="mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '2px 4px 6px' }}>
+                    Sozlamalar
+                  </div>
+
+                  {/* Theme row */}
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
+                    <Palette size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Mavzu</span>
+                    <div className="flex gap-1.5">
+                      {([
+                        { id: 'dark'  as const, color: '#6366f1' },
+                        { id: 'light' as const, color: '#94a3b8' },
+                        { id: 'cyber' as const, color: '#10b981' },
+                      ]).map(thm => (
+                        <button key={thm.id} onClick={() => setTheme(thm.id)}
+                          className="w-5 h-5 rounded-full border-2 transition-all"
+                          style={{
+                            background: thm.color,
+                            borderColor: theme === thm.id ? 'white' : 'transparent',
+                            transform: theme === thm.id ? 'scale(1.2)' : 'scale(1)',
+                          }} />
+                      ))}
                     </div>
+                  </div>
 
-                    {/* Divider */}
-                    <div style={{ borderTop: '1px solid var(--border)', margin: '10px 0' }} />
+                  {/* Language row */}
+                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
+                    <Globe size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Til</span>
+                    <div className="flex gap-1.5">
+                      {[
+                        { code: 'en' as const, flag: 'us' },
+                        { code: 'uz' as const, flag: 'uz' },
+                      ].map(({ code, flag }) => (
+                        <button key={code} onClick={() => setLang(code)} style={{
+                          width: 36, height: 24, border: lang === code ? '2px solid #6366f1' : '2px solid transparent',
+                          borderRadius: 4, overflow: 'hidden', cursor: 'pointer', padding: 0,
+                          opacity: lang === code ? 1 : 0.45, transition: 'all 0.2s',
+                        }}>
+                          <img src={`https://flagcdn.com/w80/${flag}.png`} alt={code} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                    {/* Logout */}
-                    <button onClick={signOut}
-                      className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
-                      style={{ color: '#ef4444' }}
-                    >
-                      <LogOut size={14} /> Chiqish
+                  {/* Notifications row */}
+                  {!msgTableMissing && (
+                    <button
+                      onClick={() => { setDropdownOpen(false); handleMsgsOpen() }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors hover:opacity-80"
+                      style={{ color: 'var(--text-secondary)' }}>
+                      <Bell size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span className="flex-1">Xabarlar</span>
+                      {unreadCount > 0 && (
+                        <span className="flex items-center justify-center rounded-full text-white font-bold"
+                          style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 10 }}>
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
                     </button>
-                  </motion.div>
-                </>
+                  )}
+
+                  {/* Divider */}
+                  <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0 6px' }} />
+
+                  {/* Logout */}
+                  <button onClick={signOut}
+                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
+                    style={{ color: '#ef4444' }}>
+                    <LogOut size={13} style={{ flexShrink: 0 }} />
+                    Chiqish
+                  </button>
+                </motion.div>
               )}
             </AnimatePresence>
 
@@ -455,17 +471,18 @@ export function Sidebar() {
             <AnimatePresence>
               {msgsOpen && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setMsgsOpen(false)} />
+                  <div className="fixed inset-0 z-40" onClick={() => setMsgsOpen(false)} />
                   <motion.div
                     initial={{ opacity: 0, y: 8, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute bottom-full left-0 right-0 mb-2 z-20 rounded-2xl overflow-hidden shadow-2xl"
+                    className="absolute bottom-full left-0 right-0 mb-2 z-50 rounded-2xl overflow-hidden shadow-2xl"
                     style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', boxShadow: '0 -8px 32px rgba(0,0,0,0.3)', maxHeight: '340px', display: 'flex', flexDirection: 'column' }}
                     onClick={e => e.stopPropagation()}
                   >
-                    <div className="px-4 py-2.5 text-xs font-semibold shrink-0" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                    <div className="px-4 py-2.5 text-xs font-semibold shrink-0"
+                      style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                       Admin xabarlari
                     </div>
                     <div className="overflow-y-auto flex-1">
@@ -495,14 +512,14 @@ export function Sidebar() {
               )}
             </AnimatePresence>
 
-            {/* ── Avatar row (always visible) ─── */}
+            {/* ── Avatar card (always visible) ─── */}
             <button
               type="button"
-              onClick={() => setSettingsOpen(o => !o)}
-              className="flex items-center gap-3 w-full rounded-xl px-2 py-1.5 -mx-2 transition-colors hover:opacity-80"
-              style={{ background: settingsOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
+              onClick={() => { setDropdownOpen(o => !o); setEditingName(false) }}
+              className="flex items-center gap-3 w-full rounded-xl px-2 py-2 -mx-2 transition-colors hover:opacity-80"
+              style={{ background: dropdownOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
             >
-              <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 relative flex items-center justify-center text-sm font-bold text-white"
+              <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-bold text-white"
                 style={{ background: 'var(--accent)' }}>
                 {avatarUrl
                   ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -512,18 +529,16 @@ export function Sidebar() {
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                  {displayName}
-                </div>
+                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{displayName}</div>
                 <div className="text-xs mt-0.5">
                   {isPremium ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold"
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold"
                       style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-                      <CheckCircle size={10} /> {t('nav.premiumBadge')}
+                      <CheckCircle size={9} /> {t('nav.premiumBadge')}
                     </span>
                   ) : (
                     <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <Zap size={10} /> {t('nav.freePlan')}
+                      <Zap size={9} /> {t('nav.freePlan')}
                     </span>
                   )}
                 </div>
@@ -532,14 +547,11 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Upgrade button — only for free users */}
+        {/* Upgrade button — free users only */}
         {!isPremium && (
-          <button
-            type="button"
-            onClick={() => setUpgradeOpen(true)}
+          <button type="button" onClick={() => setUpgradeOpen(true)}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mt-3 transition-all hover:opacity-90 active:scale-95"
-            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}
-          >
+            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}>
             <Crown size={15} /> {t('common.upgradeToPremium')}
           </button>
         )}
@@ -555,11 +567,9 @@ export function Sidebar() {
       </div>
 
       {/* Mobile hamburger */}
-      <button
-        className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg"
+      <button className="md:hidden fixed top-4 left-4 z-50 p-2 rounded-lg"
         style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
+        onClick={() => setMobileOpen(!mobileOpen)}>
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
@@ -567,23 +577,19 @@ export function Sidebar() {
       <AnimatePresence>
         {mobileOpen && (
           <>
-            <motion.div
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            <motion.div className="fixed inset-0 bg-black/50 z-40 md:hidden"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setMobileOpen(false)}
-            />
-            <motion.div
-              className="fixed top-0 left-0 h-full z-50 md:hidden"
+              onClick={() => setMobileOpen(false)} />
+            <motion.div className="fixed top-0 left-0 h-full z-50 md:hidden"
               initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            >
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}>
               {sidebarContent}
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
-      {/* Premium upgrade modal */}
+      {/* Premium modal */}
       <PaymentModal
         isOpen={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
@@ -593,7 +599,6 @@ export function Sidebar() {
         initialName={profile?.full_name ?? ''}
       />
 
-      {/* Toast notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </>
   )
