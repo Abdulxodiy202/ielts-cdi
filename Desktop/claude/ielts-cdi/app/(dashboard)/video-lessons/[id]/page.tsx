@@ -33,7 +33,7 @@ function getYouTubeId(url: string) {
 
 export default function VideoDetailPage() {
   const router = useRouter()
-  const { id }  = useParams<{ id: string }>()
+  const { id } = useParams<{ id: string }>()
   const [video,       setVideo]       = useState<VideoLesson | null>(null)
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
@@ -43,12 +43,7 @@ export default function VideoDetailPage() {
     if (!id) return
     fetch(`/api/video-lessons/${id}`)
       .then(r => { if (!r.ok) { setNotFound(true); setLoading(false); return null } return r.json() })
-      .then(d => {
-        if (!d) return
-        setVideo(d.video ?? null)
-        setUserPremium(d.userPremium ?? false)
-        setLoading(false)
-      })
+      .then(d => { if (!d) return; setVideo(d.video ?? null); setUserPremium(d.userPremium ?? false); setLoading(false) })
       .catch(() => setLoading(false))
   }, [id])
 
@@ -61,9 +56,7 @@ export default function VideoDetailPage() {
   if (notFound || !video) return (
     <div className="p-8 text-center">
       <p className="text-lg mb-4" style={{ color: 'var(--text-muted)' }}>Video topilmadi</p>
-      <button onClick={() => router.push('/vocabulary/video-lessons')} className="btn-primary text-sm">
-        ← Orqaga qaytish
-      </button>
+      <button onClick={() => router.push('/video-lessons')} className="btn-primary text-sm">← Orqaga qaytish</button>
     </div>
   )
 
@@ -74,15 +67,13 @@ export default function VideoDetailPage() {
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto">
 
-      {/* Back */}
+      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-        <Link href="/vocabulary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Lug&apos;at</Link>
-        <span>/</span>
-        <Link href="/vocabulary/video-lessons" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Video darslar</Link>
+        <Link href="/video-lessons" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Video darslar</Link>
         <span>/</span>
         <span style={{ color: 'var(--text-primary)' }} className="truncate max-w-[200px]">{video.title}</span>
       </div>
-      <button onClick={() => router.push('/vocabulary/video-lessons')}
+      <button onClick={() => router.push('/video-lessons')}
         className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
         style={{ color: 'var(--text-muted)' }}>
         <ChevronLeft size={16} /> Video darslarga qaytish
@@ -91,7 +82,6 @@ export default function VideoDetailPage() {
       {/* Video player */}
       <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 16, overflow: 'hidden', background: '#000', marginBottom: 24 }}>
         {locked ? (
-          /* Premium lock overlay */
           <>
             {(video.thumbnail_url || ytId) && (
               <img
@@ -120,25 +110,18 @@ export default function VideoDetailPage() {
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
             src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            title={video.title}
+            allowFullScreen title={video.title}
           />
         ) : (
-          <video
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            src={video.video_url}
-            controls
-            poster={video.thumbnail_url ?? undefined}
-          />
+          <video style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            src={video.video_url} controls poster={video.thumbnail_url ?? undefined} />
         )}
       </div>
 
       {/* Meta */}
       <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
         <div className="flex items-start justify-between gap-3 mb-3">
-          <h1 className="text-xl font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>
-            {video.title}
-          </h1>
+          <h1 className="text-xl font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>{video.title}</h1>
           {video.is_premium && (
             <span className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full"
               style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
@@ -146,23 +129,14 @@ export default function VideoDetailPage() {
             </span>
           )}
         </div>
-
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
-            style={{ background: cc.bg, color: cc.color }}>
-            {video.category}
-          </span>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: cc.bg, color: cc.color }}>{video.category}</span>
           {video.duration_minutes && (
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              ⏱ {video.duration_minutes} daqiqa
-            </span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>⏱ {video.duration_minutes} daqiqa</span>
           )}
         </div>
-
         {video.description && (
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-            {video.description}
-          </p>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{video.description}</p>
         )}
       </div>
     </div>

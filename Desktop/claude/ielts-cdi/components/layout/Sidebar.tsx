@@ -109,7 +109,7 @@ export function Sidebar() {
         { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null },
         { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null },
         { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null },
-        { href: '/coming-soon', label: t('nav.videoCourses'), icon: Video,               badge: 'pro' },
+        { href: '/video-lessons', label: t('nav.videoCourses'), icon: Video,               badge: null },
       ],
     },
     {

@@ -81,16 +81,6 @@ export default function VocabularyPage() {
       bg:    'rgba(20,184,166,0.08)',
       border:'rgba(20,184,166,0.25)',
     },
-    {
-      href:  '/vocabulary/video-lessons',
-      emoji: '🎬',
-      title: 'Video darslar',
-      desc:  'IELTS bo\'yicha video qo\'llanmalar va darslar',
-      count: 'Yangi',
-      color: '#6366f1',
-      bg:    'rgba(99,102,241,0.08)',
-      border:'rgba(99,102,241,0.25)',
-    },
   ]
 
   return (
