@@ -74,7 +74,10 @@ export default function ReadingVocabPage() {
   const [openNoteId, setOpenNoteId] = useState<string | null>(null)
   const [saveStatus, setSaveStatus] = useState<Record<string, 'saved' | 'saving' | 'idle'>>({})
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [searchRaw,    setSearchRaw]    = useState('')
+  const [searchQuery,  setSearchQuery]  = useState('')
+  const saveTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const searchTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -92,8 +95,14 @@ export default function ReadingVocabPage() {
     }).catch(() => setLoading(false))
   }, [])
 
-  /* Reset pagination when filter changes */
-  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [levelTab, catTab])
+  /* Reset pagination when filter/search changes */
+  useEffect(() => { setVisibleCount(PAGE_SIZE) }, [levelTab, catTab, searchQuery])
+
+  const handleSearch = (value: string) => {
+    setSearchRaw(value)
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => setSearchQuery(value), 200)
+  }
 
   const toggleSave = async (wordId: string) => {
     const wasSaved = savedIds.includes(wordId)
@@ -136,11 +145,20 @@ export default function ReadingVocabPage() {
 
   const filtered = useMemo(() => {
     let list = words
-    if (isSavedTab) return list.filter(w => savedIds.includes(w.id))
-    if (levelTab !== 'Barchasi') list = list.filter(w => w.level === levelTab)
-    if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+    if (isSavedTab) list = list.filter(w => savedIds.includes(w.id))
+    else {
+      if (levelTab !== 'Barchasi') list = list.filter(w => w.level === levelTab)
+      if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      list = list.filter(w =>
+        w.word.toLowerCase().includes(q) ||
+        w.uzbek_translation.toLowerCase().includes(q)
+      )
+    }
     return list
-  }, [words, savedIds, isSavedTab, levelTab, catTab])
+  }, [words, savedIds, isSavedTab, levelTab, catTab, searchQuery])
 
   const visible = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
@@ -245,7 +263,40 @@ export default function ReadingVocabPage() {
           })}
         </div>
       )}
-      {isSavedTab && <div className="mb-6" />}
+      {isSavedTab && <div className="mb-3" />}
+
+      {/* ── Search ─── */}
+      <div className="relative mb-5">
+        <span style={{
+          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 15, pointerEvents: 'none', lineHeight: 1,
+        }}>🔍</span>
+        <input
+          type="text"
+          value={searchRaw}
+          onChange={e => handleSearch(e.target.value)}
+          placeholder="So'z yoki tarjima bo'yicha qidirish..."
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            paddingLeft: 36, paddingRight: searchRaw ? 32 : 14,
+            paddingTop: 10, paddingBottom: 10,
+            background: 'var(--bg-secondary)',
+            border: '0.5px solid var(--border)',
+            borderRadius: 'var(--radius, 12px)',
+            fontSize: 14, color: 'var(--text-primary)',
+            outline: 'none', fontFamily: 'inherit',
+          }}
+        />
+        {searchRaw && (
+          <button
+            onClick={() => { setSearchRaw(''); setSearchQuery('') }}
+            style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 16, color: 'var(--text-muted)', lineHeight: 1, padding: 2,
+            }}>×</button>
+        )}
+      </div>
 
       {/* ── Filter result count ─── */}
       {!loading && filtered.length > 0 && (
@@ -270,7 +321,11 @@ export default function ReadingVocabPage() {
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
             {isSavedTab
               ? "Hali saqlangan so'zlar yo'q — yurak tugmasini bosing"
-              : words.length === 0 ? "Hali so'zlar qo'shilmagan" : "Bu filtrlarga mos so'z topilmadi"}
+              : words.length === 0
+                ? "Hali so'zlar qo'shilmagan"
+                : searchQuery.trim()
+                  ? `"${searchQuery}" bo'yicha so'z topilmadi`
+                  : "Bu filtrlarga mos so'z topilmadi"}
           </p>
         </div>
       ) : (
