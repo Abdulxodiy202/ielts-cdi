@@ -8,22 +8,9 @@ import { ChevronLeft, Lock } from 'lucide-react'
 interface VideoLesson {
   id: string
   title: string
-  description: string | null
   video_url: string
-  thumbnail_url: string | null
-  category: string
-  duration_minutes: number | null
+  recommendation: string | null
   is_premium: boolean
-}
-
-const CAT_COLORS: Record<string, { bg: string; color: string }> = {
-  Grammar:    { bg: 'rgba(99,102,241,0.1)',  color: '#6366f1' },
-  Vocabulary: { bg: 'rgba(20,184,166,0.1)',  color: '#14b8a6' },
-  Speaking:   { bg: 'rgba(249,115,22,0.1)',  color: '#f97316' },
-  Writing:    { bg: 'rgba(139,92,246,0.1)',  color: '#8b5cf6' },
-  Listening:  { bg: 'rgba(59,130,246,0.1)',  color: '#3b82f6' },
-  Tips:       { bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b' },
-  general:    { bg: 'rgba(34,197,94,0.1)',   color: '#22c55e' },
 }
 
 function getYouTubeId(url: string) {
@@ -48,8 +35,9 @@ export default function VideoDetailPage() {
   }, [id])
 
   if (loading) return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
-      <div className="rounded-2xl animate-pulse" style={{ paddingTop: '56.25%', background: 'var(--bg-card)', border: '1px solid var(--border)' }} />
+    <div style={{ width: '100%', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000' }}>
+      <div style={{ width: 48, height: 48, border: '3px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 
@@ -60,83 +48,62 @@ export default function VideoDetailPage() {
     </div>
   )
 
-  const ytId   = getYouTubeId(video.video_url)
+  const ytId  = getYouTubeId(video.video_url)
   const locked = video.is_premium && !userPremium
-  const cc     = CAT_COLORS[video.category] ?? CAT_COLORS.general
+  const thumbSrc = ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
-
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-        <Link href="/video-lessons" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Video darslar</Link>
-        <span>/</span>
-        <span style={{ color: 'var(--text-primary)' }} className="truncate max-w-[200px]">{video.title}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#000', overflow: 'hidden' }}>
+      {/* Top bar */}
+      <div style={{ height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 12, background: 'rgba(0,0,0,0.85)', borderBottom: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+        <button onClick={() => router.push('/video-lessons')}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.7)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '6px 8px', borderRadius: 8, transition: 'color .15s' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}>
+          <ChevronLeft size={18} />
+          <span className="font-medium truncate max-w-xs">{video.title}</span>
+        </button>
       </div>
-      <button onClick={() => router.push('/video-lessons')}
-        className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
-        style={{ color: 'var(--text-muted)' }}>
-        <ChevronLeft size={16} /> Video darslarga qaytish
-      </button>
 
-      {/* Video player */}
-      <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', borderRadius: 16, overflow: 'hidden', background: '#000', marginBottom: 24 }}>
+      {/* Video */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {locked ? (
           <>
-            {(video.thumbnail_url || ytId) && (
-              <img
-                src={video.thumbnail_url ?? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`}
-                alt={video.title}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(8px) brightness(0.35)' }}
-              />
+            {thumbSrc && (
+              <img src={thumbSrc} alt={video.title}
+                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(10px) brightness(0.25)' }} />
             )}
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 }}>
-              <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Lock size={28} style={{ color: '#f59e0b' }} />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
+              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Lock size={32} style={{ color: '#f59e0b' }} />
               </div>
-              <div className="text-center">
-                <p className="font-bold text-lg mb-1" style={{ color: '#fff' }}>Premium kontent</p>
-                <p className="text-sm mb-5" style={{ color: 'rgba(255,255,255,0.6)' }}>Bu video faqat premium foydalanuvchilar uchun</p>
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 8 }}>Premium kontent</p>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 24 }}>Bu video faqat premium foydalanuvchilar uchun</p>
               </div>
               <Link href="/premium"
-                className="px-6 py-2.5 rounded-full font-semibold text-sm transition-all hover:opacity-90"
-                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', textDecoration: 'none' }}>
+                style={{ padding: '12px 28px', borderRadius: 50, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', textDecoration: 'none', display: 'inline-block', transition: 'opacity .15s' }}
+                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.opacity = '1')}>
                 👑 Premiumga o&apos;tish
               </Link>
+              {video.recommendation && (
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>
+                  💡 {video.recommendation}
+                </p>
+              )}
             </div>
           </>
         ) : ytId ? (
           <iframe
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
-            src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1`}
+            src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen title={video.title}
           />
         ) : (
           <video style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            src={video.video_url} controls poster={video.thumbnail_url ?? undefined} />
-        )}
-      </div>
-
-      {/* Meta */}
-      <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <h1 className="text-xl font-bold leading-snug" style={{ color: 'var(--text-primary)' }}>{video.title}</h1>
-          {video.is_premium && (
-            <span className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full"
-              style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
-              👑 Premium
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: cc.bg, color: cc.color }}>{video.category}</span>
-          {video.duration_minutes && (
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>⏱ {video.duration_minutes} daqiqa</span>
-          )}
-        </div>
-        {video.description && (
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{video.description}</p>
+            src={video.video_url} controls autoPlay />
         )}
       </div>
     </div>

@@ -14,9 +14,9 @@ export async function GET() {
   const [videosRes, profileRes] = await Promise.all([
     admin
       .from('video_lessons')
-      .select('id, title, description, video_url, thumbnail_url, category, duration_minutes, is_premium, order_index')
+      .select('id, title, video_url, recommendation, is_premium')
       .eq('is_published', true)
-      .order('order_index', { ascending: true }),
+      .order('created_at', { ascending: false }),
     supabase
       .from('profiles')
       .select('is_premium, premium_until')

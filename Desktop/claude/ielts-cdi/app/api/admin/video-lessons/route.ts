@@ -18,8 +18,8 @@ export async function GET() {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('video_lessons')
-    .select('*')
-    .order('order_index', { ascending: true })
+    .select('id, title, video_url, recommendation, is_premium, is_published, created_at')
+    .order('created_at', { ascending: false })
   if (error) {
     if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
     return Response.json({ error: error.message }, { status: 500 })
@@ -30,7 +30,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const body = await request.json()
-  const { title, description, video_url, thumbnail_url, category, duration_minutes, is_premium, is_published, order_index } = body
+  const { title, video_url, recommendation, is_premium } = body
 
   if (!title?.trim()) return Response.json({ error: 'Sarlavha kiritilishi shart' }, { status: 400 })
   if (!video_url?.trim()) return Response.json({ error: 'Video URL kiritilishi shart' }, { status: 400 })
@@ -40,16 +40,12 @@ export async function POST(request: NextRequest) {
     .from('video_lessons')
     .insert({
       title: title.trim(),
-      description: description?.trim() ?? null,
       video_url: video_url.trim(),
-      thumbnail_url: thumbnail_url?.trim() || null,
-      category: category ?? 'general',
-      duration_minutes: duration_minutes ? Number(duration_minutes) : null,
+      recommendation: recommendation?.trim() ?? null,
       is_premium: is_premium ?? false,
-      is_published: is_published ?? true,
-      order_index: order_index ?? 0,
+      is_published: true,
     })
-    .select()
+    .select('id, title, video_url, recommendation, is_premium, is_published, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 400 })

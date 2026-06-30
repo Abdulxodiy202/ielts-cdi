@@ -3927,37 +3927,38 @@ CREATE POLICY "Saved words by owner" ON user_saved_linking_words
 interface VideoLesson {
   id: string
   title: string
-  description: string | null
   video_url: string
-  thumbnail_url: string | null
-  category: string
-  duration_minutes: number | null
+  recommendation: string | null
   is_premium: boolean
   is_published: boolean
-  order_index: number
+  created_at: string
 }
-
-const VIDEO_CATEGORIES = ['Grammar', 'Vocabulary', 'Speaking', 'Writing', 'Listening', 'Tips', 'general']
 
 function getYouTubeId(url: string) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
   return m ? m[1] : null
 }
 
-const EMPTY_VIDEO_FORM = {
-  title: '', description: '', video_url: '', thumbnail_url: '',
-  category: 'Grammar', duration_minutes: '', is_premium: false, is_published: true, order_index: 0,
-}
-
 function VideoLessonsTab() {
-  const [videos,    setVideos]    = useState<VideoLesson[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [dbMissing, setDbMissing] = useState(false)
-  const [saving,    setSaving]    = useState(false)
-  const [formError, setFormError] = useState('')
-  const [showForm,  setShowForm]  = useState(false)
-  const [editId,    setEditId]    = useState<string | null>(null)
-  const [form,      setForm]      = useState({ ...EMPTY_VIDEO_FORM })
+  const [videos,       setVideos]       = useState<VideoLesson[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [dbMissing,    setDbMissing]    = useState(false)
+  const [saving,       setSaving]       = useState(false)
+  const [deletingVid,  setDeletingVid]  = useState(false)
+  const [showDeleteVid,setShowDeleteVid]= useState(false)
+  const [message,      setMessage]      = useState<{ ok: boolean; text: string } | null>(null)
+  const [selectedId,   setSelectedId]   = useState('')
+  const [editTitle,    setEditTitle]    = useState('')
+  const [editUrl,      setEditUrl]      = useState('')
+  const [editRec,      setEditRec]      = useState('')
+  const [showCreate,   setShowCreate]   = useState(false)
+  const [newTitle,     setNewTitle]     = useState('')
+  const [newUrl,       setNewUrl]       = useState('')
+  const [newRec,       setNewRec]       = useState('')
+  const [newPremium,   setNewPremium]   = useState(false)
+  const [creating,     setCreating]     = useState(false)
+
+  const selectedVideo = videos.find(v => v.id === selectedId) ?? null
 
   const load = async () => {
     setLoading(true)
@@ -3969,65 +3970,63 @@ function VideoLessonsTab() {
 
   useEffect(() => { load() }, [])
 
-  const resetForm = () => { setForm({ ...EMPTY_VIDEO_FORM, order_index: videos.length }); setFormError(''); setShowForm(false); setEditId(null) }
+  const handleVideoChange = (id: string) => {
+    setSelectedId(id)
+    const v = videos.find(v => v.id === id)
+    if (v) { setEditTitle(v.title); setEditUrl(v.video_url); setEditRec(v.recommendation ?? '') }
+    else { setEditTitle(''); setEditUrl(''); setEditRec('') }
+    setMessage(null); setShowDeleteVid(false)
+  }
 
-  /* Auto-fill YouTube thumbnail */
-  const handleVideoUrlChange = (url: string) => {
-    setForm(f => {
-      const ytId = getYouTubeId(url)
-      const thumb = ytId && !f.thumbnail_url ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : f.thumbnail_url
-      return { ...f, video_url: url, thumbnail_url: thumb }
+  const handleToggle = async (field: 'is_premium' | 'is_published') => {
+    if (!selectedVideo) return
+    const newVal = !selectedVideo[field]
+    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: newVal }),
     })
+    if (res.ok) setVideos(prev => prev.map(v => v.id === selectedId ? { ...v, [field]: newVal } : v))
   }
 
   const handleSave = async () => {
-    if (!form.title.trim()) { setFormError('Sarlavha kiritilishi shart'); return }
-    if (!form.video_url.trim()) { setFormError('Video URL kiritilishi shart'); return }
-    setSaving(true); setFormError('')
-    const payload = {
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      video_url: form.video_url.trim(),
-      thumbnail_url: form.thumbnail_url.trim() || null,
-      category: form.category,
-      duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
-      is_premium: form.is_premium,
-      is_published: form.is_published,
-      order_index: Number(form.order_index),
-    }
-    const res = editId
-      ? await fetch(`/api/admin/video-lessons/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      : await fetch('/api/admin/video-lessons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!editTitle.trim()) { setMessage({ ok: false, text: 'Sarlavha kiritilishi shart' }); return }
+    if (!editUrl.trim()) { setMessage({ ok: false, text: 'Video URL kiritilishi shart' }); return }
+    setSaving(true); setMessage(null)
+    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editTitle.trim(), video_url: editUrl.trim(), recommendation: editRec.trim() || null }),
+    })
     const json = await res.json()
-    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
-    if (editId) setVideos(prev => prev.map(v => v.id === editId ? json : v))
-    else setVideos(prev => [...prev, json])
-    resetForm()
+    if (!res.ok) { setMessage({ ok: false, text: json.error || 'Xatolik' }); setSaving(false); return }
+    setVideos(prev => prev.map(v => v.id === selectedId ? json : v))
+    setMessage({ ok: true, text: 'Saqlandi' })
     setSaving(false)
   }
 
-  const handleEdit = (v: VideoLesson) => {
-    setForm({
-      title: v.title, description: v.description ?? '', video_url: v.video_url,
-      thumbnail_url: v.thumbnail_url ?? '', category: v.category,
-      duration_minutes: v.duration_minutes?.toString() ?? '',
-      is_premium: v.is_premium, is_published: v.is_published, order_index: v.order_index,
-    })
-    setEditId(v.id); setShowForm(true); setFormError('')
+  const handleDeleteVid = async () => {
+    setDeletingVid(true)
+    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) {
+      setVideos(prev => prev.filter(v => v.id !== selectedId))
+      setSelectedId(''); setEditTitle(''); setEditUrl(''); setEditRec('')
+      setShowDeleteVid(false)
+    }
+    setDeletingVid(false)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Videoni o'chirishni tasdiqlaysizmi?")) return
-    const res = await fetch(`/api/admin/video-lessons/${id}`, { method: 'DELETE' })
-    if (res.ok || res.status === 204) setVideos(prev => prev.filter(v => v.id !== id))
-  }
-
-  const handleTogglePublish = async (v: VideoLesson) => {
-    const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_published: !v.is_published }),
+  const handleCreate = async () => {
+    if (!newTitle.trim() || !newUrl.trim()) return
+    setCreating(true)
+    const res = await fetch('/api/admin/video-lessons', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle.trim(), video_url: newUrl.trim(), recommendation: newRec.trim() || null, is_premium: newPremium }),
     })
-    if (res.ok) setVideos(prev => prev.map(x => x.id === v.id ? { ...x, is_published: !x.is_published } : x))
+    const json = await res.json()
+    if (res.ok || res.status === 201) {
+      setVideos(prev => [json, ...prev])
+      setShowCreate(false); setNewTitle(''); setNewUrl(''); setNewRec(''); setNewPremium(false)
+    }
+    setCreating(false)
   }
 
   if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
@@ -4040,14 +4039,10 @@ function VideoLessonsTab() {
 {`CREATE TABLE IF NOT EXISTS video_lessons (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   title TEXT NOT NULL,
-  description TEXT,
   video_url TEXT NOT NULL,
-  thumbnail_url TEXT,
-  category TEXT DEFAULT 'general',
-  duration_minutes INTEGER,
+  recommendation TEXT,
   is_premium BOOLEAN DEFAULT false,
   is_published BOOLEAN DEFAULT true,
-  order_index INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE video_lessons ENABLE ROW LEVEL SECURITY;
@@ -4061,136 +4056,190 @@ CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
     </div>
   )
 
+  const ytId = selectedVideo ? getYouTubeId(selectedVideo.video_url) : null
+  const thumbUrl = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null
+
   return (
-    <div className="space-y-6">
-      {/* Add/Edit form */}
-      {showForm ? (
-        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-            {editId ? '✏️ Videoni tahrirlash' : '➕ Yangi video darsi'}
-          </h3>
-          <div className="grid sm:grid-cols-2 gap-3 mb-3">
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
-              <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 2 kirish..."
-                value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Video URL * (YouTube yoki to&apos;g&apos;ridan-to&apos;g&apos;ri link)</label>
-              <input className="input-field text-sm w-full"
-                placeholder="https://youtube.com/watch?v=... yoki video fayl URL"
-                value={form.video_url}
-                onChange={e => handleVideoUrlChange(e.target.value)} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Thumbnail URL (ixtiyoriy — YouTube da avtomatik olinadi)</label>
-              <input className="input-field text-sm w-full" placeholder="https://..."
-                value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsif</label>
-              <textarea className="input-field text-sm w-full" rows={3}
-                placeholder="Video haqida qisqacha..."
-                value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                style={{ resize: 'vertical', minHeight: 72 }} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kategoriya</label>
-              <select className="input-field text-sm w-full" value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {VIDEO_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Davomiyligi (daqiqa)</label>
-              <input className="input-field text-sm w-full" type="number" min={0} placeholder="12"
-                value={form.duration_minutes} onChange={e => setForm(f => ({ ...f, duration_minutes: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib (order_index)</label>
-              <input className="input-field text-sm" type="number" min={0}
-                value={form.order_index} onChange={e => setForm(f => ({ ...f, order_index: Number(e.target.value) }))} />
-            </div>
-            <div className="flex items-end gap-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={form.is_premium} onChange={e => setForm(f => ({ ...f, is_premium: e.target.checked }))} className="rounded" />
-                👑 Premium
-              </label>
-              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={form.is_published} onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))} className="rounded" />
-                Nashr qilish
-              </label>
-            </div>
-          </div>
-          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
-              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : (editId ? 'Saqlash' : 'Qo\'shish')}
-            </button>
-            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => { setShowForm(true); setForm(f => ({ ...f, order_index: videos.length })) }}
-          className="btn-primary text-sm flex items-center gap-2">
-          <Plus size={14} /> Yangi video qo&apos;shish
+    <div className="space-y-4 max-w-lg">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
+        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewUrl(''); setNewRec(''); setNewPremium(false) }}
+          className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} /> Yangi video
         </button>
+      </div>
+
+      <div className="card p-4">
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Video tanlang</label>
+        <select value={selectedId} onChange={e => handleVideoChange(e.target.value)} className="input-field">
+          <option value="">— Video tanlang —</option>
+          {videos.map(v => (
+            <option key={v.id} value={v.id}>{v.title}{!v.is_published ? ' (Draft)' : ''}</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedId && selectedVideo && (
+        <div className="card p-5 space-y-4">
+          {thumbUrl && (
+            <div className="rounded-xl overflow-hidden" style={{ aspectRatio: '16/9', background: '#000', border: '1px solid var(--border)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={thumbUrl} alt="thumbnail" className="w-full h-full object-cover" />
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha</label>
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL (YouTube)</label>
+              <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)}
+                placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun ko&apos;rish kerak)</label>
+              <textarea value={editRec} onChange={e => setEditRec(e.target.value)}
+                placeholder="Bu video IELTS Writing uchun ideal, chunki..."
+                rows={3} className="input-field w-full text-sm resize-none" />
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+              <button onClick={() => handleToggle('is_premium')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedVideo.is_premium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedVideo.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                {selectedVideo.is_premium ? 'Premium' : 'Bepul'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nashr holati</span>
+              <button onClick={() => handleToggle('is_published')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedVideo.is_published ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedVideo.is_published ? <CheckCircle size={13} /> : <ToggleLeft size={13} />}
+                {selectedVideo.is_published ? 'Published' : 'Draft'}
+              </button>
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {message && (
+            <div className="p-3 rounded-xl text-sm font-medium"
+              style={{
+                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: message.ok ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {message.ok ? '✅' : '❌'} {message.text}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
+              style={{ opacity: saving ? 0.6 : 1 }}>
+              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
+            </button>
+            <button onClick={() => setShowDeleteVid(true)}
+              className="px-3 py-2 rounded-xl text-sm font-medium"
+              style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+
+          {showDeleteVid && (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>Videoni o&apos;chirishni tasdiqlaysizmi?</p>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setShowDeleteVid(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  Bekor
+                </button>
+                <button onClick={handleDeleteVid} disabled={deletingVid}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--error)', color: '#fff', opacity: deletingVid ? 0.7 : 1 }}>
+                  {deletingVid ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Ha, o&apos;chirish
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* List */}
-      {videos.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Play size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Hali video darslar qo&apos;shilmagan</p>
+      {!selectedId && (
+        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+          Yuqoridan video tanlang
         </div>
-      ) : (
-        <div className="card overflow-hidden">
-          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '40px 1fr 100px 80px 80px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-            <span>#</span><span>Sarlavha</span><span>Kategoriya</span><span>Premium</span><span>Holat</span><span className="text-right">Amal</span>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {videos.map(v => (
-              <div key={v.id} className="grid items-center px-4 py-3 text-sm"
-                style={{ gridTemplateColumns: '40px 1fr 100px 80px 80px 90px', gap: 8 }}>
-                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{v.order_index}</span>
-                <div className="min-w-0">
-                  <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
-                  {v.duration_minutes && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>⏱ {v.duration_minutes} daq</p>}
+      )}
+
+      <AnimatePresence>
+        {showCreate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowCreate(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm space-y-4"
+              style={{ zIndex: 51 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi video</h3>
+                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
+                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                  <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                    placeholder="Video nomi..." className="input-field w-full text-sm" autoFocus />
                 </div>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium truncate"
-                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {v.category}
-                </span>
-                <span className="text-xs font-medium" style={{ color: v.is_premium ? '#f59e0b' : 'var(--text-muted)' }}>
-                  {v.is_premium ? '👑 Ha' : 'Yo\'q'}
-                </span>
-                <span className="text-xs px-2 py-1 rounded-full font-medium text-center"
-                  style={{ background: v.is_published ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', color: v.is_published ? 'var(--success)' : 'var(--text-muted)' }}>
-                  {v.is_published ? 'Faol' : 'Yashirin'}
-                </span>
-                <div className="flex items-center gap-1.5 justify-end">
-                  <button onClick={() => handleEdit(v)} title="Tahrirlash"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
-                    <Edit3 size={12} />
-                  </button>
-                  <button onClick={() => handleTogglePublish(v)} title={v.is_published ? "Yashirish" : 'Nashr qilish'}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: v.is_published ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: v.is_published ? 'var(--success)' : 'var(--text-muted)' }}>
-                    {v.is_published ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
-                  </button>
-                  <button onClick={() => handleDelete(v.id)} title="O'chirish"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
-                    <Trash2 size={12} />
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL *</label>
+                  <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya</label>
+                  <textarea value={newRec} onChange={e => setNewRec(e.target.value)}
+                    placeholder="Bu video IELTS uchun foydali..." rows={2}
+                    className="input-field w-full text-sm resize-none" />
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+                  <button type="button" onClick={() => setNewPremium(p => !p)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={newPremium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {newPremium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                    {newPremium ? 'Premium' : 'Bepul'}
                   </button>
                 </div>
               </div>
-            ))}
+              <button onClick={handleCreate} disabled={creating || !newTitle.trim() || !newUrl.trim()}
+                className="btn-primary w-full text-sm disabled:opacity-50">
+                {creating ? 'Yaratilyapti...' : 'Yaratish'}
+              </button>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   )
 }
