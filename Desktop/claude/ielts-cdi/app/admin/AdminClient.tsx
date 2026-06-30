@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Gamepad2, Link2,
+  Loader2, Upload, FileText, X, Music, Gamepad2, Link2, Play,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
@@ -3923,6 +3923,278 @@ CREATE POLICY "Saved words by owner" ON user_saved_linking_words
   )
 }
 
+/* ── VideoLessonsTab ─────────────────────────────────────────────────── */
+interface VideoLesson {
+  id: string
+  title: string
+  description: string | null
+  video_url: string
+  thumbnail_url: string | null
+  category: string
+  duration_minutes: number | null
+  is_premium: boolean
+  is_published: boolean
+  order_index: number
+}
+
+const VIDEO_CATEGORIES = ['Grammar', 'Vocabulary', 'Speaking', 'Writing', 'Listening', 'Tips', 'general']
+
+function getYouTubeId(url: string) {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+  return m ? m[1] : null
+}
+
+const EMPTY_VIDEO_FORM = {
+  title: '', description: '', video_url: '', thumbnail_url: '',
+  category: 'Grammar', duration_minutes: '', is_premium: false, is_published: true, order_index: 0,
+}
+
+function VideoLessonsTab() {
+  const [videos,    setVideos]    = useState<VideoLesson[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [saving,    setSaving]    = useState(false)
+  const [formError, setFormError] = useState('')
+  const [showForm,  setShowForm]  = useState(false)
+  const [editId,    setEditId]    = useState<string | null>(null)
+  const [form,      setForm]      = useState({ ...EMPTY_VIDEO_FORM })
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/video-lessons')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) { const data = await res.json(); setVideos(Array.isArray(data) ? data : []) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const resetForm = () => { setForm({ ...EMPTY_VIDEO_FORM, order_index: videos.length }); setFormError(''); setShowForm(false); setEditId(null) }
+
+  /* Auto-fill YouTube thumbnail */
+  const handleVideoUrlChange = (url: string) => {
+    setForm(f => {
+      const ytId = getYouTubeId(url)
+      const thumb = ytId && !f.thumbnail_url ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : f.thumbnail_url
+      return { ...f, video_url: url, thumbnail_url: thumb }
+    })
+  }
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { setFormError('Sarlavha kiritilishi shart'); return }
+    if (!form.video_url.trim()) { setFormError('Video URL kiritilishi shart'); return }
+    setSaving(true); setFormError('')
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim() || null,
+      video_url: form.video_url.trim(),
+      thumbnail_url: form.thumbnail_url.trim() || null,
+      category: form.category,
+      duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
+      is_premium: form.is_premium,
+      is_published: form.is_published,
+      order_index: Number(form.order_index),
+    }
+    const res = editId
+      ? await fetch(`/api/admin/video-lessons/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      : await fetch('/api/admin/video-lessons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    if (editId) setVideos(prev => prev.map(v => v.id === editId ? json : v))
+    else setVideos(prev => [...prev, json])
+    resetForm()
+    setSaving(false)
+  }
+
+  const handleEdit = (v: VideoLesson) => {
+    setForm({
+      title: v.title, description: v.description ?? '', video_url: v.video_url,
+      thumbnail_url: v.thumbnail_url ?? '', category: v.category,
+      duration_minutes: v.duration_minutes?.toString() ?? '',
+      is_premium: v.is_premium, is_published: v.is_published, order_index: v.order_index,
+    })
+    setEditId(v.id); setShowForm(true); setFormError('')
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Videoni o'chirishni tasdiqlaysizmi?")) return
+    const res = await fetch(`/api/admin/video-lessons/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setVideos(prev => prev.filter(v => v.id !== id))
+  }
+
+  const handleTogglePublish = async (v: VideoLesson) => {
+    const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !v.is_published }),
+    })
+    if (res.ok) setVideos(prev => prev.map(x => x.id === v.id ? { ...x, is_published: !x.is_published } : x))
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) return (
+    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ video_lessons jadvali topilmadi</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
+      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+{`CREATE TABLE IF NOT EXISTS video_lessons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  video_url TEXT NOT NULL,
+  thumbnail_url TEXT,
+  category TEXT DEFAULT 'general',
+  duration_minutes INTEGER,
+  is_premium BOOLEAN DEFAULT false,
+  is_published BOOLEAN DEFAULT true,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE video_lessons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Video lessons readable" ON video_lessons
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
+  USING (auth.jwt() ->> 'email' IN (
+    'abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com'
+  ));`}
+      </pre>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {/* Add/Edit form */}
+      {showForm ? (
+        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            {editId ? '✏️ Videoni tahrirlash' : '➕ Yangi video darsi'}
+          </h3>
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 2 kirish..."
+                value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Video URL * (YouTube yoki to&apos;g&apos;ridan-to&apos;g&apos;ri link)</label>
+              <input className="input-field text-sm w-full"
+                placeholder="https://youtube.com/watch?v=... yoki video fayl URL"
+                value={form.video_url}
+                onChange={e => handleVideoUrlChange(e.target.value)} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Thumbnail URL (ixtiyoriy — YouTube da avtomatik olinadi)</label>
+              <input className="input-field text-sm w-full" placeholder="https://..."
+                value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsif</label>
+              <textarea className="input-field text-sm w-full" rows={3}
+                placeholder="Video haqida qisqacha..."
+                value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                style={{ resize: 'vertical', minHeight: 72 }} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kategoriya</label>
+              <select className="input-field text-sm w-full" value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                {VIDEO_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Davomiyligi (daqiqa)</label>
+              <input className="input-field text-sm w-full" type="number" min={0} placeholder="12"
+                value={form.duration_minutes} onChange={e => setForm(f => ({ ...f, duration_minutes: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib (order_index)</label>
+              <input className="input-field text-sm" type="number" min={0}
+                value={form.order_index} onChange={e => setForm(f => ({ ...f, order_index: Number(e.target.value) }))} />
+            </div>
+            <div className="flex items-end gap-4">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={form.is_premium} onChange={e => setForm(f => ({ ...f, is_premium: e.target.checked }))} className="rounded" />
+                👑 Premium
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={form.is_published} onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))} className="rounded" />
+                Nashr qilish
+              </label>
+            </div>
+          </div>
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : (editId ? 'Saqlash' : 'Qo\'shish')}
+            </button>
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => { setShowForm(true); setForm(f => ({ ...f, order_index: videos.length })) }}
+          className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi video qo&apos;shish
+        </button>
+      )}
+
+      {/* List */}
+      {videos.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Play size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali video darslar qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '40px 1fr 100px 80px 80px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>#</span><span>Sarlavha</span><span>Kategoriya</span><span>Premium</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {videos.map(v => (
+              <div key={v.id} className="grid items-center px-4 py-3 text-sm"
+                style={{ gridTemplateColumns: '40px 1fr 100px 80px 80px 90px', gap: 8 }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{v.order_index}</span>
+                <div className="min-w-0">
+                  <p className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                  {v.duration_minutes && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>⏱ {v.duration_minutes} daq</p>}
+                </div>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium truncate"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {v.category}
+                </span>
+                <span className="text-xs font-medium" style={{ color: v.is_premium ? '#f59e0b' : 'var(--text-muted)' }}>
+                  {v.is_premium ? '👑 Ha' : 'Yo\'q'}
+                </span>
+                <span className="text-xs px-2 py-1 rounded-full font-medium text-center"
+                  style={{ background: v.is_published ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', color: v.is_published ? 'var(--success)' : 'var(--text-muted)' }}>
+                  {v.is_published ? 'Faol' : 'Yashirin'}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button onClick={() => handleEdit(v)} title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button onClick={() => handleTogglePublish(v)} title={v.is_published ? "Yashirish" : 'Nashr qilish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: v.is_published ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: v.is_published ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {v.is_published ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button onClick={() => handleDelete(v.id)} title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -3938,6 +4210,7 @@ const TABS = [
   { id: 'games',         label: 'O\'yinlar',         Icon: Gamepad2 },
   { id: 'linking-words',        label: 'Linking Words',        Icon: Link2 },
   { id: 'writing-collocations', label: 'Writing Collocations', Icon: BookOpen },
+  { id: 'videos',        label: 'Video darslar',    Icon: Play },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
@@ -4022,6 +4295,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'games'         && <GamesTab />}
       {activeTab === 'linking-words'        && <LinkingWordsTab />}
       {activeTab === 'writing-collocations' && <WritingCollocationTab />}
+      {activeTab === 'videos'               && <VideoLessonsTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
     </div>
   )
