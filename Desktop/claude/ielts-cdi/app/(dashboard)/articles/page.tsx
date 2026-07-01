@@ -80,7 +80,7 @@ export default function ArticlesPage() {
               <div
                 key={article.id}
                 onClick={() => canRead && router.push(`/articles/${article.id}`)}
-                className="rounded-2xl overflow-hidden flex flex-col transition-all duration-200"
+                className="rounded-2xl flex flex-col transition-all duration-200"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
@@ -122,7 +122,7 @@ export default function ArticlesPage() {
                 </div>
 
                 {/* ── MIDDLE: Cover image ── */}
-                <div className="relative mx-4 rounded-xl overflow-hidden" style={{ height: 200, flexShrink: 0 }}>
+                <div className="relative mx-4 rounded-xl overflow-hidden" style={{ maxHeight: 200, flexShrink: 0 }}>
                   {article.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={article.cover_image_url} alt={article.title} className="w-full h-full object-cover" />
@@ -147,7 +147,7 @@ export default function ArticlesPage() {
                 </div>
 
                 {/* ── BOTTOM: Action button ── */}
-                <div className="px-4 pt-3 pb-4">
+                <div className="px-4 pt-3 pb-4" style={{ marginTop: 'auto' }}>
                   {locked ? (
                     <button
                       onClick={e => { e.stopPropagation(); router.push('/pricing') }}
