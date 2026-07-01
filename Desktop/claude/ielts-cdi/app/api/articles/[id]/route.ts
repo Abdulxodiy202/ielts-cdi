@@ -16,7 +16,7 @@ export async function GET(
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('articles')
-    .select('id, title, file_url, cover_image_url, is_premium, is_published, created_at')
+    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, created_at')
     .eq('id', id)
     .eq('is_published', true)
     .single()
@@ -36,7 +36,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await req.json()
-  const allowed = ['title', 'is_premium', 'is_published', 'file_url', 'cover_image_url']
+  const allowed = ['title', 'is_premium', 'is_published', 'file_url', 'cover_image_url', 'order_index']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
@@ -48,7 +48,7 @@ export async function PATCH(
     .from('articles')
     .update(updates)
     .eq('id', id)
-    .select('id, title, file_url, cover_image_url, is_premium, is_published, created_at')
+    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, created_at')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

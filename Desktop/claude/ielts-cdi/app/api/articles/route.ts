@@ -13,9 +13,9 @@ export async function GET() {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('articles')
-      .select('id, title, file_url, cover_image_url, is_premium, is_published, created_at')
+      .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, created_at')
       .eq('is_published', true)
-      .order('created_at', { ascending: true })
+      .order('order_index', { ascending: true })
 
     if (error) {
       console.log('[articles GET] error:', error.code, error.message)
@@ -39,19 +39,29 @@ export async function POST(req: NextRequest) {
   if (!title?.trim()) return NextResponse.json({ error: 'Title required' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  const { data: maxRow } = await admin
+    .from('articles')
+    .select('order_index')
+    .order('order_index', { ascending: false })
+    .limit(1)
+    .single()
+  const nextIndex = ((maxRow?.order_index as number | null) ?? 0) + 1
+
   const { data, error } = await admin
     .from('articles')
     .insert({
       title: title.trim(),
       is_premium: is_premium ?? false,
       is_published: true,
+      order_index: nextIndex,
     })
-    .select('id, title, file_url, is_premium, is_published, created_at')
+    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, created_at')
     .single()
 
   if (error) {
     console.log('[articles POST] Insert error:', error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  return NextResponse.json({ ...data, cover_image_url: null }, { status: 201 })
+  return NextResponse.json(data, { status: 201 })
 }

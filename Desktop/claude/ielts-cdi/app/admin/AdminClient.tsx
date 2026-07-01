@@ -1810,6 +1810,7 @@ interface ArticleItem {
   cover_image_url: string | null
   is_premium: boolean
   is_published: boolean
+  order_index: number
   created_at: string
 }
 
@@ -1827,8 +1828,9 @@ function ArticlesTab() {
   const [showCreate, setShowCreate]       = useState(false)
   const [newTitle, setNewTitle]           = useState('')
   const [creating, setCreating]           = useState(false)
-  const [togglingPremium, setTogglingPremium] = useState(false)
-  const [editTitle, setEditTitle]             = useState('')
+  const [togglingPremium, setTogglingPremium]   = useState(false)
+  const [editTitle, setEditTitle]               = useState('')
+  const [editOrderIndex, setEditOrderIndex]     = useState(0)
   const [selectedCoverFile, setSelectedCoverFile] = useState<File | null>(null)
   const [savingCover, setSavingCover]             = useState(false)
   const [coverUrls, setCoverUrls]                 = useState<Record<string, string | null>>({})
@@ -1847,7 +1849,9 @@ function ArticlesTab() {
 
   function handleArticleChange(id: string) {
     setSelectedId(id)
-    setEditTitle(articles.find(a => a.id === id)?.title ?? '')
+    const art = articles.find(a => a.id === id)
+    setEditTitle(art?.title ?? '')
+    setEditOrderIndex(art?.order_index ?? 0)
     setSelectedFile(null); setSelectedCoverFile(null)
     setMessage(null); setShowDeleteConfirm(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -1857,17 +1861,21 @@ function ArticlesTab() {
   async function handleSave() {
     if (!selectedId) return
     const trimmedTitle = editTitle.trim()
-    const titleChanged = trimmedTitle && trimmedTitle !== selectedArticle?.title
-    if (!titleChanged && !selectedFile) return
+    const titleChanged = trimmedTitle !== '' && trimmedTitle !== selectedArticle?.title
+    const orderChanged = editOrderIndex !== (selectedArticle?.order_index ?? 0)
+    if (!titleChanged && !orderChanged && !selectedFile) return
     setSaving(true); setMessage(null)
     try {
-      if (titleChanged) {
+      if (titleChanged || orderChanged) {
+        const patch: Record<string, unknown> = {}
+        if (titleChanged) patch.title = trimmedTitle
+        if (orderChanged) patch.order_index = editOrderIndex
         const res = await fetch(`/api/articles/${selectedId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: trimmedTitle }),
+          body: JSON.stringify(patch),
         })
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Nom saqlashda xato') }
-        setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, title: trimmedTitle } : a))
+        setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, ...patch } : a))
       }
 
       if (selectedFile) {
@@ -1985,7 +1993,7 @@ function ArticlesTab() {
       })
       if (res.ok) {
         const created = await res.json()
-        setArticles(prev => [created, ...prev])
+        setArticles(prev => [...prev, created])
         setSelectedId(created.id)
         setShowCreate(false); setNewTitle(''); setMessage(null)
         setSelectedFile(null); setShowDeleteConfirm(false)
@@ -2023,18 +2031,32 @@ function ArticlesTab() {
 
       {selectedId && (
         <div className="card p-5 space-y-4">
-          {/* Title input */}
-          <div>
-            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
-              Sarlavha
-            </label>
-            <input
-              type="text"
-              value={editTitle}
-              onChange={e => setEditTitle(e.target.value)}
-              className="input-field w-full text-sm"
-              placeholder="Maqola sarlavhasi..."
-            />
+          {/* Title + order_index */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Sarlavha
+              </label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                className="input-field w-full text-sm"
+                placeholder="Maqola sarlavhasi..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Tartib raqami
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={editOrderIndex}
+                onChange={e => setEditOrderIndex(Number(e.target.value))}
+                className="input-field w-full text-sm"
+              />
+            </div>
           </div>
 
           <hr style={{ borderColor: 'var(--border)' }} />
