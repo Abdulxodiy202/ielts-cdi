@@ -15,7 +15,7 @@ export async function GET() {
       .from('articles')
       .select('id, title, file_url, cover_image_url, is_premium, is_published, created_at')
       .eq('is_published', true)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (error) {
       console.log('[articles GET] error:', error.code, error.message)
