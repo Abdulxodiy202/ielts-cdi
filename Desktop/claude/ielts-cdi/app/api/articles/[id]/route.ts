@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+const ADMIN_EMAILS = ['abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com']
 
 export async function GET(
   _req: NextRequest,
@@ -32,16 +32,19 @@ export async function PATCH(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (user.email !== ADMIN_EMAIL) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!ADMIN_EMAILS.includes(user.email ?? '')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
   const body = await req.json()
-  const allowed = ['title', 'is_premium', 'is_published', 'file_url', 'cover_image_url', 'order_index']
   const updates: Record<string, unknown> = {}
-  for (const key of allowed) {
-    if (key in body) updates[key] = body[key]
-  }
+  if (body.title          !== undefined) updates.title          = String(body.title).trim()
+  if (body.order_index    !== undefined) updates.order_index    = Number(body.order_index)
+  if (body.is_premium     !== undefined) updates.is_premium     = Boolean(body.is_premium)
+  if (body.is_published   !== undefined) updates.is_published   = Boolean(body.is_published)
+  if (body.file_url       !== undefined) updates.file_url       = body.file_url
+  if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'No fields' }, { status: 400 })
+  console.log('[articles PATCH]', id, updates)
 
   const admin = createAdminClient()
   const { data, error } = await admin
@@ -62,7 +65,7 @@ export async function DELETE(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (user.email !== ADMIN_EMAIL) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!ADMIN_EMAILS.includes(user.email ?? '')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
   const admin = createAdminClient()

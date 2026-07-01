@@ -1870,6 +1870,7 @@ function ArticlesTab() {
         const patch: Record<string, unknown> = {}
         if (titleChanged) patch.title = trimmedTitle
         if (orderChanged) patch.order_index = editOrderIndex
+        console.log('[ArticlesTab] Saving order_index:', editOrderIndex, 'patch:', patch)
         const res = await fetch(`/api/articles/${selectedId}`, {
           method: 'PATCH', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
