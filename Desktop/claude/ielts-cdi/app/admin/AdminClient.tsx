@@ -11,6 +11,7 @@ import {
   Loader2, Upload, FileText, X, Music, Gamepad2, Link2, Play,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
 import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
 
@@ -3957,8 +3958,28 @@ function VideoLessonsTab() {
   const [newRec,       setNewRec]       = useState('')
   const [newPremium,   setNewPremium]   = useState(false)
   const [creating,     setCreating]     = useState(false)
+  const [uploading,   setUploading]   = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const videoFileRef    = useRef<HTMLInputElement>(null)
+  const newVideoFileRef = useRef<HTMLInputElement>(null)
 
   const selectedVideo = videos.find(v => v.id === selectedId) ?? null
+
+  const handleFileUpload = async (file: File, setUrl: (url: string) => void) => {
+    if (file.size > 500 * 1024 * 1024) { setUploadError('Fayl hajmi 500MB dan oshmasligi kerak'); return }
+    setUploading(true); setUploadError('')
+    const supabase = createBrowserClient()
+    const ext = file.name.split('.').pop()
+    const fileName = `${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('videos').upload(fileName, file)
+    if (error) {
+      setUploadError('Yuklashda xato: ' + error.message)
+    } else {
+      const { data: urlData } = supabase.storage.from('videos').getPublicUrl(fileName)
+      setUrl(urlData.publicUrl)
+    }
+    setUploading(false)
+  }
 
   const load = async () => {
     setLoading(true)
@@ -4097,6 +4118,33 @@ CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL (YouTube)</label>
               <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)}
                 placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
+              <div className="text-center text-xs my-2" style={{ color: 'var(--text-muted)' }}>— yoki —</div>
+              <div
+                onClick={() => !uploading && videoFileRef.current?.click()}
+                className="flex flex-col items-center gap-1.5 p-4 rounded-xl text-center"
+                style={{
+                  border: `2px dashed ${uploading ? 'var(--accent)' : 'var(--border)'}`,
+                  background: uploading ? 'rgba(99,102,241,0.04)' : 'var(--bg-secondary)',
+                  cursor: uploading ? 'not-allowed' : 'pointer',
+                }}>
+                <input ref={videoFileRef} type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/*"
+                  className="hidden" disabled={uploading}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, setEditUrl); e.target.value = '' }} />
+                {uploading ? (
+                  <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                    <Loader2 size={14} className="animate-spin" /> Yuklanmoqda…
+                  </span>
+                ) : editUrl && !editUrl.includes('youtube') && !editUrl.includes('youtu.be') && editUrl.startsWith('http') ? (
+                  <span className="text-xs font-medium" style={{ color: 'var(--success)' }}>✅ Fayl yuklandi</span>
+                ) : (
+                  <>
+                    <span className="text-sm">📁</span>
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Video fayl yuklash</span>
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, MOV, AVI · Max 500MB</span>
+                  </>
+                )}
+              </div>
+              {uploadError && <p className="text-xs mt-1.5" style={{ color: 'var(--error)' }}>❌ {uploadError}</p>}
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun ko&apos;rish kerak)</label>
@@ -4215,6 +4263,33 @@ CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
                   <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL *</label>
                   <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
                     placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
+                  <div className="text-center text-xs my-2" style={{ color: 'var(--text-muted)' }}>— yoki —</div>
+                  <div
+                    onClick={() => !uploading && newVideoFileRef.current?.click()}
+                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl text-center"
+                    style={{
+                      border: `2px dashed ${uploading ? 'var(--accent)' : 'var(--border)'}`,
+                      background: uploading ? 'rgba(99,102,241,0.04)' : 'var(--bg-secondary)',
+                      cursor: uploading ? 'not-allowed' : 'pointer',
+                    }}>
+                    <input ref={newVideoFileRef} type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/*"
+                      className="hidden" disabled={uploading}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, setNewUrl); e.target.value = '' }} />
+                    {uploading ? (
+                      <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                        <Loader2 size={14} className="animate-spin" /> Yuklanmoqda…
+                      </span>
+                    ) : newUrl && !newUrl.includes('youtube') && !newUrl.includes('youtu.be') && newUrl.startsWith('http') ? (
+                      <span className="text-xs font-medium" style={{ color: 'var(--success)' }}>✅ Fayl yuklandi</span>
+                    ) : (
+                      <>
+                        <span className="text-sm">📁</span>
+                        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Video fayl yuklash</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, MOV, AVI · Max 500MB</span>
+                      </>
+                    )}
+                    {uploadError && <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>❌ {uploadError}</p>}
+                  </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya</label>
