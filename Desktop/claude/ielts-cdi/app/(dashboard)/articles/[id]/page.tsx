@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PaymentModal } from '@/components/PaymentModal'
 
 export default function ArticlePage() {
   const params = useParams()
@@ -11,6 +12,8 @@ export default function ArticlePage() {
   const [article, setArticle] = useState<any>(null)
   const [isPremium, setIsPremium] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [initialName, setInitialName] = useState('')
+  const [initialPhone, setInitialPhone] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -19,20 +22,20 @@ export default function ArticlePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const res = await fetch(`/api/articles/${id}`)
-      const article = await res.json()
-      setArticle(article)
+      const [res, profileRes] = await Promise.all([
+        fetch(`/api/articles/${id}`),
+        supabase.from('profiles').select('is_premium, full_name, phone').eq('id', user.id).single(),
+      ])
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('is_premium')
-        .eq('id', user.id)
-        .single()
-      setIsPremium(profile?.is_premium === true)
+      const data = await res.json()
+      setArticle(data)
+      setIsPremium(profileRes.data?.is_premium === true)
+      setInitialName(profileRes.data?.full_name ?? '')
+      setInitialPhone((profileRes.data as any)?.phone ?? '')
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, router])
 
   if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>Yuklanmoqda...</div>
   if (!article) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>Topilmadi</div>
@@ -50,25 +53,15 @@ export default function ArticlePage() {
           ← Maqolalarga qaytish
         </button>
 
-        {showModal && (
-          <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.8)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'20px'}}>
-            <div style={{background:'#1e1e30',borderRadius:'16px',padding:'32px',maxWidth:'480px',width:'100%',position:'relative'}}>
-              <button onClick={() => setShowModal(false)} style={{position:'absolute',top:'16px',right:'16px',background:'none',border:'none',color:'#9ca3af',fontSize:'24px',cursor:'pointer'}}>✕</button>
-              <h3 style={{color:'white',fontSize:'20px',fontWeight:'700',marginBottom:'8px'}}>To&apos;lov — Premium Obuna</h3>
-              <p style={{color:'#9ca3af',marginBottom:'24px',fontSize:'14px'}}>Kartaga o&apos;tkazma qiling, so&apos;ng chek rasmini yuboring</p>
-              <div style={{background:'#252542',borderRadius:'12px',padding:'20px',marginBottom:'20px'}}>
-                <div style={{fontSize:'12px',color:'#9ca3af',marginBottom:'8px'}}>KARTA RAQAMI</div>
-                <div style={{fontSize:'20px',fontWeight:'700',color:'white',letterSpacing:'2px',marginBottom:'4px'}}>4916 9903 5400 1395</div>
-                <div style={{color:'#9ca3af',marginBottom:'12px',fontSize:'14px'}}>Abdulxodiy Mamajonov</div>
-                <div style={{display:'flex',justifyContent:'space-between'}}>
-                  <span style={{color:'#9ca3af',fontSize:'14px'}}>O&apos;tkazma summasi</span>
-                  <span style={{color:'#6366f1',fontWeight:'700'}}>50,000 UZS</span>
-                </div>
-              </div>
-              <p style={{color:'#9ca3af',fontSize:'13px',textAlign:'center'}}>To&apos;lovdan so&apos;ng admin 24 soat ichida Premiumni faollashtiradi</p>
-            </div>
-          </div>
-        )}
+        <PaymentModal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          onSuccess={() => setShowModal(false)}
+          type="premium"
+          amount={50000}
+          initialName={initialName}
+          initialPhone={initialPhone}
+        />
       </div>
     )
   }
