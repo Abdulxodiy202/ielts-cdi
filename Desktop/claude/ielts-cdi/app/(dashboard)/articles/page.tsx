@@ -79,20 +79,18 @@ export default function ArticlesPage() {
             return (
               <div
                 key={article.id}
-                onClick={() => canRead && router.push(`/articles/${article.id}`)}
+                onClick={() => router.push(`/articles/${article.id}`)}
                 className="rounded-2xl flex flex-col transition-all duration-200"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  cursor: canRead ? 'pointer' : 'default',
+                  cursor: 'pointer',
                 }}
                 onMouseEnter={e => {
-                  if (canRead) {
-                    e.currentTarget.style.transform = 'translateY(-3px)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.14)'
-                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'
-                  }
+                  e.currentTarget.style.transform = 'translateY(-3px)'
+                  e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.14)'
+                  e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = 'none'
@@ -150,7 +148,7 @@ export default function ArticlesPage() {
                 <div className="px-4 pt-3 pb-4" style={{ marginTop: 'auto' }}>
                   {locked ? (
                     <button
-                      onClick={e => { e.stopPropagation(); router.push('/dashboard') }}
+                      onClick={e => { e.stopPropagation(); router.push(`/articles/${article.id}`) }}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     >
