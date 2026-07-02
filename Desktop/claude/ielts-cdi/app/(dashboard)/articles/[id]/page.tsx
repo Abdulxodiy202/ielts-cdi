@@ -6,7 +6,6 @@ import { redirect, notFound } from 'next/navigation'
 import { isActivePremium } from '@/lib/utils/premium'
 import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
-import { PremiumLockScreen } from '@/components/ui/PremiumLockScreen'
 import MusicPlayer from '@/components/MusicPlayer'
 
 interface Props {
@@ -24,17 +23,41 @@ export default async function ArticlePage({ params }: Props) {
     admin.from('articles')
       .select('id, title, file_url, is_premium, is_published')
       .eq('id', id)
-      .eq('is_published', true)
       .single(),
     supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
   ])
 
-  if (!article) notFound()
+  if (!article || !article.is_published) notFound()
 
   const isPremium = isActivePremium(profileRes.data)
   const locked = article.is_premium && !isPremium
 
-  if (locked) return <PremiumLockScreen descKey="premium.articleDesc" />
+  if (locked) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: 32, textAlign: 'center', gap: 24 }}>
+        <div style={{ width: 72, height: 72, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', fontSize: 32 }}>
+          🔒
+        </div>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+            Bu maqola Premium foydalanuvchilar uchun
+          </h2>
+          <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+            Barcha premium maqolalarni o&apos;qish uchun Premium tarifga o&apos;ting
+          </p>
+        </div>
+        <Link
+          href="/dashboard"
+          style={{ padding: '12px 28px', borderRadius: 12, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', textDecoration: 'none', display: 'inline-block' }}
+        >
+          👑 Premiumga o&apos;tish
+        </Link>
+        <Link href="/articles" style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }}>
+          ← Maqolalarga qaytish
+        </Link>
+      </div>
+    )
+  }
 
   if (!article.file_url) {
     return (
