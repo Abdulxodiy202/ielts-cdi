@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -122,8 +122,9 @@ function CountdownRing({ correct }: { correct: boolean }) {
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function GameClient({ levelNumber, title, questions, initialProgress }: Props) {
-  const router  = useRouter()
-  const total   = questions.length
+  const router   = useRouter()
+  const total    = questions.length
+  const saveRef  = useRef<Promise<void> | null>(null)
 
   /* Shuffled questions (client-only) */
   const [shuffled, setShuffled] = useState<(Question & { opts: string[] })[]>([])
@@ -170,7 +171,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
   useEffect(() => {
     if (!done) return
     const s = results.filter(r => r === true).length
-    fetch('/api/game/progress', {
+    saveRef.current = fetch('/api/game/progress', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -179,8 +180,18 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
         max_score: total,
         is_completed: s >= Math.ceil(total * 0.6),
       }),
-    }).catch(() => {})
+    }).then(() => {}).catch(() => {})
   }, [done]) // eslint-disable-line
+
+  const goToMap = async () => {
+    if (saveRef.current) await saveRef.current
+    router.push('/vocabulary/games')
+  }
+
+  const goToNext = async () => {
+    if (saveRef.current) await saveRef.current
+    router.push(`/vocabulary/games/${levelNumber + 1}`)
+  }
 
   /* ── Keyboard: A/B/C/D ── */
   useEffect(() => {
@@ -207,7 +218,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, margin: 0, textAlign: 'center', padding: '0 24px' }}>
             Bu daraja uchun savollar hali qo'shilmagan
           </p>
-          <button onClick={() => router.push('/vocabulary/games')}
+          <button onClick={goToMap}
             style={{
               marginTop: 8, padding: '11px 24px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
@@ -291,7 +302,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
             {/* Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {passed && levelNumber < 100 && (
-                <button onClick={() => router.push(`/vocabulary/games/${levelNumber + 1}`)}
+                <button onClick={goToNext}
                   style={{
                     padding: '14px 24px', borderRadius: 12, border: 'none',
                     background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
@@ -313,7 +324,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                 }}>
                 🔄 Qayta o'ynash
               </button>
-              <button onClick={() => router.push('/vocabulary/games')}
+              <button onClick={goToMap}
                 style={{
                   padding: '12px 24px', borderRadius: 12,
                   border: '1px solid rgba(255,255,255,0.06)',
@@ -353,7 +364,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           background: 'rgba(8,8,20,0.6)',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}>
-          <button onClick={() => router.push('/vocabulary/games')}
+          <button onClick={goToMap}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
             ← Yo'lak
           </button>

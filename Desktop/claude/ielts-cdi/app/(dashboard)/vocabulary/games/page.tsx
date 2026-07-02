@@ -125,7 +125,7 @@ export default function GamesPage() {
 
   /* Levels */
   useEffect(() => {
-    fetch('/api/game/levels')
+    fetch('/api/game/levels', { cache: 'no-store' })
       .then(r => r.json())
       .then((d: Level[]) => { setLevels(Array.isArray(d) ? d : []); setLoading(false) })
       .catch(() => setLoading(false))
