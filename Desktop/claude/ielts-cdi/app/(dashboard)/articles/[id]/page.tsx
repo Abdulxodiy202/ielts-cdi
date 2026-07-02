@@ -1,128 +1,163 @@
-export const dynamic = 'force-dynamic'
+'use client'
 
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { redirect, notFound } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
-import Link from 'next/link'
-import { BackButton } from '@/components/ui/BackButton'
-import MusicPlayer from '@/components/MusicPlayer'
+import { PaymentModal } from '@/components/PaymentModal'
 
-interface Props {
-  params: Promise<{ id: string }>
+interface Article {
+  id: string
+  title: string
+  file_url: string | null
+  is_premium: boolean
+  is_published: boolean
 }
 
-export default async function ArticlePage({ params }: Props) {
-  const { id } = await params
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+export default function ArticlePage() {
+  const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const [article, setArticle] = useState<Article | null>(null)
+  const [isPremiumUser, setIsPremiumUser] = useState(false)
+  const [initialName, setInitialName] = useState('')
+  const [initialPhone, setInitialPhone] = useState('')
+  const [showPayment, setShowPayment] = useState(false)
+  const [loading, setLoading] = useState(true)
 
-  const admin = createAdminClient()
-  const [{ data: article }, profileRes] = await Promise.all([
-    admin.from('articles')
-      .select('id, title, file_url, is_premium, is_published')
-      .eq('id', id)
-      .single(),
-    supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
-  ])
+  useEffect(() => {
+    const load = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { router.push('/login'); return }
 
-  if (!article || !article.is_published) notFound()
+      const [res, profileRes] = await Promise.all([
+        fetch(`/api/articles/${id}`),
+        supabase.from('profiles').select('is_premium, premium_until, full_name, phone').eq('id', user.id).single(),
+      ])
 
-  const isPremium = isActivePremium(profileRes.data)
-  const locked = article.is_premium && !isPremium
+      if (!res.ok) { setLoading(false); return }
+      const data = await res.json()
+      setArticle(data)
+      setIsPremiumUser(isActivePremium(profileRes.data))
+      setInitialName(profileRes.data?.full_name ?? '')
+      setInitialPhone((profileRes.data as any)?.phone ?? '')
+      setLoading(false)
+    }
+    load()
+  }, [id, router])
 
-  if (locked) {
+  if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', padding: 32, textAlign: 'center', gap: 24 }}>
-        <div style={{ width: 72, height: 72, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', fontSize: 32 }}>
-          🔒
-        </div>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
-            Bu maqola Premium foydalanuvchilar uchun
-          </h2>
-          <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-            Barcha premium maqolalarni o&apos;qish uchun Premium tarifga o&apos;ting
-          </p>
-        </div>
-        <Link
-          href="/dashboard?showPayment=true"
-          style={{ padding: '12px 28px', borderRadius: 12, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', textDecoration: 'none', display: 'inline-block' }}
-        >
-          👑 Premiumga o&apos;tish
-        </Link>
-        <Link href="/articles" style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }}>
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+      </div>
+    )
+  }
+
+  if (!article) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <p style={{ color: 'var(--text-muted)' }}>Maqola topilmadi</p>
+        <button onClick={() => router.push('/articles')} style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
           ← Maqolalarga qaytish
-        </Link>
+        </button>
       </div>
     )
   }
 
-  if (!article.file_url) {
+  // PREMIUM LOCK — overlay, redirect yo'q
+  if (article.is_premium && !isPremiumUser) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center gap-4">
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{/* articles.noFile — static fallback */}Maqola fayli hali yuklanmagan</p>
-        <BackButton href="/articles" />
-      </div>
-    )
-  }
-
-  const TOPBAR_H = 52
-
-  return (
-    <>
-      {/* Fixed top bar */}
-      <div
-        style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          height: TOPBAR_H, zIndex: 200,
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '0 16px',
-          background: 'var(--bg-card)',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        <BackButton href="/articles" />
-        <h1
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-primary)',
+        padding: '40px 20px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 24 }}>🔒</div>
+        <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12 }}>
+          Bu maqola Premium foydalanuvchilar uchun
+        </h2>
+        <p style={{ color: 'var(--text-muted)', marginBottom: 32, maxWidth: 400 }}>
+          Barcha premium maqolalarni o&apos;qish uchun Premium tarifga o&apos;ting
+        </p>
+        <button
+          onClick={() => setShowPayment(true)}
           style={{
-            fontSize: 14, fontWeight: 600, flex: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            color: 'var(--text-primary)',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: 'white',
+            border: 'none',
+            padding: '14px 32px',
+            borderRadius: 12,
+            fontSize: 16,
+            fontWeight: 600,
+            cursor: 'pointer',
+            marginBottom: 16,
           }}
         >
-          {article.title}
-        </h1>
-        {article.is_premium && (
-          <span
-            style={{
-              fontSize: 11, fontWeight: 700, padding: '2px 10px',
-              borderRadius: 20, flexShrink: 0,
-              background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-              border: '1px solid rgba(245,158,11,0.3)',
-            }}
-          >
-            {/* same word both langs */}Premium
-          </span>
-        )}
-      </div>
+          👑 Premiumga o&apos;tish — 50,000 so&apos;m/oy
+        </button>
+        <button
+          onClick={() => router.push('/articles')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+        >
+          ← Maqolalarga qaytish
+        </button>
 
-      {/* Full-screen iframe below topbar */}
+        <PaymentModal
+          isOpen={showPayment}
+          onClose={() => setShowPayment(false)}
+          onSuccess={() => setShowPayment(false)}
+          type="premium"
+          amount={50000}
+          initialName={initialName}
+          initialPhone={initialPhone}
+        />
+      </div>
+    )
+  }
+
+  // Premium user — PDF ko'rsat
+  if (!article.file_url) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <p style={{ color: 'var(--text-muted)' }}>Maqola fayli hali yuklanmagan</p>
+        <button onClick={() => router.push('/articles')} style={{ color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+          ← Maqolalarga qaytish
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{
+        height: 48,
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0 16px',
+        background: 'var(--bg-card)',
+        borderBottom: '1px solid var(--border)',
+        flexShrink: 0,
+      }}>
+        <button
+          onClick={() => router.push('/articles')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600 }}
+        >
+          ← {article.title}
+        </button>
+      </div>
       <iframe
         src={article.file_url}
+        style={{ flex: 1, border: 'none', width: '100%' }}
         title={article.title}
         allowFullScreen
-        style={{
-          position: 'fixed',
-          top: TOPBAR_H, left: 0, right: 0, bottom: 0,
-          width: '100%',
-          height: `calc(100vh - ${TOPBAR_H}px)`,
-          border: 'none',
-          zIndex: 200,
-          display: 'block',
-        }}
       />
-      <MusicPlayer autoPlay defaultMinimized />
-    </>
+    </div>
   )
 }
