@@ -150,7 +150,7 @@ export default function ArticlesPage() {
                 <div className="px-4 pt-3 pb-4" style={{ marginTop: 'auto' }}>
                   {locked ? (
                     <button
-                      onClick={e => { e.stopPropagation(); router.push('/pricing') }}
+                      onClick={e => { e.stopPropagation(); router.push('/dashboard') }}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     >

@@ -26,7 +26,7 @@ export function PremiumLockScreen({ descKey }: Props) {
           {t(descKey)}
         </p>
       </div>
-      <Link href="/pricing" className="btn-primary px-6 py-2.5 text-sm font-semibold">
+      <Link href="/dashboard" className="btn-primary px-6 py-2.5 text-sm font-semibold">
         {t('premium.getBtn')}
       </Link>
     </div>

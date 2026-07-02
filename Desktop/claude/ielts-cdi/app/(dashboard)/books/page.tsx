@@ -214,7 +214,7 @@ export default function BooksPage() {
                     )}
                     {locked ? (
                       <button
-                        onClick={() => router.push('/pricing')}
+                        onClick={() => router.push('/dashboard')}
                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold"
                         style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                       >
