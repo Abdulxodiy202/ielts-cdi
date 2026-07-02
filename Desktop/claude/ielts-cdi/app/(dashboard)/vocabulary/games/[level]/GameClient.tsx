@@ -73,15 +73,24 @@ const CSS = `
 `
 
 /* ── Star logic ───────────────────────────────────────────────────── */
-const PASS_THRESHOLD = 25
+function getPassThreshold(total: number): number {
+  return total === 100 ? 75 : 25
+}
 
 function computeStars(score: number, total: number): number {
-  const wrong = total - score
-  if (wrong === 0) return 5
-  if (wrong === 1) return 4
-  if (wrong === 2) return 3
-  if (wrong === 3) return 2
-  if (wrong === 4) return 1
+  if (total === 100) {
+    if (score >= 100) return 5
+    if (score >= 95)  return 4
+    if (score >= 90)  return 3
+    if (score >= 85)  return 2
+    if (score >= 80)  return 1
+    return 0
+  }
+  if (score >= 30) return 5
+  if (score >= 29) return 4
+  if (score >= 28) return 3
+  if (score >= 27) return 2
+  if (score >= 26) return 1
   return 0
 }
 
@@ -193,7 +202,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           score: s,
           max_score: total,
           stars: computeStars(s, total),
-          is_completed: s >= PASS_THRESHOLD,
+          is_completed: s >= getPassThreshold(total),
         }
         console.log('[GameClient] saving progress:', body)
         try {
@@ -253,9 +262,10 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
 
   /* ── Result screen ── */
   if (done) {
-    const finalScore = results.filter(r => r === true).length
-    const passed     = finalScore >= PASS_THRESHOLD
-    const stars      = computeStars(finalScore, total)
+    const finalScore    = results.filter(r => r === true).length
+    const passThreshold = getPassThreshold(total)
+    const passed        = finalScore >= passThreshold
+    const stars         = computeStars(finalScore, total)
 
     const retry = () => {
       setShuffled(questions.map(q => ({ ...q, opts: shuffle(q.options) })))
@@ -337,7 +347,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                   Siz {total} tadan faqat {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
                 </p>
                 <p style={{ margin: '0 0 24px', color: 'rgba(239,68,68,0.65)', fontSize: 13 }}>
-                  Keyingi levelga o&apos;tish uchun kamida {PASS_THRESHOLD} ta to&apos;g&apos;ri javob kerak
+                  Keyingi levelga o&apos;tish uchun kamida {passThreshold} ta to&apos;g&apos;ri javob kerak
                 </p>
                 <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
                   <span style={{ fontSize: 44, fontWeight: 900, color: '#f87171' }}>{finalScore}</span>
