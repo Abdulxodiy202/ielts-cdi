@@ -47,7 +47,7 @@ export default async function ArticlePage({ params }: Props) {
           </p>
         </div>
         <Link
-          href="/dashboard"
+          href="/dashboard?showPayment=true"
           style={{ padding: '12px 28px', borderRadius: 12, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', textDecoration: 'none', display: 'inline-block' }}
         >
           👑 Premiumga o&apos;tish

@@ -9,6 +9,7 @@ import { TestHistory } from '@/components/dashboard/TestHistory'
 import { DashboardGreeting } from '@/components/dashboard/DashboardGreeting'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { ReferralCard } from '@/components/dashboard/ReferralCard'
+import { DashboardPaymentOpener } from '@/components/dashboard/DashboardPaymentOpener'
 import { isActivePremium } from '@/lib/utils/premium'
 
 /* ── Cached: global test counts (same for all users, revalidate every 5 min) ── */
@@ -65,17 +66,24 @@ const getCachedUserStats = unstable_cache(
   { revalidate: 60 },
 )
 
-export default async function DashboardPage() {
+interface PageProps {
+  searchParams: Promise<{ showPayment?: string }>
+}
+
+export default async function DashboardPage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const sp = await searchParams
+  const showPayment = sp.showPayment === 'true'
 
   // Profile fetched FRESH every request so premium status is never stale
   const admin = createAdminClient()
   const [{ results, stats }, counts, profileRes] = await Promise.all([
     getCachedUserStats(user.id),
     getCachedTestCounts(),
-    admin.from('profiles').select('full_name, is_premium, premium_until').eq('id', user.id).single(),
+    admin.from('profiles').select('full_name, phone, is_premium, premium_until').eq('id', user.id).single(),
   ])
 
   const profile = profileRes.data
@@ -84,6 +92,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
+      {showPayment && !isPremium && (
+        <DashboardPaymentOpener
+          open
+          initialName={profile?.full_name ?? ''}
+          initialPhone={(profile as any)?.phone ?? ''}
+        />
+      )}
       <DashboardGreeting
         firstName={firstName}
         totalTests={stats.totalTests}
