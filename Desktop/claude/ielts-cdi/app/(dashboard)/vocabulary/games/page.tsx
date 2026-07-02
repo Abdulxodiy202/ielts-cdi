@@ -344,6 +344,19 @@ export default function GamesPage() {
                     el.style.opacity = String(opacity)
                   }}
                 >
+                  {/* Floating stars above stone */}
+                  {isDone && !isMilestone && lvlStars > 0 && (
+                    <span style={{
+                      position: 'absolute', top: -20, left: '50%',
+                      transform: 'translateX(-50%)',
+                      fontSize: 15, lineHeight: 1, letterSpacing: '1px',
+                      color: '#fbbf24',
+                      textShadow: '0 0 6px rgba(255,200,0,0.7)',
+                      whiteSpace: 'nowrap', pointerEvents: 'none',
+                    }}>
+                      {'★'.repeat(lvlStars)}
+                    </span>
+                  )}
                   {isMilestone ? (
                     /* ── Milestone content ─── */
                     <>
@@ -358,16 +371,9 @@ export default function GamesPage() {
                     /* ── Completed content ─── */
                     <>
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: 'rgba(255,255,255,0.7)', letterSpacing: '-.2px' }}>{n}</span>
-                      {lvlStars > 0 ? (
-                        <span style={{ fontSize: 14, lineHeight: 1, letterSpacing: '1px', textShadow: '0 0 4px rgba(255,200,0,0.6)' }}>
-                          <span style={{ color: '#fbbf24' }}>{'★'.repeat(lvlStars)}</span>
-                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>{'★'.repeat(5 - lvlStars)}</span>
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
-                      )}
+                      <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
                       {shortCat && (
-                        <span style={{ fontSize: 8, lineHeight: 1, color: 'rgba(255,255,255,0.65)', maxWidth: SW - 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1, color: 'rgba(255,255,255,0.88)', maxWidth: SW - 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           {shortCat}
                         </span>
                       )}
