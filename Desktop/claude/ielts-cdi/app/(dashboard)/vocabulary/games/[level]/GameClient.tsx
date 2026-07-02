@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
 /* ── Types ────────────────────────────────────────────────────────── */
@@ -122,9 +122,8 @@ function CountdownRing({ correct }: { correct: boolean }) {
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function GameClient({ levelNumber, title, questions, initialProgress }: Props) {
-  const router   = useRouter()
-  const total    = questions.length
-  const saveRef  = useRef<Promise<void> | null>(null)
+  const router = useRouter()
+  const total  = questions.length
 
   /* Shuffled questions (client-only) */
   const [shuffled, setShuffled] = useState<(Question & { opts: string[] })[]>([])
@@ -151,47 +150,41 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
     setResults(prev => { const n = [...prev]; n[idx] = ok; return n })
   }, [answered, idx, q])
 
-  /* ── Auto-advance after 1.2s ── */
+  /* ── Auto-advance after 1.2s; save DB on last question BEFORE showing result ── */
   useEffect(() => {
     if (!answered) return
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       if (idx < total - 1) {
         setIdx(p => p + 1)
         setSelected(null)
         setAnswered(false)
         setHintOpen(false)
       } else {
+        // Last question — await save so map re-fetch always sees completed row
+        const s = results.filter(r => r === true).length
+        const body = {
+          level_number: levelNumber,
+          score: s,
+          max_score: total,
+          is_completed: s >= Math.ceil(total * 0.6),
+        }
+        console.log('[GameClient] saving progress:', body)
+        try {
+          const res = await fetch('/api/game/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          const data = await res.json()
+          console.log('[GameClient] save response:', res.status, data)
+        } catch (err) {
+          console.error('[GameClient] save error:', err)
+        }
         setDone(true)
       }
     }, 1200)
     return () => clearTimeout(t)
-  }, [answered, idx, total])
-
-  /* ── Save on completion ── */
-  useEffect(() => {
-    if (!done) return
-    const s = results.filter(r => r === true).length
-    saveRef.current = fetch('/api/game/progress', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        level_number: levelNumber,
-        score: s,
-        max_score: total,
-        is_completed: s >= Math.ceil(total * 0.6),
-      }),
-    }).then(() => {}).catch(() => {})
-  }, [done]) // eslint-disable-line
-
-  const goToMap = async () => {
-    if (saveRef.current) await saveRef.current
-    router.push('/vocabulary/games')
-  }
-
-  const goToNext = async () => {
-    if (saveRef.current) await saveRef.current
-    router.push(`/vocabulary/games/${levelNumber + 1}`)
-  }
+  }, [answered, idx, total]) // eslint-disable-line
 
   /* ── Keyboard: A/B/C/D ── */
   useEffect(() => {
@@ -218,7 +211,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, margin: 0, textAlign: 'center', padding: '0 24px' }}>
             Bu daraja uchun savollar hali qo'shilmagan
           </p>
-          <button onClick={goToMap}
+          <button onClick={() => router.push('/vocabulary/games')}
             style={{
               marginTop: 8, padding: '11px 24px', borderRadius: 10, border: 'none',
               background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
@@ -264,9 +257,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
               {perfect ? 'Ajoyib!' : passed ? 'Yaxshi!' : 'Qayta urining!'}
             </h2>
             <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
-              {passed
-                ? `${levelNumber}-daraja muvaffaqiyatli o'tildi`
-                : `60% dan ortiq to'g'ri javob kerak edi`}
+              Siz {total} tadan {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
             </p>
 
             {/* Per-question result badges */}
@@ -302,13 +293,13 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
             {/* Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {passed && levelNumber < 100 && (
-                <button onClick={goToNext}
+                <button onClick={() => router.push(`/vocabulary/games/${levelNumber + 1}`)}
                   style={{
                     padding: '14px 24px', borderRadius: 12, border: 'none',
                     background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
                     color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer',
                   }}>
-                  Keyingi daraja →
+                  Keyingi level →
                 </button>
               )}
               <button onClick={() => {
@@ -322,9 +313,9 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                   background: 'rgba(255,255,255,0.04)',
                   color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 14, cursor: 'pointer',
                 }}>
-                🔄 Qayta o'ynash
+                🔄 Qayta urinish
               </button>
-              <button onClick={goToMap}
+              <button onClick={() => router.push('/vocabulary/games')}
                 style={{
                   padding: '12px 24px', borderRadius: 12,
                   border: '1px solid rgba(255,255,255,0.06)',
@@ -364,7 +355,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           background: 'rgba(8,8,20,0.6)',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}>
-          <button onClick={goToMap}
+          <button onClick={() => router.push('/vocabulary/games')}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
             ← Yo'lak
           </button>
@@ -372,7 +363,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
             {levelNumber}-daraja · {title}
           </span>
           <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
-            {score}/{total}
+            {idx + 1}/{total}
           </span>
         </div>
 

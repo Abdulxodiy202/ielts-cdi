@@ -19,6 +19,7 @@ export async function GET() {
   const progress = progressRes.data ?? []
 
   const completedSet = new Set(progress.filter(p => p.is_completed).map(p => p.level_number))
+  console.log('[levels GET] user:', user.id, 'completed_levels:', [...completedSet])
   const progressMap = Object.fromEntries(progress.map(p => [p.level_number, p]))
   const levelMap = Object.fromEntries(levels.map(l => [l.level_number, l]))
 

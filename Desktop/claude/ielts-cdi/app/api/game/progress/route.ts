@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const { level_number, score, max_score, is_completed } = body
+  console.log('[progress POST] user:', user.id, 'body:', body)
 
   if (!level_number || score === undefined) {
     return Response.json({ error: 'level_number and score required' }, { status: 400 })
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single()
 
+  console.log('[progress POST] upsert result:', { data, error })
   if (error) return Response.json({ error: error.message }, { status: 500 })
   return Response.json(data)
 }
