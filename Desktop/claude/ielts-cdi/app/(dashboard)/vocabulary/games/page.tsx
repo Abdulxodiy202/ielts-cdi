@@ -385,8 +385,8 @@ export default function GamesPage() {
                     el.style.opacity = String(opacity)
                   }}
                 >
-                  {/* Floating stars above stone (all completed levels, including milestones) */}
-                  {isDone && lvlStars > 0 && (
+                  {/* Floating stars above stone — skip for perfect milestones (giant icon says it all) */}
+                  {isDone && lvlStars > 0 && !isPerfectMilestone && (
                     <span style={{
                       position: 'absolute', top: -20, left: '50%',
                       transform: 'translateX(-50%)',
