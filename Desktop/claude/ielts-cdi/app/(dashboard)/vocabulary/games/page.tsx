@@ -19,7 +19,7 @@ interface Level {
 /* ── Layout constants ─────────────────────────────────────────────── */
 const COLS = 5
 const ROWS = 20
-const SW   = 88      // normal node size
+const SW   = 96      // normal node size
 const MS   = 96      // milestone node size
 const BR   = 16      // border-radius
 const CSP  = 108     // col spacing center-to-center
@@ -359,8 +359,9 @@ export default function GamesPage() {
                     <>
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: 'rgba(255,255,255,0.7)', letterSpacing: '-.2px' }}>{n}</span>
                       {lvlStars > 0 ? (
-                        <span style={{ fontSize: 9, lineHeight: 1, letterSpacing: 0, color: '#fbbf24', filter: 'drop-shadow(0 0 3px rgba(245,158,11,0.7))' }}>
-                          {'★'.repeat(lvlStars)}{'☆'.repeat(5 - lvlStars)}
+                        <span style={{ fontSize: 14, lineHeight: 1, letterSpacing: '1px', textShadow: '0 0 4px rgba(255,200,0,0.6)' }}>
+                          <span style={{ color: '#fbbf24' }}>{'★'.repeat(lvlStars)}</span>
+                          <span style={{ color: 'rgba(255,255,255,0.35)' }}>{'★'.repeat(5 - lvlStars)}</span>
                         </span>
                       ) : (
                         <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
