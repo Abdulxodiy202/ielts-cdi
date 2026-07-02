@@ -401,8 +401,8 @@ export default function GamesPage() {
                   {isPerfectMilestone ? (
                     /* ── Case A: Perfect milestone — giant floating icon ─── */
                     <span style={{
-                      fontSize: 88, lineHeight: 1, display: 'block',
-                      filter: 'drop-shadow(0 0 12px rgba(255,200,0,0.7))',
+                      fontSize: 60, lineHeight: 1, display: 'block',
+                      filter: 'drop-shadow(0 0 8px rgba(255,200,0,0.7))',
                     }}>
                       {MILESTONE[n] ?? '⭐'}
                     </span>
