@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+
+const TEST_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Level {
@@ -108,9 +111,10 @@ const CSS = `
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function GamesPage() {
-  const [levels, setLevels]   = useState<Level[]>([])
-  const [loading, setLoading] = useState(true)
-  const [stars, setStars]     = useState<{ id: number; x: number; y: number; r: number; dur: string; del: string }[]>([])
+  const [levels,    setLevels]    = useState<Level[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [stars,     setStars]     = useState<{ id: number; x: number; y: number; r: number; dur: string; del: string }[]>([])
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const router     = useRouter()
   const currentRef = useRef<HTMLDivElement | null>(null)
 
@@ -122,6 +126,12 @@ export default function GamesPage() {
       dur: (1.8 + Math.random() * 3).toFixed(1) + 's',
       del: (Math.random() * 3).toFixed(1) + 's',
     })))
+  }, [])
+
+  /* User email — test mode bypass */
+  useEffect(() => {
+    const sb = createClient()
+    sb.auth.getUser().then(({ data: { user } }) => setUserEmail(user?.email ?? null))
   }, [])
 
   /* Levels */
@@ -137,6 +147,8 @@ export default function GamesPage() {
     if (!loading && currentRef.current)
       setTimeout(() => currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)
   }, [loading])
+
+  const isTestUser = userEmail === TEST_EMAIL
 
   const lvlMap     = useMemo(() => new Map(levels.map(l => [l.level_number, l])), [levels])
   const doneN      = levels.filter(l => l.status === 'completed').length
@@ -187,6 +199,17 @@ export default function GamesPage() {
             🎮 So&apos;z O&apos;yini
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isTestUser && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+                borderRadius: 8, padding: '4px 8px',
+                fontSize: 11, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
+                letterSpacing: '.2px',
+              }}>
+                🔧 Test
+              </div>
+            )}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
               background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
@@ -276,10 +299,12 @@ export default function GamesPage() {
               const { x, y }   = stonePos(n)
               const lvl         = lvlMap.get(n)
               const st          = lvl?.status ?? 'locked'
-              const isDone      = st === 'completed'
-              const isCur       = st === 'current'
-              const isLocked    = st === 'locked'
-              const cat         = lvl?.category ?? null
+              const isDone         = st === 'completed'
+              const isCur          = st === 'current'
+              const isLocked       = st === 'locked'
+              const isTestUnlocked = isTestUser && isLocked   // test bypass: treat as unlocked
+              const effectiveLock  = isLocked && !isTestUnlocked
+              const cat            = lvl?.category ?? null
               const isMilestone = n % 10 === 0
               const nodeW       = isMilestone ? MS : SW
               const nodeHalf    = nodeW / 2
@@ -299,6 +324,9 @@ export default function GamesPage() {
                 bg   = 'linear-gradient(135deg,#6366f1 0%,#7c3aed 100%)'
                 bord = '2px solid rgba(129,140,248,0.7)'
                 anim = 'nodeGlow 2s ease-in-out infinite'
+              } else if (isTestUnlocked) {
+                bg   = 'linear-gradient(135deg,#3730a3 0%,#312e81 100%)'
+                bord = '1px solid rgba(99,102,241,0.4)'
               } else {
                 bg   = isMilestone
                   ? 'linear-gradient(135deg,#2a2a3e 0%,#1a1a2e 100%)'
@@ -306,7 +334,7 @@ export default function GamesPage() {
                 bord = isMilestone ? '2px solid rgba(245,158,11,0.18)' : '1px solid rgba(255,255,255,0.06)'
               }
 
-              const opacity = isLocked ? (isMilestone ? 0.6 : 0.5) : 1
+              const opacity = effectiveLock ? (isMilestone ? 0.6 : 0.5) : 1
               const shortCat   = cat ? (CAT_SHORT[cat] ?? cat.slice(0, 8)) : ''
               const lvlStars   = lvl?.stars ?? 0
 
@@ -314,7 +342,7 @@ export default function GamesPage() {
                 <div
                   key={n}
                   ref={isCur ? currentRef : undefined}
-                  onClick={() => { if (!isLocked) router.push(`/vocabulary/games/${n}`) }}
+                  onClick={() => { if (!effectiveLock) router.push(`/vocabulary/games/${n}`) }}
                   style={{
                     position: 'absolute',
                     left: x - nodeHalf,
@@ -324,7 +352,7 @@ export default function GamesPage() {
                     background: bg, border: bord, boxShadow: shad || undefined,
                     animation: anim,
                     opacity,
-                    cursor: isLocked ? 'not-allowed' : 'pointer',
+                    cursor: effectiveLock ? 'not-allowed' : 'pointer',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center',
                     gap: 3,
@@ -335,8 +363,8 @@ export default function GamesPage() {
                   }}
                   onMouseEnter={e => {
                     const el = e.currentTarget as HTMLDivElement
-                    el.style.transform = isLocked ? 'scale(1.02)' : 'scale(1.08)'
-                    if (!isLocked) el.style.opacity = '1'
+                    el.style.transform = effectiveLock ? 'scale(1.02)' : 'scale(1.08)'
+                    if (!effectiveLock) el.style.opacity = '1'
                   }}
                   onMouseLeave={e => {
                     const el = e.currentTarget as HTMLDivElement
@@ -360,10 +388,10 @@ export default function GamesPage() {
                   {isMilestone ? (
                     /* ── Milestone content ─── */
                     <>
-                      <span style={{ fontSize: isDone ? 28 : isCur ? 26 : 22, lineHeight: 1, filter: isLocked ? 'grayscale(1)' : 'none' }}>
+                      <span style={{ fontSize: isDone ? 28 : isCur ? 26 : 22, lineHeight: 1, filter: effectiveLock ? 'grayscale(1)' : 'none' }}>
                         {MILESTONE[n] ?? '⭐'}
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: isDone ? '#fff' : isCur ? '#e0e7ff' : 'rgba(255,255,255,0.28)', letterSpacing: '-.2px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: isDone ? '#fff' : (isCur || isTestUnlocked) ? '#e0e7ff' : 'rgba(255,255,255,0.28)', letterSpacing: '-.2px' }}>
                         {n}
                       </span>
                     </>
@@ -384,6 +412,12 @@ export default function GamesPage() {
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: '#e0e7ff', letterSpacing: '-.2px' }}>{n}</span>
                       <span style={{ fontSize: 16, lineHeight: 1, color: '#fff' }}>▶</span>
                       <span style={{ fontSize: 9, lineHeight: 1, color: 'rgba(224,231,255,0.85)', fontWeight: 600 }}>Boshlash</span>
+                    </>
+                  ) : isTestUnlocked ? (
+                    /* ── Test-unlocked content ─── */
+                    <>
+                      <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: '#c4b5fd', letterSpacing: '-.2px' }}>{n}</span>
+                      <span style={{ fontSize: 16, lineHeight: 1, color: 'rgba(196,181,253,0.85)' }}>▶</span>
                     </>
                   ) : (
                     /* ── Locked content ─── */
