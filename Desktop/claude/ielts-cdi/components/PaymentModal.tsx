@@ -28,8 +28,8 @@ interface PaymentModalProps {
   initialPhone?: string
 }
 
-const CARD_NUMBER = '4916 9903 5400 1395'
-const CARD_HOLDER = 'Abdulxodiy Mamajonov'
+const CARD_NUMBER = '5614 6838 6058 6569'
+const CARD_HOLDER = "MO'MINJONOV OTABEK"
 
 export function PaymentModal({
   isOpen,
