@@ -65,7 +65,34 @@ const CSS = `
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes starPop {
+  0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+  60%  { transform: scale(1.35) rotate(5deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
 `
+
+/* ── Star logic ───────────────────────────────────────────────────── */
+const PASS_THRESHOLD = 25
+
+function computeStars(score: number, total: number): number {
+  const wrong = total - score
+  if (wrong === 0) return 5
+  if (wrong === 1) return 4
+  if (wrong === 2) return 3
+  if (wrong === 3) return 2
+  if (wrong === 4) return 1
+  return 0
+}
+
+const STAR_MESSAGES: Record<number, string> = {
+  5: "Ajoyib! Mukammal natija! 🎉",
+  4: "Zo'r natija! Yana bir oz harakat!",
+  3: "Yaxshi! Yana urinib ko'ring!",
+  2: "Yomon emas, lekin yaxshiroq bo'lishi mumkin",
+  1: "O'tdingiz, lekin qayta urinib ko'ring",
+  0: "O'tdingiz. Yulduzlar uchun qayta urinib ko'ring!",
+}
 
 /* ── Confetti ─────────────────────────────────────────────────────── */
 function Confetti() {
@@ -138,8 +165,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
   const [hintOpen, setHintOpen] = useState(false)
   const [done,     setDone]     = useState(false)
 
-  const q     = shuffled[idx]
-  const score = results.filter(r => r === true).length
+  const q = shuffled[idx]
 
   /* ── Select answer ── */
   const handleSelect = useCallback((opt: string) => {
@@ -166,7 +192,8 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           level_number: levelNumber,
           score: s,
           max_score: total,
-          is_completed: s >= Math.ceil(total * 0.6),
+          stars: computeStars(s, total),
+          is_completed: s >= PASS_THRESHOLD,
         }
         console.log('[GameClient] saving progress:', body)
         try {
@@ -227,104 +254,107 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
   /* ── Result screen ── */
   if (done) {
     const finalScore = results.filter(r => r === true).length
-    const perfect    = finalScore === total
-    const passed     = finalScore >= Math.ceil(total * 0.6)
+    const passed     = finalScore >= PASS_THRESHOLD
+    const stars      = computeStars(finalScore, total)
+
+    const retry = () => {
+      setShuffled(questions.map(q => ({ ...q, opts: shuffle(q.options) })))
+      setIdx(0); setSelected(null); setAnswered(false)
+      setResults(Array(total).fill(null)); setHintOpen(false); setDone(false)
+    }
 
     return (
       <>
         <style dangerouslySetInnerHTML={{ __html: CSS }} />
-        {perfect && <Confetti />}
+        {stars >= 4 && <Confetti />}
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(8,8,20,0.97)',
-          backdropFilter: 'blur(4px)',
+          background: 'rgba(8,8,20,0.97)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflowY: 'auto',
         }}>
           <div style={{
-            textAlign: 'center', padding: '0 24px', maxWidth: 420, width: '100%',
+            textAlign: 'center', padding: '32px 24px', maxWidth: 420, width: '100%',
             animation: 'resultIn .4s cubic-bezier(.4,0,.2,1)',
           }}>
-            {/* Emoji */}
-            <div style={{ fontSize: 80, lineHeight: 1, marginBottom: 16 }}>
-              {perfect ? '🎉' : passed ? '⭐' : '💪'}
-            </div>
-
-            {/* Title */}
-            <h2 style={{
-              margin: '0 0 8px', fontSize: 30, fontWeight: 900,
-              color: perfect ? '#fbbf24' : passed ? '#4ade80' : '#f59e0b',
-            }}>
-              {perfect ? 'Ajoyib!' : passed ? 'Yaxshi!' : 'Qayta urining!'}
-            </h2>
-            <p style={{ margin: '0 0 28px', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
-              Siz {total} tadan {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
-            </p>
-
-            {/* Per-question result badges */}
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8, marginBottom: 36,
-            }}>
-              {results.map((r, i) => (
-                <div key={i} style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  background: r === true ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
-                  border: `2px solid ${r === true ? '#22c55e' : '#ef4444'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 15, color: r === true ? '#4ade80' : '#f87171',
-                  fontWeight: 800,
-                }}>
-                  {r === true ? '✓' : '✗'}
+            {passed ? (
+              <>
+                {/* ── Stars ── */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 20 }}>
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <span key={n} style={{
+                      fontSize: 42, display: 'inline-block',
+                      animation: `starPop 0.4s cubic-bezier(.36,.07,.19,.97) ${(n - 1) * 0.15}s both`,
+                      filter: n <= stars
+                        ? 'drop-shadow(0 0 10px rgba(245,158,11,0.85))'
+                        : 'grayscale(1) opacity(0.18)',
+                    }}>⭐</span>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Score */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'baseline', gap: 4,
-              marginBottom: 36,
-            }}>
-              <span style={{ fontSize: 40, fontWeight: 900, color: passed ? '#4ade80' : '#f87171' }}>
-                {finalScore}
-              </span>
-              <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.3)' }}>/{total}</span>
-            </div>
+                {/* ── Message ── */}
+                <h2 style={{ margin: '0 0 10px', fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>
+                  {STAR_MESSAGES[stars]}
+                </h2>
 
-            {/* Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {passed && levelNumber < 100 && (
-                <button onClick={() => router.push(`/vocabulary/games/${levelNumber + 1}`)}
-                  style={{
-                    padding: '14px 24px', borderRadius: 12, border: 'none',
-                    background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
-                    color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer',
-                  }}>
-                  Keyingi level →
-                </button>
-              )}
-              <button onClick={() => {
-                setShuffled(questions.map(q => ({ ...q, opts: shuffle(q.options) })))
-                setIdx(0); setSelected(null); setAnswered(false)
-                setResults(Array(total).fill(null)); setHintOpen(false); setDone(false)
-              }}
-                style={{
-                  padding: '13px 24px', borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.04)',
-                  color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 14, cursor: 'pointer',
-                }}>
-                🔄 Qayta urinish
-              </button>
-              <button onClick={() => router.push('/vocabulary/games')}
-                style={{
-                  padding: '12px 24px', borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  background: 'transparent',
-                  color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 13, cursor: 'pointer',
-                }}>
-                ← Yo'lakka qaytish
-              </button>
-            </div>
+                {/* ── Score text ── */}
+                <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
+                  Siz {total} tadan {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
+                </p>
+
+                {/* ── Score badge ── */}
+                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
+                  <span style={{ fontSize: 44, fontWeight: 900, color: '#4ade80' }}>{finalScore}</span>
+                  <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.3)' }}>/{total}</span>
+                </div>
+
+                {/* ── Buttons ── */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {levelNumber < 100 && (
+                    <button onClick={() => router.push(`/vocabulary/games/${levelNumber + 1}`)}
+                      style={{ padding: '14px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                      Keyingi level →
+                    </button>
+                  )}
+                  <button onClick={retry}
+                    style={{ padding: '13px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+                    🔄 Qayta urinish
+                  </button>
+                  <button onClick={() => router.push('/vocabulary/games')}
+                    style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    ← Yo&apos;lakka qaytish
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* ── Fail ── */}
+                <div style={{ fontSize: 72, lineHeight: 1, marginBottom: 16 }}>😔</div>
+                <h2 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 900, color: '#f87171' }}>
+                  Ko&apos;proq harakat kerak!
+                </h2>
+                <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>
+                  Siz {total} tadan faqat {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
+                </p>
+                <p style={{ margin: '0 0 24px', color: 'rgba(239,68,68,0.65)', fontSize: 13 }}>
+                  Keyingi levelga o&apos;tish uchun kamida {PASS_THRESHOLD} ta to&apos;g&apos;ri javob kerak
+                </p>
+                <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
+                  <span style={{ fontSize: 44, fontWeight: 900, color: '#f87171' }}>{finalScore}</span>
+                  <span style={{ fontSize: 22, color: 'rgba(255,255,255,0.3)' }}>/{total}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button onClick={retry}
+                    style={{ padding: '14px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                    🔄 Qayta urinish
+                  </button>
+                  <button onClick={() => router.push('/vocabulary/games')}
+                    style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    ← Yo&apos;lakka qaytish
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </>

@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { level_number, score, max_score, is_completed } = body
+  const { level_number, score, max_score, is_completed, stars } = body
   console.log('[progress POST] user:', user.id, 'body:', body)
 
   if (!level_number || score === undefined) {
@@ -18,15 +18,30 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient()
+
+  // Fetch existing row to keep best score and never downgrade is_completed
+  const { data: existing } = await admin
+    .from('game_progress')
+    .select('score, max_score, is_completed, stars')
+    .eq('user_id', user.id)
+    .eq('level_number', level_number)
+    .maybeSingle()
+
+  const bestScore     = Math.max(score, existing?.score ?? 0)
+  const bestStars     = Math.max(stars ?? 0, existing?.stars ?? 0)
+  const wasCompleted  = existing?.is_completed ?? false
+  const nowCompleted  = (is_completed ?? false) || wasCompleted
+
   const { data, error } = await admin
     .from('game_progress')
     .upsert({
       user_id: user.id,
       level_number,
-      score,
-      max_score: max_score ?? 5,
-      is_completed: is_completed ?? false,
-      completed_at: is_completed ? new Date().toISOString() : null,
+      score: bestScore,
+      max_score: max_score ?? existing?.max_score ?? 5,
+      stars: bestStars,
+      is_completed: nowCompleted,
+      completed_at: nowCompleted ? new Date().toISOString() : null,
     }, { onConflict: 'user_id,level_number' })
     .select()
     .single()

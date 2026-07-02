@@ -13,6 +13,7 @@ interface Level {
   status: 'completed' | 'current' | 'locked'
   score: number
   max_score: number
+  stars: number
 }
 
 /* ── Layout constants ─────────────────────────────────────────────── */
@@ -137,9 +138,10 @@ export default function GamesPage() {
       setTimeout(() => currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)
   }, [loading])
 
-  const lvlMap = useMemo(() => new Map(levels.map(l => [l.level_number, l])), [levels])
-  const doneN  = levels.filter(l => l.status === 'completed').length
-  const curN   = levels.find(l => l.status === 'current')?.level_number ?? 1
+  const lvlMap     = useMemo(() => new Map(levels.map(l => [l.level_number, l])), [levels])
+  const doneN      = levels.filter(l => l.status === 'completed').length
+  const totalStars = levels.reduce((sum, l) => sum + (l.stars ?? 0), 0)
+  const curN       = levels.find(l => l.status === 'current')?.level_number ?? 1
   const curPos = stonePos(curN)
 
   /* Completed path segment */
@@ -184,15 +186,27 @@ export default function GamesPage() {
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 15, letterSpacing: '-.3px' }}>
             🎮 So&apos;z O&apos;yini
           </span>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 7,
-            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
-            borderRadius: 10, padding: '5px 12px',
-          }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-            <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>
-              {doneN}<span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>/100</span>
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
+              borderRadius: 10, padding: '5px 10px',
+            }}>
+              <span style={{ fontSize: 13 }}>⭐</span>
+              <span style={{ color: '#fbbf24', fontWeight: 700, fontSize: 13 }}>
+                {totalStars}<span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>/500</span>
+              </span>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+              borderRadius: 10, padding: '5px 12px',
+            }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+              <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>
+                {doneN}<span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>/100</span>
+              </span>
+            </div>
           </div>
         </div>
 
@@ -293,7 +307,8 @@ export default function GamesPage() {
               }
 
               const opacity = isLocked ? (isMilestone ? 0.6 : 0.5) : 1
-              const shortCat = cat ? (CAT_SHORT[cat] ?? cat.slice(0, 8)) : ''
+              const shortCat   = cat ? (CAT_SHORT[cat] ?? cat.slice(0, 8)) : ''
+              const lvlStars   = lvl?.stars ?? 0
 
               return (
                 <div
@@ -343,7 +358,13 @@ export default function GamesPage() {
                     /* ── Completed content ─── */
                     <>
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: 'rgba(255,255,255,0.7)', letterSpacing: '-.2px' }}>{n}</span>
-                      <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
+                      {lvlStars > 0 ? (
+                        <span style={{ fontSize: 9, lineHeight: 1, letterSpacing: 0, color: '#fbbf24', filter: 'drop-shadow(0 0 3px rgba(245,158,11,0.7))' }}>
+                          {'★'.repeat(lvlStars)}{'☆'.repeat(5 - lvlStars)}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
+                      )}
                       {shortCat && (
                         <span style={{ fontSize: 8, lineHeight: 1, color: 'rgba(255,255,255,0.65)', maxWidth: SW - 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           {shortCat}
