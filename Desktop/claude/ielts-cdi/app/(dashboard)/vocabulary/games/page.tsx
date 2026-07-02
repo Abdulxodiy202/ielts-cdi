@@ -107,6 +107,10 @@ const CSS = `
   0%,100% { opacity: .2; transform: scale(1); }
   50%      { opacity: .85; transform: scale(1.4); }
 }
+@keyframes milestoneFloat {
+  0%,100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
 `
 
 /* ── Main component ───────────────────────────────────────────────── */
@@ -309,17 +313,27 @@ export default function GamesPage() {
               const nodeW       = isMilestone ? MS : SW
               const nodeHalf    = nodeW / 2
 
+              const shortCat          = cat ? (CAT_SHORT[cat] ?? cat.slice(0, 8)) : ''
+              const lvlStars          = lvl?.stars ?? 0
+              const isPerfectMilestone   = isMilestone && isDone && lvlStars === 5
+              const isCompletedMilestone = isMilestone && isDone && lvlStars < 5
+
               /* ── Background & style ─── */
               let bg      = ''
               let bord    = ''
               let shad    = ''
               let anim: string | undefined
 
-              if (isDone) {
+              if (isPerfectMilestone) {
+                // Case A — transparent; only the giant icon shows
+                bg   = 'transparent'
+                bord = 'none'
+                anim = 'milestoneFloat 3s ease-in-out infinite'
+              } else if (isDone) {
+                // Case B (completed milestone) + regular completed: same green style
                 bg   = cat ? (CAT_GRADIENT[cat] ?? 'linear-gradient(135deg,#22c55e,#16a34a)') : 'linear-gradient(135deg,#22c55e,#16a34a)'
-                bord = isMilestone ? '2px solid #f59e0b' : '2px solid rgba(255,255,255,0.22)'
-                shad = isMilestone ? '0 4px 24px rgba(245,158,11,0.4)' : '0 2px 12px rgba(0,0,0,0.35)'
-                if (isMilestone) anim = 'milestoneGlow 2.5s ease-in-out infinite'
+                bord = '2px solid rgba(255,255,255,0.22)'
+                shad = '0 2px 12px rgba(0,0,0,0.35)'
               } else if (isCur) {
                 bg   = 'linear-gradient(135deg,#6366f1 0%,#7c3aed 100%)'
                 bord = '2px solid rgba(129,140,248,0.7)'
@@ -335,8 +349,6 @@ export default function GamesPage() {
               }
 
               const opacity = effectiveLock ? (isMilestone ? 0.6 : 0.5) : 1
-              const shortCat   = cat ? (CAT_SHORT[cat] ?? cat.slice(0, 8)) : ''
-              const lvlStars   = lvl?.stars ?? 0
 
               return (
                 <div
@@ -348,7 +360,7 @@ export default function GamesPage() {
                     left: x - nodeHalf,
                     top:  y - nodeHalf,
                     width: nodeW, height: nodeW,
-                    borderRadius: isMilestone ? nodeW / 2 : BR,
+                    borderRadius: (isMilestone && !isDone) ? nodeW / 2 : BR,
                     background: bg, border: bord, boxShadow: shad || undefined,
                     animation: anim,
                     opacity,
@@ -361,6 +373,7 @@ export default function GamesPage() {
                     transition: 'transform .15s, opacity .15s',
                     userSelect: 'none', boxSizing: 'border-box',
                   }}
+                  title={isPerfectMilestone ? `Level ${n} — Mukammal!` : undefined}
                   onMouseEnter={e => {
                     const el = e.currentTarget as HTMLDivElement
                     el.style.transform = effectiveLock ? 'scale(1.02)' : 'scale(1.08)'
@@ -372,8 +385,8 @@ export default function GamesPage() {
                     el.style.opacity = String(opacity)
                   }}
                 >
-                  {/* Floating stars above stone */}
-                  {isDone && !isMilestone && lvlStars > 0 && (
+                  {/* Floating stars above stone (all completed levels, including milestones) */}
+                  {isDone && lvlStars > 0 && (
                     <span style={{
                       position: 'absolute', top: -20, left: '50%',
                       transform: 'translateX(-50%)',
@@ -385,18 +398,26 @@ export default function GamesPage() {
                       {'★'.repeat(lvlStars)}
                     </span>
                   )}
-                  {isMilestone ? (
-                    /* ── Milestone content ─── */
+                  {isPerfectMilestone ? (
+                    /* ── Case A: Perfect milestone — giant floating icon ─── */
+                    <span style={{
+                      fontSize: 88, lineHeight: 1, display: 'block',
+                      filter: 'drop-shadow(0 0 12px rgba(255,200,0,0.7))',
+                    }}>
+                      {MILESTONE[n] ?? '⭐'}
+                    </span>
+                  ) : isMilestone && !isDone ? (
+                    /* ── Case C: Uncompleted milestone — circular stone with icon ─── */
                     <>
-                      <span style={{ fontSize: isDone ? 28 : isCur ? 26 : 22, lineHeight: 1, filter: effectiveLock ? 'grayscale(1)' : 'none' }}>
+                      <span style={{ fontSize: isCur ? 26 : 22, lineHeight: 1, filter: effectiveLock ? 'grayscale(1)' : 'none' }}>
                         {MILESTONE[n] ?? '⭐'}
                       </span>
-                      <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: isDone ? '#fff' : (isCur || isTestUnlocked) ? '#e0e7ff' : 'rgba(255,255,255,0.28)', letterSpacing: '-.2px' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: (isCur || isTestUnlocked) ? '#e0e7ff' : 'rgba(255,255,255,0.28)', letterSpacing: '-.2px' }}>
                         {n}
                       </span>
                     </>
                   ) : isDone ? (
-                    /* ── Completed content ─── */
+                    /* ── Case B / Regular completed (milestone or not) ─── */
                     <>
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: 'rgba(255,255,255,0.7)', letterSpacing: '-.2px' }}>{n}</span>
                       <span style={{ fontSize: 18, lineHeight: 1, color: '#fff', fontWeight: 700 }}>✓</span>
