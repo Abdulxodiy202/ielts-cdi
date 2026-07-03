@@ -11,11 +11,8 @@ const TEST_EMAIL = 'abdulxdiymamajonov@gmail.com'
 interface Level {
   level_number: number
   title: string
-  difficulty: string
   category: string | null
   status: 'completed' | 'current' | 'locked'
-  score: number
-  max_score: number
   stars: number
 }
 
@@ -138,11 +135,37 @@ export default function GamesPage() {
     sb.auth.getUser().then(({ data: { user } }) => setUserEmail(user?.email ?? null))
   }, [])
 
-  /* Levels */
+  /* Levels — sessionStorage 30 s cache, bust after level completion */
   useEffect(() => {
-    fetch('/api/game/levels', { cache: 'no-store' })
+    const CACHE_KEY = 'game-levels-v1'
+    const TTL = 30_000
+
+    const stale = sessionStorage.getItem('game-levels-stale')
+    if (stale) sessionStorage.removeItem('game-levels-stale')
+
+    if (!stale) {
+      try {
+        const raw = sessionStorage.getItem(CACHE_KEY)
+        if (raw) {
+          const { data, ts } = JSON.parse(raw)
+          if (Array.isArray(data) && Date.now() - ts < TTL) {
+            setLevels(data)
+            setLoading(false)
+            return
+          }
+        }
+      } catch {}
+    }
+
+    fetch('/api/game/levels')
       .then(r => r.json())
-      .then((d: Level[]) => { setLevels(Array.isArray(d) ? d : []); setLoading(false) })
+      .then((d: Level[]) => {
+        if (Array.isArray(d)) {
+          try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: d, ts: Date.now() })) } catch {}
+          setLevels(d)
+        }
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
 
@@ -377,7 +400,10 @@ export default function GamesPage() {
                   onMouseEnter={e => {
                     const el = e.currentTarget as HTMLDivElement
                     el.style.transform = effectiveLock ? 'scale(1.02)' : 'scale(1.08)'
-                    if (!effectiveLock) el.style.opacity = '1'
+                    if (!effectiveLock) {
+                      el.style.opacity = '1'
+                      router.prefetch(`/vocabulary/games/${n}`)
+                    }
                   }}
                   onMouseLeave={e => {
                     const el = e.currentTarget as HTMLDivElement

@@ -204,18 +204,18 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           stars: computeStars(s, total),
           is_completed: s >= getPassThreshold(total),
         }
-        console.log('[GameClient] saving progress:', body)
         try {
           const res = await fetch('/api/game/progress', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
           })
-          const data = await res.json()
-          console.log('[GameClient] save response:', res.status, data)
+          await res.json()
         } catch (err) {
           console.error('[GameClient] save error:', err)
         }
+        // Bust the map's sessionStorage cache so returning shows updated progress
+        try { sessionStorage.setItem('game-levels-stale', '1') } catch {}
         setDone(true)
       }
     }, 1200)

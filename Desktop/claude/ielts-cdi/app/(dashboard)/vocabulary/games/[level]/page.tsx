@@ -16,20 +16,22 @@ export default async function GameLevelPage({ params }: { params: Promise<{ leve
 
   const admin = createAdminClient()
 
+  // Single round-trip: level + questions together, parallel with progress
   const [levelRes, progressRes] = await Promise.all([
-    admin.from('game_levels').select('id, title, description, difficulty').eq('level_number', levelNum).maybeSingle(),
-    admin.from('game_progress').select('score, max_score, is_completed').eq('user_id', user.id).eq('level_number', levelNum).maybeSingle(),
+    admin.from('game_levels')
+      .select('id, title, game_questions(id, question, correct_answer, options, hint, order_index)')
+      .eq('level_number', levelNum)
+      .maybeSingle(),
+    admin.from('game_progress')
+      .select('score, max_score, is_completed')
+      .eq('user_id', user.id)
+      .eq('level_number', levelNum)
+      .maybeSingle(),
   ])
 
-  let questions: any[] = []
-  if (levelRes.data) {
-    const { data: qs } = await admin
-      .from('game_questions')
-      .select('id, question, correct_answer, options, hint, order_index')
-      .eq('level_id', levelRes.data.id)
-      .order('order_index')
-    questions = qs ?? []
-  }
+  const questions = ((levelRes.data as any)?.game_questions ?? [])
+    .slice()
+    .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
 
   return (
     <GameClient

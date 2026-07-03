@@ -11,15 +11,14 @@ export async function GET() {
   const admin = createAdminClient()
 
   const [levelsRes, progressRes] = await Promise.all([
-    admin.from('game_levels').select('level_number, title, description, difficulty, category').eq('is_active', true).order('level_number'),
-    admin.from('game_progress').select('level_number, score, max_score, is_completed, stars').eq('user_id', user.id),
+    admin.from('game_levels').select('level_number, title, category').eq('is_active', true).order('level_number'),
+    admin.from('game_progress').select('level_number, is_completed, stars').eq('user_id', user.id),
   ])
 
   const levels = levelsRes.data ?? []
   const progress = progressRes.data ?? []
 
   const completedSet = new Set(progress.filter(p => p.is_completed).map(p => p.level_number))
-  console.log('[levels GET] user:', user.id, 'completed_levels:', [...completedSet])
   const progressMap = Object.fromEntries(progress.map(p => [p.level_number, p]))
   const levelMap = Object.fromEntries(levels.map(l => [l.level_number, l]))
 
@@ -40,11 +39,11 @@ export async function GET() {
       difficulty: meta?.difficulty ?? 'medium',
       category: meta?.category ?? null,
       status,
-      score: prog?.score ?? 0,
-      max_score: prog?.max_score ?? 5,
       stars: prog?.stars ?? 0,
     }
   })
 
-  return Response.json(result)
+  return Response.json(result, {
+    headers: { 'Cache-Control': 'private, max-age=30' },
+  })
 }
