@@ -86,7 +86,9 @@
     "trainingTitle": "Training with Sections",
     "trainingDesc": "Practice one section at a time — focus on your weakest parts",
     "freeBadge": "{count} free",
-    "premiumBadge": "{count} premium"
+    "premiumBadge": "{count} premium",
+    "dictationTitle": "Dictation",
+    "dictationDesc": "Listen to BBC 'Six Minute English' clips and type what you hear"
   },
   "mock": {
     "title": "Mock IELTS Test",
@@ -294,5 +296,39 @@
   "community": {
     "title": "Community",
     "soon": "Coming soon..."
+  },
+  "dictation": {
+    "title": "Dictation",
+    "subtitle": "Listen to BBC 'Six Minute English' clips and type what you hear",
+    "cardTitle": "Dictation",
+    "cardSubtitle": "Listen and type",
+    "listTitle": "Dictation Exercises",
+    "listSubtitle": "Listen to each clip and type what you hear as accurately as possible",
+    "instructions": "Listen to the audio and type what you hear",
+    "check": "Check",
+    "clear": "Clear",
+    "retry": "Try Again",
+    "next": "Next",
+    "totalStars": "{n} stars",
+    "bestAccuracy": "Best accuracy",
+    "passThreshold": "Pass threshold: 70%",
+    "failMessage": "Below 70%. Try again!",
+    "accuracy": "Accuracy",
+    "attempts": "Attempts",
+    "yourAnswer": "Your answer",
+    "correctAnswer": "Correct text",
+    "result5": "Outstanding! Perfect result! 🎉",
+    "result4": "Excellent! Almost perfect! 🌟",
+    "result3": "Good! Keep practising 💪",
+    "result2": "Satisfactory. Listen more 🎧",
+    "result1": "Keep going! You can do it 🔥",
+    "result0": "Try again. You didn't pass ❌",
+    "passed": "Passed!",
+    "failed": "Failed",
+    "premiumTitle": "Premium Dictation",
+    "premiumDesc": "This dictation is for premium users. Get premium to unlock!",
+    "locked": "Locked",
+    "lockedDesc": "Score 70%+ on the previous dictation to unlock",
+    "free": "Free"
   }
 }
