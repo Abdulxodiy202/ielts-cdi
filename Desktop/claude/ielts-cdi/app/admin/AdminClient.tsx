@@ -2577,9 +2577,9 @@ function BooksTab() {
           <div className="space-y-2">
             <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Muqova rasmi</p>
             {currentCover && !selectedCoverFile && (
-              <div className="relative rounded-xl overflow-hidden" style={{ height: 100, border: '1px solid var(--border)' }}>
+              <div className="relative rounded-xl overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', maxWidth: 120, background: '#111', border: '1px solid var(--border)' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={currentCover} alt="cover" className="w-full h-full object-cover" />
+                <img src={currentCover} alt="cover" className="w-full h-full object-contain" />
                 <button type="button" onClick={handleDeleteCover} disabled={savingCover}
                   className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
                   style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', backdropFilter: 'blur(4px)' }}>

@@ -94,10 +94,10 @@ export default function BooksPage() {
                         cursor: locked ? 'default' : 'pointer',
                         borderRadius: 10,
                         boxShadow: '-6px 6px 20px rgba(0,0,0,0.35)',
-                        height: 220,
+                        aspectRatio: '3 / 4',
                         position: 'relative',
                         overflow: 'hidden',
-                        background: gradient,
+                        background: book.cover_image_url ? '#111' : gradient,
                       }}
                       onMouseEnter={e => { if (!locked) (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(-20deg)' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(0deg)' }}
@@ -111,7 +111,7 @@ export default function BooksPage() {
                         {book.cover_image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={book.cover_image_url} alt={book.title}
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                         ) : (
                           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 12, gap: 8 }}>
                             <div style={{ fontSize: 32, opacity: 0.4 }}>📖</div>
