@@ -3488,11 +3488,241 @@ interface AdminDictation {
   duration_seconds: number | null
 }
 
+interface AdminVideo {
+  id: string
+  title: string
+  video_url: string
+  recommendation: string | null
+  is_premium: boolean
+  is_published: boolean
+  created_at: string
+}
+
+const VL_BLANK = { title: '', video_url: '', recommendation: '', is_premium: false, is_published: true }
+
+function getYtId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+  return m ? m[1] : null
+}
+
 function VideoLessonsTab() {
+  const [videos,   setVideos]   = useState<AdminVideo[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [saving,   setSaving]   = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [formError, setFormError] = useState('')
+  const [modal, setModal] = useState<{ mode: 'add' | 'edit'; data: typeof VL_BLANK & { id?: string } } | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/video-lessons')
+    if (res.ok) { const d = await res.json(); setVideos(Array.isArray(d) ? d : []) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const openAdd  = () => { setFormError(''); setModal({ mode: 'add', data: { ...VL_BLANK } }) }
+  const openEdit = (v: AdminVideo) => {
+    setFormError('')
+    setModal({ mode: 'edit', data: { id: v.id, title: v.title, video_url: v.video_url, recommendation: v.recommendation ?? '', is_premium: v.is_premium, is_published: v.is_published } })
+  }
+  const closeModal = () => { setModal(null); setFormError('') }
+
+  const handleSave = async () => {
+    if (!modal) return
+    if (!modal.data.title.trim())     { setFormError('Sarlavha kiritilishi shart'); return }
+    if (!modal.data.video_url.trim()) { setFormError('Video URL kiritilishi shart'); return }
+    setSaving(true); setFormError('')
+    const body = {
+      title:          modal.data.title.trim(),
+      video_url:      modal.data.video_url.trim(),
+      recommendation: modal.data.recommendation?.trim() || null,
+      is_premium:     modal.data.is_premium,
+      is_published:   modal.data.is_published,
+    }
+    try {
+      const res = modal.mode === 'add'
+        ? await fetch('/api/admin/video-lessons',               { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(`/api/admin/video-lessons/${modal.data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+      if (modal.mode === 'add') setVideos(prev => [json, ...prev])
+      else setVideos(prev => prev.map(v => v.id === modal.data.id ? json : v))
+      closeModal()
+    } catch { setFormError('Tarmoq xatosi') }
+    setSaving(false)
+  }
+
+  const handleTogglePublish = async (v: AdminVideo) => {
+    const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !v.is_published }),
+    })
+    if (res.ok) setVideos(prev => prev.map(x => x.id === v.id ? { ...x, is_published: !v.is_published } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bu video darsni o'chirishni tasdiqlaysizmi?")) return
+    setDeleting(id)
+    const res = await fetch(`/api/admin/video-lessons/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setVideos(prev => prev.filter(v => v.id !== id))
+    setDeleting(null)
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
   return (
-    <div className="card p-8 text-center" style={{ color: 'var(--text-muted)' }}>
-      <p className="text-4xl mb-3">🎬</p>
-      <p className="font-medium">Video darslar bo&apos;limi tez orada</p>
+    <div className="space-y-5">
+      {/* Header row */}
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
+        <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi video qo&apos;shish
+        </button>
+      </div>
+
+      {/* List */}
+      {videos.length === 0 ? (
+        <div className="card p-16 text-center">
+          <div className="text-4xl mb-3">🎬</div>
+          <p style={{ color: 'var(--text-muted)' }}>Hali video darslar qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '88px 1fr 90px 80px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Preview</span><span>Sarlavha</span><span>Turi</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {videos.map(v => {
+              const ytId = getYtId(v.video_url)
+              const thumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null
+              return (
+                <div key={v.id} className="grid items-center px-4 py-3"
+                  style={{ gridTemplateColumns: '88px 1fr 90px 80px 72px', gap: 8 }}>
+                  {/* Thumbnail */}
+                  <div className="rounded-lg overflow-hidden shrink-0"
+                    style={{ width: 88, height: 50, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    {thumb ? (
+                      <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Play size={14} style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                    )}
+                  </div>
+                  {/* Title + recommendation */}
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                    {v.recommendation && (
+                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{v.recommendation}</p>
+                    )}
+                  </div>
+                  {/* Premium/Free badge */}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                    style={v.is_premium
+                      ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
+                      : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    {v.is_premium ? '👑 Premium' : 'Bepul'}
+                  </span>
+                  {/* Published toggle */}
+                  <button onClick={() => handleTogglePublish(v)}
+                    className="text-xs px-2 py-1 rounded-lg font-medium text-center"
+                    style={v.is_published
+                      ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                      : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {v.is_published ? 'Chop' : 'Draft'}
+                  </button>
+                  {/* Actions */}
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button onClick={() => openEdit(v)} title="Tahrirlash"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                      <Edit3 size={12} />
+                    </button>
+                    <button onClick={() => handleDelete(v.id)} disabled={deleting === v.id} title="O'chirish"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                      {deleting === v.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Add / Edit modal */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                {modal.mode === 'add' ? '🎬 Yangi video qo\'shish' : '✏️ Videoni tahrirlash'}
+              </h3>
+              <button onClick={closeModal} className="p-1 rounded-lg hover:opacity-70"
+                style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+                <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 1 dars..."
+                  value={modal.data.title}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>YouTube URL *</label>
+                <input className="input-field text-sm w-full" placeholder="https://www.youtube.com/watch?v=..."
+                  value={modal.data.video_url}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, video_url: e.target.value } } : m)} />
+                {getYtId(modal.data.video_url) && (
+                  <div className="mt-2 rounded-lg overflow-hidden" style={{ maxWidth: 180, border: '1px solid var(--border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`https://img.youtube.com/vi/${getYtId(modal.data.video_url)}/mqdefault.jpg`}
+                      alt="preview" style={{ width: '100%', display: 'block' }} />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsiya (ixtiyoriy)</label>
+                <textarea className="input-field text-sm w-full resize-none" rows={3}
+                  placeholder="Bu dars IELTS Writing uchun foydali, chunki..."
+                  value={modal.data.recommendation}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, recommendation: e.target.value } } : m)} />
+              </div>
+              <div className="flex items-center gap-6 pt-1">
+                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" className="rounded" checked={modal.data.is_premium}
+                    onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
+                  Premium
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" className="rounded" checked={modal.data.is_published}
+                    onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_published: e.target.checked } } : m)} />
+                  Nashr etilgan
+                </label>
+              </div>
+            </div>
+
+            {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSave} disabled={saving}
+                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" /> Saqlanmoqda...</>
+                  : <><Plus size={14} /> {modal.mode === 'add' ? 'Qo\'shish' : 'Saqlash'}</>}
+              </button>
+              <button onClick={closeModal} className="btn-outline text-sm">Bekor qilish</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
