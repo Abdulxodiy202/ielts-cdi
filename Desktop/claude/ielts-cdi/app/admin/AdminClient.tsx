@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Gamepad2, Play,
+  Loader2, Upload, FileText, X, Music, Play,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
@@ -3191,288 +3191,6 @@ CREATE POLICY "Music readable by authenticated" ON background_music
   )
 }
 
-/* в”Ђв”Ђ GamesTab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
-function GamesTab() {
-  const [selectedLevel, setSelectedLevel] = useState(1)
-  const [levelData, setLevelData] = useState<any>(null)
-  const [questions, setQuestions] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  const [dbMissing, setDbMissing] = useState(false)
-  const [msg, setMsg] = useState('')
-
-  const [lvlTitle, setLvlTitle] = useState('')
-  const [lvlDesc, setLvlDesc] = useState('')
-  const [lvlDiff, setLvlDiff] = useState('medium')
-  const [lvlActive, setLvlActive] = useState(true)
-  const [savingLvl, setSavingLvl] = useState(false)
-
-  const [showAddQ, setShowAddQ] = useState(false)
-  const [qQuestion, setQQuestion] = useState('')
-  const [qCorrect, setQCorrect] = useState('')
-  const [qWrong1, setQWrong1] = useState('')
-  const [qWrong2, setQWrong2] = useState('')
-  const [qWrong3, setQWrong3] = useState('')
-  const [qHint, setQHint] = useState('')
-  const [savingQ, setSavingQ] = useState(false)
-
-  async function loadLevel(num: number) {
-    setLoading(true); setMsg('')
-    const res = await fetch(`/api/admin/game/levels`)
-    if (!res.ok) {
-      const d = await res.json()
-      if (d.error === 'TABLE_NOT_FOUND') { setDbMissing(true); setLoading(false); return }
-    }
-    const all = res.ok ? await res.json() : []
-    const found = all.find((l: any) => l.level_number === num) ?? null
-    setLevelData(found)
-    setLvlTitle(found?.title ?? `Level ${num}`)
-    setLvlDesc(found?.description ?? '')
-    setLvlDiff(found?.difficulty ?? 'medium')
-    setLvlActive(found?.is_active ?? true)
-
-    if (found) {
-      const qRes = await fetch(`/api/admin/game/questions?level_id=${found.id}`)
-      setQuestions(qRes.ok ? await qRes.json() : [])
-    } else {
-      setQuestions([])
-    }
-    setLoading(false)
-  }
-
-  useEffect(() => { loadLevel(selectedLevel) }, [selectedLevel])
-
-  async function saveLevel() {
-    setSavingLvl(true); setMsg('')
-    if (levelData) {
-      const res = await fetch(`/api/admin/game/levels/${levelData.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: lvlTitle, description: lvlDesc || null, difficulty: lvlDiff, is_active: lvlActive }),
-      })
-      if (res.ok) { setMsg('вњ“ Saqlandi'); await loadLevel(selectedLevel) }
-      else setMsg('вќЊ Xato')
-    } else {
-      const res = await fetch(`/api/admin/game/levels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level_number: selectedLevel, title: lvlTitle, description: lvlDesc || null, difficulty: lvlDiff }),
-      })
-      if (res.ok) { setMsg('вњ“ Yaratildi'); await loadLevel(selectedLevel) }
-      else { const d = await res.json(); setMsg(`вќЊ ${d.error}`) }
-    }
-    setSavingLvl(false)
-  }
-
-  async function deleteLevel() {
-    if (!levelData || !confirm(`${selectedLevel}-daraja va barcha savollar o'chadi. Davom etasizmi?`)) return
-    await fetch(`/api/admin/game/levels/${levelData.id}`, { method: 'DELETE' })
-    setMsg('вњ“ O\'chirildi'); await loadLevel(selectedLevel)
-  }
-
-  async function addQuestion() {
-    if (!levelData) { setMsg('вќЊ Avval darajani saqlang'); return }
-    if (!qQuestion.trim() || !qCorrect.trim() || !qWrong1.trim() || !qWrong2.trim() || !qWrong3.trim()) {
-      setMsg('вќЊ Savol, to\'g\'ri va 3 noto\'g\'ri javob talab qilinadi'); return
-    }
-    setSavingQ(true)
-    const options = [qCorrect.trim(), qWrong1.trim(), qWrong2.trim(), qWrong3.trim()]
-    const res = await fetch(`/api/admin/game/questions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level_id: levelData.id, question: qQuestion, correct_answer: qCorrect.trim(), options, hint: qHint || null, order_index: questions.length }),
-    })
-    if (res.ok) {
-      setQQuestion(''); setQCorrect(''); setQWrong1(''); setQWrong2(''); setQWrong3(''); setQHint('')
-      setShowAddQ(false); await loadLevel(selectedLevel); setMsg('вњ“ Savol qo\'shildi')
-    } else { const d = await res.json(); setMsg(`вќЊ ${d.error}`) }
-    setSavingQ(false)
-  }
-
-  async function deleteQuestion(id: string) {
-    if (!confirm('Savolni o\'chirasizmi?')) return
-    await fetch(`/api/admin/game/questions/${id}`, { method: 'DELETE' })
-    setQuestions(qs => qs.filter(q => q.id !== id))
-  }
-
-  const SQL_SETUP = `CREATE TABLE IF NOT EXISTS game_levels (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  level_number INTEGER UNIQUE NOT NULL,
-  title TEXT NOT NULL DEFAULT 'Level',
-  description TEXT, category TEXT DEFAULT 'vocabulary',
-  difficulty TEXT DEFAULT 'medium', is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS game_questions (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  level_id UUID REFERENCES game_levels(id) ON DELETE CASCADE,
-  question TEXT NOT NULL, correct_answer TEXT NOT NULL,
-  options JSONB NOT NULL, hint TEXT, order_index INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS game_progress (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  level_number INTEGER NOT NULL, score INTEGER DEFAULT 0,
-  max_score INTEGER DEFAULT 5, is_completed BOOLEAN DEFAULT false,
-  completed_at TIMESTAMPTZ, created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, level_number)
-);
-ALTER TABLE game_levels ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "game_levels_read" ON game_levels FOR SELECT TO authenticated USING (true);
-ALTER TABLE game_progress ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING (user_id = auth.uid());`
-
-  if (dbMissing) {
-    return (
-      <div className="card p-6 max-w-3xl">
-        <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>вљ пёЏ Jadvallar topilmadi</h2>
-        <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>Supabase SQL Editor da quyidagi so'rovni bajaring:</p>
-        <pre className="text-xs rounded-lg p-4 overflow-auto" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
-          {SQL_SETUP}
-        </pre>
-        <button onClick={() => { setDbMissing(false); loadLevel(selectedLevel) }} className="mt-4 px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--accent)', color: '#fff' }}>
-          Qayta tekshirish
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center gap-4">
-        <div>
-          <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Daraja tanlang (1-100)</label>
-          <select
-            value={selectedLevel}
-            onChange={e => setSelectedLevel(Number(e.target.value))}
-            className="px-3 py-2 rounded-lg text-sm border"
-            style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
-          >
-            {Array.from({ length: 100 }, (_, i) => i + 1).map(n => (
-              <option key={n} value={n}>{n}-daraja</option>
-            ))}
-          </select>
-        </div>
-        {msg && (
-          <div className="text-sm font-medium mt-5" style={{ color: msg.startsWith('вњ“') ? '#22c55e' : '#ef4444' }}>{msg}</div>
-        )}
-      </div>
-
-      <div className="card p-5">
-        <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-          {levelData ? `${selectedLevel}-daraja tahrirlash` : `${selectedLevel}-daraja yaratish`}
-          {levelData && <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>({questions.length} savol)</span>}
-        </h3>
-        <div className="space-y-3">
-          <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Sarlavha</label>
-            <input value={lvlTitle} onChange={e => setLvlTitle(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
-          </div>
-          <div>
-            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Tavsif (ixtiyoriy)</label>
-            <input value={lvlDesc} onChange={e => setLvlDesc(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Qiyinlik</label>
-              <select value={lvlDiff} onChange={e => setLvlDiff(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
-                <option value="easy">Oson</option>
-                <option value="medium">O'rta</option>
-                <option value="hard">Qiyin</option>
-              </select>
-            </div>
-            {levelData && (
-              <div className="flex items-end pb-0.5">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={lvlActive} onChange={e => setLvlActive(e.target.checked)} />
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Faol</span>
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex gap-2 mt-4">
-          <button onClick={saveLevel} disabled={savingLvl} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--accent)', color: '#fff', opacity: savingLvl ? 0.7 : 1 }}>
-            {savingLvl ? 'Saqlanmoqda...' : levelData ? 'Saqlash' : 'Yaratish'}
-          </button>
-          {levelData && (
-            <button onClick={deleteLevel} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-              O'chirish
-            </button>
-          )}
-        </div>
-      </div>
-
-      {levelData && (
-        <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Savollar ({questions.length})</h3>
-            <button onClick={() => setShowAddQ(v => !v)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.3)' }}>
-              <Plus size={13} /> Savol qo'shish
-            </button>
-          </div>
-
-          {showAddQ && (
-            <div className="rounded-xl p-4 mb-4 space-y-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Savol matni</label>
-                <textarea value={qQuestion} onChange={e => setQQuestion(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg text-sm border resize-none" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
-              </div>
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: '#22c55e' }}>вњ“ To'g'ri javob</label>
-                <input value={qCorrect} onChange={e => setQCorrect(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'rgba(34,197,94,0.4)' }} />
-              </div>
-              {['qWrong1', 'qWrong2', 'qWrong3'].map((key, i) => {
-                const val = key === 'qWrong1' ? qWrong1 : key === 'qWrong2' ? qWrong2 : qWrong3
-                const setter = key === 'qWrong1' ? setQWrong1 : key === 'qWrong2' ? setQWrong2 : setQWrong3
-                return (
-                  <div key={key}>
-                    <label className="text-xs font-medium mb-1 block" style={{ color: '#ef4444' }}>вњ— Noto'g'ri javob {i + 1}</label>
-                    <input value={val} onChange={e => setter(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'rgba(239,68,68,0.3)' }} />
-                  </div>
-                )
-              })}
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>рџ’Ў Ko'rsatma (ixtiyoriy)</label>
-                <input value={qHint} onChange={e => setQHint(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
-              </div>
-              <div className="flex gap-2 pt-1">
-                <button onClick={addQuestion} disabled={savingQ} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: '#8b5cf6', color: '#fff', opacity: savingQ ? 0.7 : 1 }}>
-                  {savingQ ? 'Saqlanmoqda...' : 'Qo\'shish'}
-                </button>
-                <button onClick={() => setShowAddQ(false)} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                  Bekor
-                </button>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center gap-2 py-4" style={{ color: 'var(--text-muted)' }}><Loader2 size={16} className="animate-spin" /> Yuklanmoqda...</div>
-          ) : questions.length === 0 ? (
-            <p className="text-sm py-4" style={{ color: 'var(--text-muted)' }}>Savollar yo'q. Birinchi savolni qo'shing.</p>
-          ) : (
-            <div className="space-y-2">
-              {questions.map((q, i) => (
-                <div key={q.id} className="rounded-lg p-3 flex items-start gap-3" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                  <span className="text-xs font-bold mt-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>{q.question}</p>
-                    <p className="text-xs" style={{ color: '#22c55e' }}>вњ“ {q.correct_answer}</p>
-                    {q.hint && <p className="text-xs mt-0.5" style={{ color: '#f59e0b' }}>рџ’Ў {q.hint}</p>}
-                  </div>
-                  <button onClick={() => deleteQuestion(q.id)} className="shrink-0 p-1 rounded" style={{ color: '#ef4444', opacity: 0.7 }}>
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 /* в”Ђв”Ђ Dictations tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface AdminDictation {
@@ -3968,6 +3686,8 @@ function DictationsTab() {
   const [audioProgress,  setAudioProgress]  = useState(0)
   const [deleteTarget,   setDeleteTarget]   = useState<AdminDictation | null>(null)
   const audioXhrRef = useRef<XMLHttpRequest | null>(null)
+  const [transcriptMode, setTranscriptMode] = useState<'manual' | 'file'>('manual')
+  const [transcriptFileMsg, setTranscriptFileMsg] = useState<string | null>(null)
 
   useEffect(() => { reloadD() }, [])
 
@@ -4056,6 +3776,33 @@ function DictationsTab() {
     await fetch(`/api/admin/dictations/${deleteTarget.id}`, { method: 'DELETE' })
     await reloadD()
     setDeleteTarget(null)
+  }
+
+  async function handleTranscriptFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) { alert('Fayl hajmi 5MB dan oshmasligi kerak'); return }
+    setTranscriptFileMsg(null)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    try {
+      let text = ''
+      if (ext === 'txt') {
+        text = await file.text()
+      } else if (ext === 'docx') {
+        const mammoth = (await import('mammoth')).default
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer })
+        text = result.value
+      } else {
+        alert("Faqat .txt yoki .docx fayllar qabul qilinadi")
+        return
+      }
+      setEditing(p => ({ ...p, transcript: text.trim() }))
+      const wc = text.trim().split(/\s+/).filter(Boolean).length
+      setTranscriptFileMsg("Fayl yuklandi (" + wc + " so'z)")
+    } catch (err) {
+      alert("Fayl o'qishda xato: " + (err instanceof Error ? err.message : "Noma'lum xato"))
+    }
   }
 
   const wordCount = editing?.transcript ? editing.transcript.trim().split(/\s+/).filter(Boolean).length : 0
@@ -4209,6 +3956,38 @@ function DictationsTab() {
                     {wordCount} so&apos;z{wordCount < 20 ? ' (min 20)' : ''}
                   </span>
                 </div>
+                <div className="flex gap-4 mb-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                    <input type="radio" checked={transcriptMode === 'file'}
+                      onChange={() => { setTranscriptMode('file'); setTranscriptFileMsg(null) }}
+                      className="w-3 h-3" />
+                    <span style={{ color: 'var(--text-primary)' }}>Fayl yuklash</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                    <input type="radio" checked={transcriptMode === 'manual'}
+                      onChange={() => { setTranscriptMode('manual'); setTranscriptFileMsg(null) }}
+                      className="w-3 h-3" />
+                    <span style={{ color: 'var(--text-primary)' }}>Qo&apos;lda yozish</span>
+                  </label>
+                </div>
+                {transcriptMode === 'file' && (
+                  <div className="mb-3">
+                    <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm"
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                      <FileText size={14} style={{ color: 'var(--accent)' }} />
+                      {transcriptFileMsg
+                        ? <span style={{ color: '#10b981' }}>✓ {transcriptFileMsg}</span>
+                        : <span style={{ color: 'var(--text-muted)' }}>TXT yoki DOCX fayl tanlang</span>}
+                      <input type="file" accept=".txt,.docx" className="hidden" onChange={handleTranscriptFile} />
+                    </label>
+                    {transcriptFileMsg && (
+                      <label className="mt-1.5 flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>
+                        <Upload size={11} /> Boshqa fayl tanlash
+                        <input type="file" accept=".txt,.docx" className="hidden" onChange={handleTranscriptFile} />
+                      </label>
+                    )}
+                  </div>
+                )}
                 <textarea value={editing.transcript ?? ''} onChange={e => setEditing(p => ({ ...p, transcript: e.target.value }))}
                   rows={12} className="w-full px-3 py-2 rounded-lg text-sm border resize-y"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)', minHeight: 300 }}
@@ -4276,7 +4055,6 @@ const TABS = [
   { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
   { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
   { id: 'music',     label: 'Musiqa',            Icon: Music },
-  { id: 'games',         label: 'O\'yinlar',         Icon: Gamepad2 },
   { id: 'videos',        label: 'Video darslar',    Icon: Play },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
 ] as const
@@ -4360,7 +4138,6 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'articles' && <ArticlesTab />}
       {activeTab === 'books'    && <BooksTab />}
       {activeTab === 'music'         && <MusicTab />}
-      {activeTab === 'games'         && <GamesTab />}
       {activeTab === 'videos'               && <VideoLessonsTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
     </div>
