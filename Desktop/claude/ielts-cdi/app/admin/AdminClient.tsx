@@ -3482,10 +3482,9 @@ interface AdminDictation {
   audio_url: string
   transcript: string
   order_index: number
-  difficulty: 'easy' | 'medium' | 'hard'
   is_premium: boolean
   is_active: boolean
-  duration_seconds: number | null
+  created_at: string
 }
 
 interface AdminVideo {
@@ -3955,18 +3954,20 @@ function VideoLessonsTab() {
   )
 }
 
-const DICTATION_BLANK: Omit<AdminDictation, 'id'> = {
-  title: '', description: '', audio_url: '', transcript: '',
-  order_index: 1, difficulty: 'medium', is_premium: false, is_active: true, duration_seconds: null,
+const DICTATION_BLANK: Omit<AdminDictation, 'id' | 'created_at'> = {
+  title: '', description: null, audio_url: '', transcript: '',
+  order_index: 1, is_premium: false, is_active: true,
 }
 
 function DictationsTab() {
-  const [dicts,     setDicts]     = useState<AdminDictation[]>([])
-  const [loadingD,  setLoadingD]  = useState(true)
-  const [editing,   setEditing]   = useState<Partial<AdminDictation> | null>(null)
-  const [saving,    setSaving]    = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [deleteId,  setDeleteId]  = useState<number | null>(null)
+  const [dicts,          setDicts]          = useState<AdminDictation[]>([])
+  const [loadingD,       setLoadingD]       = useState(true)
+  const [editing,        setEditing]        = useState<Partial<AdminDictation> | null>(null)
+  const [saving,         setSaving]         = useState(false)
+  const [audioUploading, setAudioUploading] = useState(false)
+  const [audioProgress,  setAudioProgress]  = useState(0)
+  const [deleteTarget,   setDeleteTarget]   = useState<AdminDictation | null>(null)
+  const audioXhrRef = useRef<XMLHttpRequest | null>(null)
 
   useEffect(() => { reloadD() }, [])
 
@@ -3977,18 +3978,64 @@ function DictationsTab() {
     setLoadingD(false)
   }
 
+  async function uploadAudio(file: File): Promise<string> {
+    const supabase = createBrowserClient()
+    const ext = file.name.split('.').pop() ?? 'mp3'
+    const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { data, error } = await supabase.storage.from('dictation_audio').createSignedUploadUrl(path)
+    if (error || !data) throw new Error(error?.message ?? 'Signed URL olishda xato')
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      audioXhrRef.current = xhr
+      xhr.upload.onprogress = e => { if (e.lengthComputable) setAudioProgress(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`))
+      xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+      xhr.open('PUT', data.signedUrl)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.send(file)
+    })
+    const { data: { publicUrl } } = supabase.storage.from('dictation_audio').getPublicUrl(path)
+    return publicUrl
+  }
+
+  async function handleAudioFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !editing) return
+    setAudioUploading(true)
+    setAudioProgress(0)
+    try {
+      const url = await uploadAudio(file)
+      setEditing(p => ({ ...p, audio_url: url }))
+    } catch (err) {
+      alert(`Audio yuklashda xato: ${err instanceof Error ? err.message : "Noma'lum xato"}`)
+    } finally { setAudioUploading(false); setAudioProgress(0); audioXhrRef.current = null }
+  }
+
   async function handleSaveD() {
     if (!editing) return
+    const title = editing.title?.trim() ?? ''
+    const transcript = editing.transcript?.trim() ?? ''
+    if (title.length < 3) { alert("Sarlavha kamida 3 belgidan iborat bo'lishi kerak"); return }
+    const wc = transcript.split(/\s+/).filter(Boolean).length
+    if (wc < 20) { alert("Transkript kamida 20 so'zdan iborat bo'lishi kerak"); return }
+    if (!editing.audio_url) { alert('Audio fayl talab qilinadi'); return }
     setSaving(true)
     try {
       const isEdit = !!(editing as AdminDictation).id
+      const payload = {
+        title, description: editing.description ?? null,
+        audio_url: editing.audio_url, transcript,
+        order_index: editing.order_index ?? 1,
+        is_premium: editing.is_premium ?? false,
+        is_active: editing.is_active ?? true,
+      }
       if (isEdit) {
         await fetch(`/api/admin/dictations/${(editing as AdminDictation).id}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing),
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         })
       } else {
         await fetch('/api/admin/dictations', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing),
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
         })
       }
       await reloadD()
@@ -4004,29 +4051,20 @@ function DictationsTab() {
     setDicts(prev => prev.map(x => x.id === d.id ? { ...x, is_active: !x.is_active } : x))
   }
 
-  async function handleDeleteD(id: number) {
-    await fetch(`/api/admin/dictations/${id}`, { method: 'DELETE' })
+  async function handleDeleteD() {
+    if (!deleteTarget) return
+    await fetch(`/api/admin/dictations/${deleteTarget.id}`, { method: 'DELETE' })
     await reloadD()
-    setDeleteId(null)
+    setDeleteTarget(null)
   }
 
-  async function handleUploadD(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file || !editing) return
-    setUploading(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/admin/dictations/upload', { method: 'POST', body: fd })
-      if (res.ok) { const { url } = await res.json(); setEditing(p => ({ ...p, audio_url: url })) }
-    } finally { setUploading(false) }
-  }
+  const wordCount = editing?.transcript ? editing.transcript.trim().split(/\s+/).filter(Boolean).length : 0
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>вњЌпёЏ Diktantlar</h2>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>✍️ Diktantlar</h2>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>BBC Listening audiolarini boshqaring</p>
         </div>
         <button
@@ -4053,7 +4091,7 @@ function DictationsTab() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
-                  {['#','Tartib','Sarlavha','Davomiyligi','Turi','Holat',''].map(h => (
+                  {['#', 'Sarlavha', 'Transkript', 'Turi', 'Nashr', ''].map(h => (
                     <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
@@ -4062,20 +4100,17 @@ function DictationsTab() {
                 {dicts.map((d, i) => (
                   <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{d.order_index}</span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[200px]">
+                    <td className="px-4 py-3 max-w-[180px]">
                       <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{d.title}</p>
                       {d.audio_url
-                        ? <p className="text-xs mt-0.5" style={{ color: '#10b981' }}>рџЋµ Audio bor</p>
-                        : <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>вљ пёЏ Audio yo&apos;q</p>
+                        ? <p className="text-xs mt-0.5" style={{ color: '#10b981' }}>🎵 Audio bor</p>
+                        : <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>⚠️ Audio yo&apos;q</p>
                       }
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                      {d.duration_seconds
-                        ? `${Math.floor(d.duration_seconds / 60)}:${String(d.duration_seconds % 60).padStart(2,'0')}`
-                        : 'вЂ”'}
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                        {d.transcript ? d.transcript.slice(0, 60) + (d.transcript.length > 60 ? '...' : '') : '—'}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       {d.is_premium
@@ -4093,7 +4128,7 @@ function DictationsTab() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => setEditing(d)} className="p-1.5 rounded-lg hover:opacity-70 transition-opacity" style={{ color: 'var(--accent)' }}><Edit3 size={15} /></button>
-                        <button onClick={() => setDeleteId(d.id)} className="p-1.5 rounded-lg hover:opacity-70 transition-opacity" style={{ color: '#ef4444' }}><Trash2 size={15} /></button>
+                        <button onClick={() => setDeleteTarget(d)} className="p-1.5 rounded-lg hover:opacity-70 transition-opacity" style={{ color: '#ef4444' }}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
@@ -4107,25 +4142,30 @@ function DictationsTab() {
       {/* Add/Edit modal */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={() => setEditing(null)} />
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={() => !saving && !audioUploading && setEditing(null)} />
           <div className="relative card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ zIndex: 51 }}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
                 {(editing as AdminDictation).id ? 'Diktant tahrirlash' : 'Yangi diktant'}
               </h2>
-              <button onClick={() => setEditing(null)} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+              <button onClick={() => setEditing(null)} disabled={saving || audioUploading} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                <label className="text-xs font-medium mb-1 flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                  Sarlavha *
+                  {editing.title && editing.title.trim().length < 3 && (
+                    <span style={{ color: '#ef4444' }}>(kamida 3 belgi)</span>
+                  )}
+                </label>
                 <input value={editing.title ?? ''} onChange={e => setEditing(p => ({ ...p, title: e.target.value }))}
                   className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
               </div>
 
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Tavsif (ixtiyoriy)</label>
-                <textarea value={editing.description ?? ''} onChange={e => setEditing(p => ({ ...p, description: e.target.value }))}
+                <textarea value={editing.description ?? ''} onChange={e => setEditing(p => ({ ...p, description: e.target.value || null }))}
                   rows={2} className="w-full px-3 py-2 rounded-lg text-sm border resize-none"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
               </div>
@@ -4143,44 +4183,36 @@ function DictationsTab() {
                     placeholder="URL kiriting yoki yuklang..."
                     className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
                   <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer shrink-0"
-                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', opacity: uploading ? 0.6 : 1 }}>
-                    {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                    {uploading ? '...' : 'MP3'}
-                    <input type="file" accept=".mp3,audio/*" className="hidden" onChange={handleUploadD} disabled={uploading} />
+                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', opacity: audioUploading ? 0.6 : 1, pointerEvents: audioUploading ? 'none' : 'auto' }}>
+                    {audioUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                    {audioUploading ? `${audioProgress}%` : 'MP3'}
+                    <input type="file" accept=".mp3,.m4a,.ogg,audio/*" className="hidden" onChange={handleAudioFile} disabled={audioUploading} />
                   </label>
                 </div>
-                {editing.audio_url && (
-                  <p className="text-xs mt-1 truncate" style={{ color: '#10b981' }}>вњ“ {editing.audio_url}</p>
+                {audioUploading && (
+                  <div className="mt-2" style={{ height: 4, background: 'var(--bg-secondary)', borderRadius: 2 }}>
+                    <div style={{ height: '100%', width: `${audioProgress}%`, background: 'var(--accent)', borderRadius: 2, transition: 'width 0.2s' }} />
+                  </div>
+                )}
+                {editing.audio_url && !audioUploading && (
+                  <p className="text-xs mt-1 truncate" style={{ color: '#10b981' }}>✓ {editing.audio_url}</p>
                 )}
               </div>
 
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
-                  Matn вЂ” to&apos;g&apos;ri javob *
-                  <span className="ml-2 font-normal" style={{ color: 'var(--text-muted)' }}>(audiodagi so&apos;zma-so&apos;z)</span>
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                    Matn &mdash; to&apos;g&apos;ri javob *
+                    <span className="ml-2 font-normal">(audiodagi so&apos;zma-so&apos;z)</span>
+                  </label>
+                  <span className="text-xs" style={{ color: wordCount >= 20 ? '#10b981' : '#ef4444' }}>
+                    {wordCount} so&apos;z{wordCount < 20 ? ' (min 20)' : ''}
+                  </span>
+                </div>
                 <textarea value={editing.transcript ?? ''} onChange={e => setEditing(p => ({ ...p, transcript: e.target.value }))}
                   rows={12} className="w-full px-3 py-2 rounded-lg text-sm border resize-y"
                   style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)', minHeight: 300 }}
                   placeholder="Audiodagi to'liq matn..." />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Qiyinlik</label>
-                  <select value={editing.difficulty ?? 'medium'} onChange={e => setEditing(p => ({ ...p, difficulty: e.target.value as 'easy'|'medium'|'hard' }))}
-                    className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
-                    <option value="easy">Oson</option>
-                    <option value="medium">O&apos;rta</option>
-                    <option value="hard">Qiyin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Davomiyligi (soniya)</label>
-                  <input type="number" value={editing.duration_seconds ?? ''} placeholder="360"
-                    onChange={e => setEditing(p => ({ ...p, duration_seconds: e.target.value ? parseInt(e.target.value) : null }))}
-                    className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
-                </div>
               </div>
 
               <div className="flex gap-6 pt-1">
@@ -4196,12 +4228,12 @@ function DictationsTab() {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button onClick={handleSaveD} disabled={saving || !editing.title?.trim() || !editing.transcript?.trim()}
+              <button onClick={handleSaveD} disabled={saving || audioUploading}
                 className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
-                style={{ background: 'var(--accent)', color: '#fff', opacity: (saving || !editing.title?.trim() || !editing.transcript?.trim()) ? 0.6 : 1 }}>
-                {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+                style={{ background: 'var(--accent)', color: '#fff', opacity: (saving || audioUploading) ? 0.6 : 1 }}>
+                {saving ? 'Saqlanmoqda...' : (editing as AdminDictation).id ? 'Saqlash' : "Qo'shish"}
               </button>
-              <button onClick={() => setEditing(null)} className="px-5 py-2.5 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
+              <button onClick={() => setEditing(null)} disabled={saving || audioUploading} className="px-5 py-2.5 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
                 Bekor
               </button>
             </div>
@@ -4210,15 +4242,18 @@ function DictationsTab() {
       )}
 
       {/* Delete confirm */}
-      {deleteId !== null && (
+      {deleteTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteId(null)} />
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteTarget(null)} />
           <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
             <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Diktantni o&apos;chirish?</p>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
+              &apos;<strong style={{ color: 'var(--text-primary)' }}>{deleteTarget.title}</strong>&apos; butunlay o&apos;chiriladi.
+            </p>
             <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi.</p>
             <div className="flex gap-3">
-              <button onClick={() => handleDeleteD(deleteId)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
-              <button onClick={() => setDeleteId(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+              <button onClick={handleDeleteD} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
             </div>
           </div>
         </div>

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { title, description, audio_url, transcript, order_index, difficulty, is_premium, duration_seconds } = body
+  const { title, description, audio_url, transcript, order_index, is_premium, is_active } = body
 
   if (!title || !audio_url || !transcript) {
     return Response.json({ error: 'title, audio_url, and transcript required' }, { status: 400 })
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('dictations')
-    .insert({ title, description, audio_url, transcript, order_index, difficulty, is_premium, duration_seconds })
+    .insert({ title, description, audio_url, transcript, order_index, is_premium, is_active })
     .select()
     .single()
 
