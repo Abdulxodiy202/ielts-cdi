@@ -19,9 +19,6 @@ interface Book {
   created_at: string
 }
 
-const SPINE_COLORS = [
-  '#4f46e5', '#0d9488', '#db2777', '#16a34a', '#d97706',
-]
 const COVER_GRADIENTS = [
   'linear-gradient(160deg, #312e81 0%, #4f46e5 60%, #7c3aed 100%)',
   'linear-gradient(160deg, #134e4a 0%, #0d9488 60%, #06b6d4 100%)',
@@ -83,8 +80,7 @@ export default function BooksPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {books.map(book => {
               const locked = book.is_premium && !isPremium
-              const spineColor = bookColor(book.id, SPINE_COLORS)
-              const gradient   = bookColor(book.id, COVER_GRADIENTS)
+              const gradient = bookColor(book.id, COVER_GRADIENTS)
 
               return (
                 <div key={book.id} className="flex flex-col gap-3">
@@ -92,55 +88,25 @@ export default function BooksPage() {
                   <div style={{ perspective: '900px' }}>
                     <div
                       style={{
-                        display: 'flex',
                         transformStyle: 'preserve-3d',
                         transform: 'rotateY(0deg)',
                         transition: 'transform 0.35s ease',
                         cursor: locked ? 'default' : 'pointer',
-                        borderRadius: '4px 10px 10px 4px',
+                        borderRadius: 10,
                         boxShadow: '-6px 6px 20px rgba(0,0,0,0.35)',
                         height: 220,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        background: gradient,
                       }}
                       onMouseEnter={e => { if (!locked) (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(-20deg)' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = 'rotateY(0deg)' }}
                       onClick={() => !locked && router.push(`/books/${book.id}`)}
                     >
-                      {/* Spine */}
-                      <div style={{
-                        width: 28,
-                        flexShrink: 0,
-                        background: `linear-gradient(to right, ${spineColor}cc, ${spineColor}66, ${spineColor}22)`,
-                        borderRadius: '4px 0 0 4px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                      }}>
-                        <span style={{
-                          writingMode: 'vertical-rl',
-                          textOrientation: 'mixed',
-                          transform: 'rotate(180deg)',
-                          fontSize: 9,
-                          fontWeight: 700,
-                          color: 'rgba(255,255,255,0.7)',
-                          letterSpacing: '0.05em',
-                          textTransform: 'uppercase',
-                          maxHeight: '90%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {book.title}
-                        </span>
-                      </div>
-
                       {/* Cover */}
                       <div style={{
-                        flex: 1,
-                        position: 'relative',
-                        borderRadius: '0 10px 10px 0',
-                        overflow: 'hidden',
-                        background: gradient,
+                        position: 'absolute',
+                        inset: 0,
                       }}>
                         {book.cover_image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element

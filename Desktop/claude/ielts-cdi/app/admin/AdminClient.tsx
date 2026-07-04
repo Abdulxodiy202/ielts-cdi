@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Gamepad2, Link2, Play,
+  Loader2, Upload, FileText, X, Music, Gamepad2, Play,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
@@ -85,7 +85,7 @@ interface Props {
   promoDbMissing?: boolean
 }
 
-/* ── Badges ──────────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Badges в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 function StatusBadge({ status }: { status: string }) {
   const cfg = {
     pending:  { label: 'Kutilmoqda', icon: <Clock size={12} />,       bg: 'rgba(245,158,11,0.15)',  color: 'var(--warning)', border: 'rgba(245,158,11,0.3)' },
@@ -114,7 +114,7 @@ function TypeBadge({ type }: { type: string }) {
   )
 }
 
-/* ── Payments tab ────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Payments tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] }) {
   const [payments, setPayments] = useState(initialPayments)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -235,13 +235,13 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
                                 <span style={{ color: 'var(--text-secondary)' }}>
-                                  {pr.meta.booking_date} · {pr.meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
+                                  {pr.meta.booking_date} В· {pr.meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
                                 </span>
                               </div>
                             )}
                             {pr.admin_note && (
                               <div className="text-xs mt-2 p-2 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                                📝 {pr.admin_note}
+                                рџ“ќ {pr.admin_note}
                               </div>
                             )}
                           </div>
@@ -292,7 +292,7 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
   )
 }
 
-/* ── Results tab ─────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Results tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   const [results, setResults] = useState(initialResults)
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -350,7 +350,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
   return (
     <div className="space-y-5">
-      {/* ── Filters row 1: type ── */}
+      {/* в”Ђв”Ђ Filters row 1: type в”Ђв”Ђ */}
       <div className="flex items-center gap-2 flex-wrap">
         <div
           className="flex gap-1 p-1 rounded-xl"
@@ -367,20 +367,20 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
               }}
             >
               {t === 'reading' ? <BookOpen size={14} /> : <Headphones size={14} />}
-              {t === 'reading' ? '📖 Reading' : '🎧 Listening'}
+              {t === 'reading' ? 'рџ“– Reading' : 'рџЋ§ Listening'}
             </button>
           ))}
         </div>
 
-        {/* ── Filters row 2: premium ── */}
+        {/* в”Ђв”Ђ Filters row 2: premium в”Ђв”Ђ */}
         <div
           className="flex gap-1 p-1 rounded-xl"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
         >
           {([
             { key: 'all',     label: 'Barchasi' },
-            { key: 'premium', label: '👑 Premium' },
-            { key: 'free',    label: '👤 Oddiy' },
+            { key: 'premium', label: 'рџ‘‘ Premium' },
+            { key: 'free',    label: 'рџ‘¤ Oddiy' },
           ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
             <button
               key={key}
@@ -405,10 +405,10 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
       {/* Summary line */}
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        {grouped.length} ta foydalanuvchi · {filtered.length} ta natija
+        {grouped.length} ta foydalanuvchi В· {filtered.length} ta natija
       </p>
 
-      {/* ── Table ── */}
+      {/* в”Ђв”Ђ Table в”Ђв”Ђ */}
       {grouped.length === 0 ? (
         <div className="card p-12 text-center">
           <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
@@ -491,7 +491,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
                       {/* Last date */}
                       <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                        {lastTest ? formatDate(lastTest.completed_at) : '—'}
+                        {lastTest ? formatDate(lastTest.completed_at) : 'вЂ”'}
                       </div>
 
                       {/* Chevron */}
@@ -577,7 +577,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   )
 }
 
-/* ── Users tab ───────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Users tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [users, setUsers] = useState(initialUsers)
   const [subTab, setSubTab] = useState<'all' | 'premium' | 'free'>('all')
@@ -614,7 +614,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
       const json = await res.json().catch(() => ({}))
       if (res.ok) {
         const label = broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Oddiy' : ''
-        setBroadcastResult(`✅ ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
+        setBroadcastResult(`вњ… ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
         setBroadcastText('')
         setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null) }, 2500)
       } else {
@@ -766,8 +766,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
         >
           {([
             { key: 'all',     label: 'Barchasi' },
-            { key: 'premium', label: '👑 Premium' },
-            { key: 'free',    label: '👤 Oddiy' },
+            { key: 'premium', label: 'рџ‘‘ Premium' },
+            { key: 'free',    label: 'рџ‘¤ Oddiy' },
           ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
             <button
               key={key}
@@ -871,7 +871,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          {u.full_name ?? '—'}
+                          {u.full_name ?? 'вЂ”'}
                         </span>
                         {u.is_premium ? (
                           <span
@@ -906,10 +906,10 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                             border: '1px solid rgba(99,102,241,0.2)',
                           }}
                         >
-                          💳 {u.payment_count} ta
+                          рџ’і {u.payment_count} ta
                         </button>
                       ) : (
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>вЂ”</span>
                       )}
                     </div>
 
@@ -920,7 +920,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
 
                     {/* Last seen */}
                     <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
+                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : 'вЂ”'}
                     </div>
 
                     {/* Toggle premium + reset password */}
@@ -947,7 +947,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80"
                         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                       >
-                        🔑
+                        рџ”‘
                       </button>
                       <button
                         onClick={() => openMsgModal(u.id, u.full_name ?? u.email)}
@@ -985,7 +985,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                                       background: p.type === 'premium' ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
                                       color: p.type === 'premium' ? 'var(--warning)' : 'var(--accent)',
                                     }}>
-                                    {p.type === 'premium' ? '👑 Premium' : '📅 Mock Test'}
+                                    {p.type === 'premium' ? 'рџ‘‘ Premium' : 'рџ“… Mock Test'}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -997,7 +997,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                                       background: p.status === 'approved' ? 'rgba(34,197,94,0.12)' : p.status === 'rejected' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
                                       color: p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--error)' : 'var(--warning)',
                                     }}>
-                                    {p.status === 'approved' ? '✓ Tasdiqlandi' : p.status === 'rejected' ? '✗ Rad etildi' : '⏳ Kutilmoqda'}
+                                    {p.status === 'approved' ? 'вњ“ Tasdiqlandi' : p.status === 'rejected' ? 'вњ— Rad etildi' : 'вЏі Kutilmoqda'}
                                   </span>
                                 </div>
                               </div>
@@ -1040,7 +1040,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                 <XCircle size={18} />
               </button>
 
-              <div className="text-2xl mb-3">🔑</div>
+              <div className="text-2xl mb-3">рџ”‘</div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
                 Parol o&apos;rnatish
               </h2>
@@ -1069,7 +1069,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   disabled={savingPass || newPassword.length < 6}
                   className="btn-primary w-full font-semibold disabled:opacity-50"
                 >
-                  {passSaved ? '✅ Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
+                  {passSaved ? 'вњ… Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
                 </button>
               </div>
             </motion.div>
@@ -1146,7 +1146,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   disabled={sendingMsg || !msgText.trim()}
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {msgSent ? '✅ Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                  {msgSent ? 'вњ… Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>
@@ -1189,8 +1189,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   <div className="flex gap-2">
                     {([
                       { key: 'all',     label: 'Hammaga' },
-                      { key: 'premium', label: '👑 Premium' },
-                      { key: 'free',    label: '👤 Oddiy' },
+                      { key: 'premium', label: 'рџ‘‘ Premium' },
+                      { key: 'free',    label: 'рџ‘¤ Oddiy' },
                     ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
                       <button
                         key={key}
@@ -1217,7 +1217,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   autoFocus
                 />
                 {broadcastResult && (
-                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('✅') ? 'var(--success)' : 'var(--error)' }}>
+                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('вњ…') ? 'var(--success)' : 'var(--error)' }}>
                     {broadcastResult}
                   </p>
                 )}
@@ -1238,7 +1238,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   )
 }
 
-/* ── Promo Codes tab ─────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Promo Codes tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface PromoUsage {
   id: string
   user_name: string | null
@@ -1266,7 +1266,7 @@ interface PromoCode {
   usage?: PromoUsage[]
 }
 
-const SETUP_SQL = `-- Run in Supabase SQL Editor → New query → Run
+const SETUP_SQL = `-- Run in Supabase SQL Editor в†’ New query в†’ Run
 create table if not exists public.promo_codes (
   id uuid default gen_random_uuid() primary key,
   code text not null unique,
@@ -1417,7 +1417,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       {dbMissing && (
         <div className="card p-5" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
           <div className="flex items-start gap-3 mb-4">
-            <div className="text-2xl">⚠️</div>
+            <div className="text-2xl">вљ пёЏ</div>
             <div>
               <p className="font-bold text-sm mb-1" style={{ color: 'var(--warning)' }}>Jadval topilmadi</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1430,7 +1430,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                 className="text-xs underline mt-1 inline-block"
                 style={{ color: 'var(--accent)' }}
               >
-                Supabase SQL Editor →
+                Supabase SQL Editor в†’
               </a>
             </div>
           </div>
@@ -1438,7 +1438,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
             {SETUP_SQL}
           </pre>
           <button onClick={copySQL} className="btn-outline text-sm mt-3 flex items-center gap-2">
-            {copied ? '✅ Nusxalandi!' : '📋 SQL ni nusxalash'}
+            {copied ? 'вњ… Nusxalandi!' : 'рџ“‹ SQL ni nusxalash'}
           </button>
         </div>
       )}
@@ -1446,7 +1446,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       {/* Create / Edit form */}
       <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-          {editingId ? '✏️ Promokodni tahrirlash' : '➕ Yangi promokod'}
+          {editingId ? 'вњЏпёЏ Promokodni tahrirlash' : 'вћ• Yangi promokod'}
         </h3>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <div>
@@ -1531,16 +1531,16 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                 </button>
               </div>
               {emailLookupState === 'found' && (
-                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>✓ Foydalanuvchi topildi</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>вњ“ Foydalanuvchi topildi</p>
               )}
               {emailLookupState === 'notfound' && (
-                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>✗ Bunday email ro&apos;yxatdan o&apos;tmagan</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>вњ— Bunday email ro&apos;yxatdan o&apos;tmagan</p>
               )}
             </div>
           )}
         </div>
         {formError && (
-          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>вќЊ {formError}</p>
         )}
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
@@ -1578,10 +1578,10 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                     <div>
                       <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
                       {isOneTime && c.assigned_user_email && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>→ {c.assigned_user_email}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>в†’ {c.assigned_user_email}</div>
                       )}
                       {isUsed && c.used_by_email && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>✓ {c.used_by_email}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>вњ“ {c.used_by_email}</div>
                       )}
                     </div>
                     <span className="text-xs px-1.5 py-0.5 rounded-full font-medium text-center"
@@ -1590,7 +1590,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                         color: isOneTime ? 'var(--warning)' : 'var(--success)',
                         border: `1px solid ${isOneTime ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       }}>
-                      {isOneTime ? '1x' : '∞'}
+                      {isOneTime ? '1x' : 'в€ћ'}
                     </span>
                     <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
                     <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
@@ -1650,7 +1650,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                               <div className="flex items-center gap-4 flex-wrap text-right">
                               {u.original_amount != null && (
                                 <span style={{ color: 'var(--text-muted)' }}>
-                                  <s>{formatPrice(u.original_amount)}</s> → <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
+                                  <s>{formatPrice(u.original_amount)}</s> в†’ <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
                                 </span>
                               )}
                                 <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
@@ -1671,7 +1671,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
   )
 }
 
-/* ── Referrals tab ───────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Referrals tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface ReferrerStat {
   id: string
   full_name: string | null
@@ -1730,7 +1730,7 @@ function ReferralsTab() {
       <div className="card p-6 space-y-4" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
         <div className="flex items-center gap-2">
           <Users size={18} style={{ color: 'var(--warning)' }} />
-          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
+          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi вЂ” Referral tizimi</h3>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Supabase SQL Editor da migration faylini ishga tushiring.</p>
         <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
@@ -1775,10 +1775,10 @@ function ReferralsTab() {
           ) : stats.map(u => (
             <div key={u.id} className="grid items-center px-4 py-3 text-sm"
               style={{ gridTemplateColumns: '1fr 1fr 160px 100px', gap: 8 }}>
-              <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.full_name ?? '—'}</span>
+              <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.full_name ?? 'вЂ”'}</span>
               <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</span>
               <span className="font-mono font-bold" style={{ color: u.referral_code ? 'var(--accent)' : 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                {u.referral_code ?? '—'}
+                {u.referral_code ?? 'вЂ”'}
               </span>
               <span className="text-center font-bold" style={{ color: u.converted_count > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
                 {u.converted_count}
@@ -1791,7 +1791,7 @@ function ReferralsTab() {
   )
 }
 
-/* ── Feedback tab ────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Feedback tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface FeedbackItem {
   id: string
   user_id: string
@@ -1802,7 +1802,7 @@ interface FeedbackItem {
   created_at: string
 }
 
-/* ── Articles Tab ────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Articles Tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface ArticleItem {
   id: string
   title: string
@@ -2023,7 +2023,7 @@ function ArticlesTab() {
       <div className="card p-4">
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Maqola tanlang</label>
         <select value={selectedId} onChange={e => handleArticleChange(e.target.value)} className="input-field">
-          <option value="">— Maqola tanlang —</option>
+          <option value="">вЂ” Maqola tanlang вЂ”</option>
           {articles.map(a => (
             <option key={a.id} value={a.id}>{a.title}{!a.is_published ? ' (Draft)' : ''}</option>
           ))}
@@ -2144,7 +2144,7 @@ function ArticlesTab() {
                   <button onClick={handleSaveCover} disabled={savingCover}
                     className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
                     style={{ opacity: savingCover ? 0.6 : 1 }}>
-                    {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
+                    {savingCover ? <><Loader2 size={14} className="animate-spin" /> YuklanmoqdaвЂ¦</> : <><Upload size={14} /> Rasmni saqlash</>}
                   </button>
                 )}
               </div>
@@ -2189,7 +2189,7 @@ function ArticlesTab() {
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
                       style={{ background: 'var(--error)', color: '#fff', opacity: deleting ? 0.7 : 1 }}>
                       {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                      {deleting ? "O'chirilmoqda…" : "Ha, o'chirish"}
+                      {deleting ? "O'chirilmoqdaвЂ¦" : "Ha, o'chirish"}
                     </button>
                   </div>
                 </div>
@@ -2247,7 +2247,7 @@ function ArticlesTab() {
                 color: message.ok ? 'var(--success)' : 'var(--error)',
                 border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
               }}>
-              {message.ok ? '✅' : '❌'} {message.text}
+              {message.ok ? 'вњ…' : 'вќЊ'} {message.text}
             </div>
           )}
 
@@ -2259,7 +2259,7 @@ function ArticlesTab() {
               opacity: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 0.5 : 1,
               cursor: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 'not-allowed' : 'pointer',
             }}>
-            {saving ? <><Loader2 size={16} className="animate-spin" /> Saqlanmoqda…</> : <><Upload size={16} /> Saqlash</>}
+            {saving ? <><Loader2 size={16} className="animate-spin" /> SaqlanmoqdaвЂ¦</> : <><Upload size={16} /> Saqlash</>}
           </button>
         </div>
       )}
@@ -2313,7 +2313,7 @@ function ArticlesTab() {
   )
 }
 
-/* ── Books Tab ───────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Books Tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface BookItem {
   id: string
   title: string
@@ -2512,7 +2512,7 @@ function BooksTab() {
       <div className="card p-4">
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
         <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field">
-          <option value="">— Kitob tanlang —</option>
+          <option value="">вЂ” Kitob tanlang вЂ”</option>
           {books.map(b => (
             <option key={b.id} value={b.id}>{b.title}{!b.is_published ? ' (Draft)' : ''}</option>
           ))}
@@ -2625,7 +2625,7 @@ function BooksTab() {
               <button onClick={handleSaveCover} disabled={savingCover}
                 className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
                 style={{ opacity: savingCover ? 0.6 : 1 }}>
-                {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
+                {savingCover ? <><Loader2 size={14} className="animate-spin" /> YuklanmoqdaвЂ¦</> : <><Upload size={14} /> Rasmni saqlash</>}
               </button>
             )}
           </div>
@@ -2637,7 +2637,7 @@ function BooksTab() {
                 color: message.ok ? 'var(--success)' : 'var(--error)',
                 border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
               }}>
-              {message.ok ? '✅' : '❌'} {message.text}
+              {message.ok ? 'вњ…' : 'вќЊ'} {message.text}
             </div>
           )}
 
@@ -2646,7 +2646,7 @@ function BooksTab() {
             <button onClick={handleSave} disabled={saving}
               className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
               style={{ opacity: saving ? 0.6 : 1 }}>
-              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
+              {saving ? <><Loader2 size={15} className="animate-spin" /> SaqlanmoqdaвЂ¦</> : 'Saqlash'}
             </button>
             <button onClick={() => setShowDeleteBook(true)}
               className="px-3 py-2 rounded-xl text-sm font-medium"
@@ -2808,7 +2808,7 @@ function FeedbackTab() {
   if (dbMissing) {
     return (
       <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
-        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ feedback jadvali topilmadi</p>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>вљ пёЏ feedback jadvali topilmadi</p>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           Supabase SQL Editor da migration ni ishga tushiring, keyin sahifani yangilang.
         </p>
@@ -2832,7 +2832,7 @@ function FeedbackTab() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {items.length} ta feedback · {items.filter(f => f.status === 'new').length} ta yangi
+          {items.length} ta feedback В· {items.filter(f => f.status === 'new').length} ta yangi
         </p>
         <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
@@ -2871,7 +2871,7 @@ function FeedbackTab() {
               >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                    {item.user_name ?? '—'}
+                    {item.user_name ?? 'вЂ”'}
                   </div>
                   <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {item.user_email}
@@ -2890,7 +2890,7 @@ function FeedbackTab() {
                       ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' }
                       : { background: 'rgba(245,158,11,0.12)', color: 'var(--warning)' }}
                   >
-                    {item.status === 'replied' ? '✓ Javob berilgan' : '● Yangi'}
+                    {item.status === 'replied' ? 'вњ“ Javob berilgan' : 'в—Џ Yangi'}
                   </span>
                 </div>
                 <div className="shrink-0">
@@ -2967,7 +2967,7 @@ function FeedbackTab() {
                   disabled={sending || !replyText.trim()}
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {replySent ? '✅ Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                  {replySent ? 'вњ… Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>
@@ -2978,7 +2978,7 @@ function FeedbackTab() {
   )
 }
 
-/* ── Music tab ───────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Music tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface MusicTrack {
   id: string
   title: string
@@ -3048,7 +3048,7 @@ function MusicTab() {
 
   if (dbMissing) return (
     <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
-      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ background_music jadvali topilmadi</p>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>вљ пёЏ background_music jadvali topilmadi</p>
       <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
       <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
 {`CREATE TABLE IF NOT EXISTS background_music (
@@ -3071,7 +3071,7 @@ CREATE POLICY "Music readable by authenticated" ON background_music
       {/* Add form */}
       {showForm ? (
         <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>➕ Yangi musiqa</h3>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>вћ• Yangi musiqa</h3>
           <div className="grid sm:grid-cols-2 gap-3 mb-3">
             <div className="sm:col-span-2">
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Nomi</label>
@@ -3113,7 +3113,7 @@ CREATE POLICY "Music readable by authenticated" ON background_music
               </label>
             </div>
           </div>
-          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>вќЊ {formError}</p>}
           <div className="flex gap-2">
             <button onClick={handleAdd} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
               <Plus size={14} /> {saving ? 'Saqlanmoqda...' : 'Qo\'shish'}
@@ -3191,7 +3191,7 @@ CREATE POLICY "Music readable by authenticated" ON background_music
   )
 }
 
-/* ── GamesTab ────────────────────────────────────────────────────────── */
+/* в”Ђв”Ђ GamesTab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 function GamesTab() {
   const [selectedLevel, setSelectedLevel] = useState(1)
   const [levelData, setLevelData] = useState<any>(null)
@@ -3249,16 +3249,16 @@ function GamesTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: lvlTitle, description: lvlDesc || null, difficulty: lvlDiff, is_active: lvlActive }),
       })
-      if (res.ok) { setMsg('✓ Saqlandi'); await loadLevel(selectedLevel) }
-      else setMsg('❌ Xato')
+      if (res.ok) { setMsg('вњ“ Saqlandi'); await loadLevel(selectedLevel) }
+      else setMsg('вќЊ Xato')
     } else {
       const res = await fetch(`/api/admin/game/levels`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ level_number: selectedLevel, title: lvlTitle, description: lvlDesc || null, difficulty: lvlDiff }),
       })
-      if (res.ok) { setMsg('✓ Yaratildi'); await loadLevel(selectedLevel) }
-      else { const d = await res.json(); setMsg(`❌ ${d.error}`) }
+      if (res.ok) { setMsg('вњ“ Yaratildi'); await loadLevel(selectedLevel) }
+      else { const d = await res.json(); setMsg(`вќЊ ${d.error}`) }
     }
     setSavingLvl(false)
   }
@@ -3266,13 +3266,13 @@ function GamesTab() {
   async function deleteLevel() {
     if (!levelData || !confirm(`${selectedLevel}-daraja va barcha savollar o'chadi. Davom etasizmi?`)) return
     await fetch(`/api/admin/game/levels/${levelData.id}`, { method: 'DELETE' })
-    setMsg('✓ O\'chirildi'); await loadLevel(selectedLevel)
+    setMsg('вњ“ O\'chirildi'); await loadLevel(selectedLevel)
   }
 
   async function addQuestion() {
-    if (!levelData) { setMsg('❌ Avval darajani saqlang'); return }
+    if (!levelData) { setMsg('вќЊ Avval darajani saqlang'); return }
     if (!qQuestion.trim() || !qCorrect.trim() || !qWrong1.trim() || !qWrong2.trim() || !qWrong3.trim()) {
-      setMsg('❌ Savol, to\'g\'ri va 3 noto\'g\'ri javob talab qilinadi'); return
+      setMsg('вќЊ Savol, to\'g\'ri va 3 noto\'g\'ri javob talab qilinadi'); return
     }
     setSavingQ(true)
     const options = [qCorrect.trim(), qWrong1.trim(), qWrong2.trim(), qWrong3.trim()]
@@ -3283,8 +3283,8 @@ function GamesTab() {
     })
     if (res.ok) {
       setQQuestion(''); setQCorrect(''); setQWrong1(''); setQWrong2(''); setQWrong3(''); setQHint('')
-      setShowAddQ(false); await loadLevel(selectedLevel); setMsg('✓ Savol qo\'shildi')
-    } else { const d = await res.json(); setMsg(`❌ ${d.error}`) }
+      setShowAddQ(false); await loadLevel(selectedLevel); setMsg('вњ“ Savol qo\'shildi')
+    } else { const d = await res.json(); setMsg(`вќЊ ${d.error}`) }
     setSavingQ(false)
   }
 
@@ -3325,7 +3325,7 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
   if (dbMissing) {
     return (
       <div className="card p-6 max-w-3xl">
-        <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>⚠️ Jadvallar topilmadi</h2>
+        <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>вљ пёЏ Jadvallar topilmadi</h2>
         <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>Supabase SQL Editor da quyidagi so'rovni bajaring:</p>
         <pre className="text-xs rounded-lg p-4 overflow-auto" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
           {SQL_SETUP}
@@ -3354,7 +3354,7 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
           </select>
         </div>
         {msg && (
-          <div className="text-sm font-medium mt-5" style={{ color: msg.startsWith('✓') ? '#22c55e' : '#ef4444' }}>{msg}</div>
+          <div className="text-sm font-medium mt-5" style={{ color: msg.startsWith('вњ“') ? '#22c55e' : '#ef4444' }}>{msg}</div>
         )}
       </div>
 
@@ -3419,7 +3419,7 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
                 <textarea value={qQuestion} onChange={e => setQQuestion(e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg text-sm border resize-none" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
               </div>
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: '#22c55e' }}>✓ To'g'ri javob</label>
+                <label className="text-xs font-medium mb-1 block" style={{ color: '#22c55e' }}>вњ“ To'g'ri javob</label>
                 <input value={qCorrect} onChange={e => setQCorrect(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'rgba(34,197,94,0.4)' }} />
               </div>
               {['qWrong1', 'qWrong2', 'qWrong3'].map((key, i) => {
@@ -3427,13 +3427,13 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
                 const setter = key === 'qWrong1' ? setQWrong1 : key === 'qWrong2' ? setQWrong2 : setQWrong3
                 return (
                   <div key={key}>
-                    <label className="text-xs font-medium mb-1 block" style={{ color: '#ef4444' }}>✗ Noto'g'ri javob {i + 1}</label>
+                    <label className="text-xs font-medium mb-1 block" style={{ color: '#ef4444' }}>вњ— Noto'g'ri javob {i + 1}</label>
                     <input value={val} onChange={e => setter(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'rgba(239,68,68,0.3)' }} />
                   </div>
                 )
               })}
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>💡 Ko'rsatma (ixtiyoriy)</label>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>рџ’Ў Ko'rsatma (ixtiyoriy)</label>
                 <input value={qHint} onChange={e => setQHint(e.target.value)} className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
               </div>
               <div className="flex gap-2 pt-1">
@@ -3458,8 +3458,8 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
                   <span className="text-xs font-bold mt-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>{q.question}</p>
-                    <p className="text-xs" style={{ color: '#22c55e' }}>✓ {q.correct_answer}</p>
-                    {q.hint && <p className="text-xs mt-0.5" style={{ color: '#f59e0b' }}>💡 {q.hint}</p>}
+                    <p className="text-xs" style={{ color: '#22c55e' }}>вњ“ {q.correct_answer}</p>
+                    {q.hint && <p className="text-xs mt-0.5" style={{ color: '#f59e0b' }}>рџ’Ў {q.hint}</p>}
                   </div>
                   <button onClick={() => deleteQuestion(q.id)} className="shrink-0 p-1 rounded" style={{ color: '#ef4444', opacity: 0.7 }}>
                     <Trash2 size={14} />
@@ -3474,7 +3474,7 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
   )
 }
 
-/* ── Dictations tab ──────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Dictations tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 interface AdminDictation {
   id: number
   title: string
@@ -3486,6 +3486,15 @@ interface AdminDictation {
   is_premium: boolean
   is_active: boolean
   duration_seconds: number | null
+}
+
+function VideoLessonsTab() {
+  return (
+    <div className="card p-8 text-center" style={{ color: 'var(--text-muted)' }}>
+      <p className="text-4xl mb-3">🎬</p>
+      <p className="font-medium">Video darslar bo&apos;limi tez orada</p>
+    </div>
+  )
 }
 
 const DICTATION_BLANK: Omit<AdminDictation, 'id'> = {
@@ -3559,7 +3568,7 @@ function DictationsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>✍️ Diktantlar</h2>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>вњЌпёЏ Diktantlar</h2>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>BBC Listening audiolarini boshqaring</p>
         </div>
         <button
@@ -3601,14 +3610,14 @@ function DictationsTab() {
                     <td className="px-4 py-3 max-w-[200px]">
                       <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{d.title}</p>
                       {d.audio_url
-                        ? <p className="text-xs mt-0.5" style={{ color: '#10b981' }}>🎵 Audio bor</p>
-                        : <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>⚠️ Audio yo&apos;q</p>
+                        ? <p className="text-xs mt-0.5" style={{ color: '#10b981' }}>рџЋµ Audio bor</p>
+                        : <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>вљ пёЏ Audio yo&apos;q</p>
                       }
                     </td>
                     <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                       {d.duration_seconds
                         ? `${Math.floor(d.duration_seconds / 60)}:${String(d.duration_seconds % 60).padStart(2,'0')}`
-                        : '—'}
+                        : 'вЂ”'}
                     </td>
                     <td className="px-4 py-3">
                       {d.is_premium
@@ -3683,13 +3692,13 @@ function DictationsTab() {
                   </label>
                 </div>
                 {editing.audio_url && (
-                  <p className="text-xs mt-1 truncate" style={{ color: '#10b981' }}>✓ {editing.audio_url}</p>
+                  <p className="text-xs mt-1 truncate" style={{ color: '#10b981' }}>вњ“ {editing.audio_url}</p>
                 )}
               </div>
 
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
-                  Matn — to&apos;g&apos;ri javob *
+                  Matn вЂ” to&apos;g&apos;ri javob *
                   <span className="ml-2 font-normal" style={{ color: 'var(--text-muted)' }}>(audiodagi so&apos;zma-so&apos;z)</span>
                 </label>
                 <textarea value={editing.transcript ?? ''} onChange={e => setEditing(p => ({ ...p, transcript: e.target.value }))}
@@ -3760,873 +3769,6 @@ function DictationsTab() {
   )
 }
 
-/* ── Tab definitions ─────────────────────────────────────────────────── */
-/* ── WritingCollocationTab ───────────────────────────────────────────── */
-const WC_CATEGORIES = ['Task 1', 'Task 2', 'Both']
-const WC_LEVELS     = ['beginner', 'elementary', 'intermediate', 'advanced']
-
-interface WritingCollocation {
-  id: string
-  word: string
-  uzbek_translation: string
-  english_definition: string
-  example_sentence: string
-  category: string
-  level: string
-  is_active: boolean
-  created_at: string
-}
-
-const EMPTY_WC_FORM = {
-  word: '', uzbek_translation: '', english_definition: '',
-  example_sentence: '', category: 'Both', level: 'intermediate', is_active: true,
-}
-
-function WritingCollocationTab() {
-  const [words,     setWords]     = useState<WritingCollocation[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [dbMissing, setDbMissing] = useState(false)
-  const [saving,    setSaving]    = useState(false)
-  const [showForm,  setShowForm]  = useState(false)
-  const [editId,    setEditId]    = useState<string | null>(null)
-  const [form,      setForm]      = useState({ ...EMPTY_WC_FORM })
-  const [formError, setFormError] = useState('')
-
-  const load = async () => {
-    setLoading(true)
-    const res = await fetch('/api/admin/writing-collocations')
-    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
-    if (res.ok) { const d = await res.json(); setWords(Array.isArray(d) ? d : []) }
-    setLoading(false)
-  }
-  useEffect(() => { load() }, [])
-
-  const resetForm = () => { setForm({ ...EMPTY_WC_FORM }); setFormError(''); setShowForm(false); setEditId(null) }
-
-  const openEdit = (w: WritingCollocation) => {
-    setForm({ word: w.word, uzbek_translation: w.uzbek_translation, english_definition: w.english_definition, example_sentence: w.example_sentence, category: w.category, level: w.level, is_active: w.is_active })
-    setEditId(w.id); setShowForm(true); setFormError('')
-  }
-
-  const handleSave = async () => {
-    if (!form.word.trim())              { setFormError('Word kiritilishi shart'); return }
-    if (!form.uzbek_translation.trim()) { setFormError("O'zbekcha tarjima kiritilishi shart"); return }
-    if (!form.english_definition.trim()){ setFormError("Ta'rif kiritilishi shart"); return }
-    if (!form.example_sentence.trim())  { setFormError('Misol jumla kiritilishi shart'); return }
-    setSaving(true); setFormError('')
-    const url    = editId ? `/api/admin/writing-collocations/${editId}` : '/api/admin/writing-collocations'
-    const method = editId ? 'PATCH' : 'POST'
-    const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    const json   = await res.json()
-    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
-    if (editId) {
-      setWords(prev => prev.map(x => x.id === editId ? json : x))
-    } else {
-      setWords(prev => [...prev, json])
-    }
-    resetForm(); setSaving(false)
-  }
-
-  const handleToggle = async (w: WritingCollocation) => {
-    const res = await fetch(`/api/admin/writing-collocations/${w.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !w.is_active }),
-    })
-    if (res.ok) setWords(prev => prev.map(x => x.id === w.id ? { ...x, is_active: !x.is_active } : x))
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Bu so'zni o'chirishni tasdiqlaysizmi?")) return
-    const res = await fetch(`/api/admin/writing-collocations/${id}`, { method: 'DELETE' })
-    if (res.ok || res.status === 204) setWords(prev => prev.filter(x => x.id !== id))
-  }
-
-  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
-
-  if (dbMissing) return (
-    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
-      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ writing_collocations jadvali topilmadi</p>
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da bajaring:</p>
-      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-{`CREATE TABLE IF NOT EXISTS writing_collocations (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  word TEXT NOT NULL,
-  uzbek_translation TEXT NOT NULL,
-  english_definition TEXT NOT NULL,
-  example_sentence TEXT NOT NULL,
-  category TEXT NOT NULL DEFAULT 'Both',
-  level TEXT NOT NULL DEFAULT 'intermediate',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE writing_collocations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Writing collocations readable" ON writing_collocations
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Writing collocations admin" ON writing_collocations FOR ALL TO authenticated
-  USING (auth.jwt() ->> 'email' IN ('abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com'));
-
-CREATE TABLE IF NOT EXISTS user_saved_writing_words (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  word_id UUID REFERENCES writing_collocations(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, word_id)
-);
-ALTER TABLE user_saved_writing_words ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Saved writing words by owner" ON user_saved_writing_words
-  FOR ALL TO authenticated USING (auth.uid() = user_id);`}
-      </pre>
-    </div>
-  )
-
-  return (
-    <div className="space-y-6">
-      {showForm ? (
-        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-            {editId ? "✏️ So'zni tahrirlash" : "➕ Yangi collocation qo'shish"}
-          </h3>
-          <div className="grid sm:grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Collocation *</label>
-              <input className="input-field text-sm w-full" placeholder="significant increase"
-                value={form.word} onChange={e => setForm(f => ({ ...f, word: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>O'zbekcha tarjima *</label>
-              <input className="input-field text-sm w-full" placeholder="sezilarli o'sish"
-                value={form.uzbek_translation} onChange={e => setForm(f => ({ ...f, uzbek_translation: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Inglizcha ta'rif *</label>
-              <textarea className="input-field text-sm w-full" rows={2} placeholder="A large and noticeable rise..."
-                value={form.english_definition} onChange={e => setForm(f => ({ ...f, english_definition: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Misol jumla * (collocation so'z o'z nomida bo'lishi kerak)</label>
-              <textarea className="input-field text-sm w-full" rows={2}
-                placeholder="There has been a significant increase in global temperatures."
-                value={form.example_sentence} onChange={e => setForm(f => ({ ...f, example_sentence: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kategoriya</label>
-              <select className="input-field text-sm w-full" value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {WC_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Daraja</label>
-              <select className="input-field text-sm w-full capitalize" value={form.level}
-                onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
-                {WC_LEVELS.map(l => <option key={l} value={l} className="capitalize">{l}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={form.is_active}
-                  onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} className="rounded" />
-                Faol
-              </label>
-            </div>
-          </div>
-          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
-              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : editId ? 'Saqlash' : "Qo'shish"}
-            </button>
-            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_WC_FORM }) }}
-          className="btn-primary text-sm flex items-center gap-2">
-          <Plus size={14} /> Yangi collocation qo&apos;shish
-        </button>
-      )}
-
-      {words.length === 0 ? (
-        <div className="card p-12 text-center">
-          <BookOpen size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Hali collocations qo&apos;shilmagan</p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ display: 'grid', gridTemplateColumns: '1fr 90px 100px 70px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-            <span>So'z / Ibora</span><span>Kategoriya</span><span>Daraja</span><span>Holat</span><span className="text-right">Amal</span>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {words.map(w => (
-              <div key={w.id} className="px-4 py-3 text-sm items-center"
-                style={{ display: 'grid', gridTemplateColumns: '1fr 90px 100px 70px 90px', gap: 8 }}>
-                <span className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{w.word}</span>
-                <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{w.category}</span>
-                <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>{w.level}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center"
-                  style={{
-                    background: w.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
-                    color: w.is_active ? 'var(--success)' : 'var(--text-muted)',
-                  }}>
-                  {w.is_active ? 'Faol' : "O'chiq"}
-                </span>
-                <div className="flex items-center gap-1.5 justify-end">
-                  <button onClick={() => openEdit(w)} title="Tahrirlash"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
-                    <Edit3 size={12} />
-                  </button>
-                  <button onClick={() => handleToggle(w)} title={w.is_active ? "O'chirish" : 'Yoqish'}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: w.is_active ? 'rgba(34,197,94,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: w.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
-                    {w.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
-                  </button>
-                  <button onClick={() => handleDelete(w.id)} title="O'chirish"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ── LinkingWordsTab ─────────────────────────────────────────────────── */
-const LW_CATEGORIES = ['Addition','Contrast','Cause/Effect','Sequence','Emphasis','Example','Concession']
-const LW_LEVELS     = ['beginner','elementary','intermediate','advanced']
-
-interface LinkingWord {
-  id: string
-  word: string
-  uzbek_translation: string
-  english_definition: string
-  example_sentence: string
-  category: string
-  level: string
-  is_active: boolean
-  created_at: string
-}
-
-const EMPTY_LW_FORM = {
-  word: '', uzbek_translation: '', english_definition: '',
-  example_sentence: '', category: 'Addition', level: 'beginner', is_active: true,
-}
-
-function LinkingWordsTab() {
-  const [words,     setWords]     = useState<LinkingWord[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [dbMissing, setDbMissing] = useState(false)
-  const [saving,    setSaving]    = useState(false)
-  const [showForm,  setShowForm]  = useState(false)
-  const [editId,    setEditId]    = useState<string | null>(null)
-  const [form,      setForm]      = useState({ ...EMPTY_LW_FORM })
-  const [formError, setFormError] = useState('')
-
-  const load = async () => {
-    setLoading(true)
-    const res = await fetch('/api/admin/linking-words')
-    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
-    if (res.ok) { const d = await res.json(); setWords(Array.isArray(d) ? d : []) }
-    setLoading(false)
-  }
-  useEffect(() => { load() }, [])
-
-  const resetForm = () => { setForm({ ...EMPTY_LW_FORM }); setFormError(''); setShowForm(false); setEditId(null) }
-
-  const openEdit = (w: LinkingWord) => {
-    setForm({ word: w.word, uzbek_translation: w.uzbek_translation, english_definition: w.english_definition, example_sentence: w.example_sentence, category: w.category, level: w.level, is_active: w.is_active })
-    setEditId(w.id); setShowForm(true); setFormError('')
-  }
-
-  const handleSave = async () => {
-    if (!form.word.trim()) { setFormError('Word kiritilishi shart'); return }
-    if (!form.uzbek_translation.trim()) { setFormError('O\'zbekcha tarjima kiritilishi shart'); return }
-    if (!form.english_definition.trim()) { setFormError('Ta\'rif kiritilishi shart'); return }
-    if (!form.example_sentence.trim()) { setFormError('Misol jumla kiritilishi shart'); return }
-    setSaving(true); setFormError('')
-    const url    = editId ? `/api/admin/linking-words/${editId}` : '/api/admin/linking-words'
-    const method = editId ? 'PATCH' : 'POST'
-    const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    const json   = await res.json()
-    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
-    if (editId) {
-      setWords(prev => prev.map(x => x.id === editId ? json : x))
-    } else {
-      setWords(prev => [...prev, json])
-    }
-    resetForm(); setSaving(false)
-  }
-
-  const handleToggle = async (w: LinkingWord) => {
-    const res = await fetch(`/api/admin/linking-words/${w.id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: !w.is_active }),
-    })
-    if (res.ok) setWords(prev => prev.map(x => x.id === w.id ? { ...x, is_active: !x.is_active } : x))
-  }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Bu so\'zni o\'chirishni tasdiqlaysizmi?')) return
-    const res = await fetch(`/api/admin/linking-words/${id}`, { method: 'DELETE' })
-    if (res.ok || res.status === 204) setWords(prev => prev.filter(x => x.id !== id))
-  }
-
-  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
-
-  if (dbMissing) return (
-    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
-      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ linking_words jadvali topilmadi</p>
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da bajaring:</p>
-      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-{`CREATE TABLE IF NOT EXISTS linking_words (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  word TEXT NOT NULL,
-  uzbek_translation TEXT NOT NULL,
-  english_definition TEXT NOT NULL,
-  example_sentence TEXT NOT NULL,
-  category TEXT NOT NULL,
-  level TEXT NOT NULL DEFAULT 'beginner',
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE linking_words ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Linking words readable by authenticated" ON linking_words
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Linking words manageable by admin" ON linking_words FOR ALL TO authenticated
-  USING (auth.jwt() ->> 'email' IN ('abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com'));
-
-CREATE TABLE IF NOT EXISTS user_saved_linking_words (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  word_id UUID REFERENCES linking_words(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(user_id, word_id)
-);
-ALTER TABLE user_saved_linking_words ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Saved words by owner" ON user_saved_linking_words
-  FOR ALL TO authenticated USING (auth.uid() = user_id);`}
-      </pre>
-    </div>
-  )
-
-  return (
-    <div className="space-y-6">
-      {/* Add/Edit form */}
-      {showForm ? (
-        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-            {editId ? '✏️ So\'zni tahrirlash' : '➕ Yangi so\'z qo\'shish'}
-          </h3>
-          <div className="grid sm:grid-cols-2 gap-3 mb-3">
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Word *</label>
-              <input className="input-field text-sm w-full" placeholder="Furthermore"
-                value={form.word} onChange={e => setForm(f => ({ ...f, word: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>O'zbekcha tarjima *</label>
-              <input className="input-field text-sm w-full" placeholder="Bundan tashqari"
-                value={form.uzbek_translation} onChange={e => setForm(f => ({ ...f, uzbek_translation: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Inglizcha ta'rif *</label>
-              <textarea className="input-field text-sm w-full" rows={2} placeholder="Used to add more information..."
-                value={form.english_definition} onChange={e => setForm(f => ({ ...f, english_definition: e.target.value }))} />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Misol jumla * (so'z o'z nomida bo'lishi kerak)</label>
-              <textarea className="input-field text-sm w-full" rows={2}
-                placeholder="The results were impressive. Furthermore, the cost was lower."
-                value={form.example_sentence} onChange={e => setForm(f => ({ ...f, example_sentence: e.target.value }))} />
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kategoriya</label>
-              <select className="input-field text-sm w-full" value={form.category}
-                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                {LW_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Daraja</label>
-              <select className="input-field text-sm w-full capitalize" value={form.level}
-                onChange={e => setForm(f => ({ ...f, level: e.target.value }))}>
-                {LW_LEVELS.map(l => <option key={l} value={l} className="capitalize">{l}</option>)}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={form.is_active}
-                  onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} className="rounded" />
-                Faol
-              </label>
-            </div>
-          </div>
-          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
-              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : editId ? 'Saqlash' : 'Qo\'shish'}
-            </button>
-            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm({ ...EMPTY_LW_FORM }) }}
-          className="btn-primary text-sm flex items-center gap-2">
-          <Plus size={14} /> Yangi so&apos;z qo&apos;shish
-        </button>
-      )}
-
-      {/* List */}
-      {words.length === 0 ? (
-        <div className="card p-12 text-center">
-          <Link2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Hali so&apos;zlar qo&apos;shilmagan</p>
-        </div>
-      ) : (
-        <div className="card overflow-hidden">
-          <div className="px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ display: 'grid', gridTemplateColumns: '1fr 120px 100px 70px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
-            <span>So'z</span><span>Kategoriya</span><span>Daraja</span><span>Holat</span><span className="text-right">Amal</span>
-          </div>
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {words.map(w => (
-              <div key={w.id} className="px-4 py-3 text-sm items-center"
-                style={{ display: 'grid', gridTemplateColumns: '1fr 120px 100px 70px 90px', gap: 8 }}>
-                <span className="font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{w.word}</span>
-                <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{w.category}</span>
-                <span className="text-xs capitalize" style={{ color: 'var(--text-secondary)' }}>{w.level}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center"
-                  style={{
-                    background: w.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
-                    color: w.is_active ? 'var(--success)' : 'var(--text-muted)',
-                  }}>
-                  {w.is_active ? 'Faol' : 'O\'chiq'}
-                </span>
-                <div className="flex items-center gap-1.5 justify-end">
-                  <button onClick={() => openEdit(w)} title="Tahrirlash"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
-                    <Edit3 size={12} />
-                  </button>
-                  <button onClick={() => handleToggle(w)} title={w.is_active ? "O'chirish" : 'Yoqish'}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: w.is_active ? 'rgba(34,197,94,0.08)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: w.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
-                    {w.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
-                  </button>
-                  <button onClick={() => handleDelete(w.id)} title="O'chirish"
-                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
-                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
-                    <Trash2 size={12} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/* ── VideoLessonsTab ─────────────────────────────────────────────────── */
-interface VideoLesson {
-  id: string
-  title: string
-  video_url: string
-  recommendation: string | null
-  is_premium: boolean
-  is_published: boolean
-  created_at: string
-}
-
-function getYouTubeId(url: string) {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
-  return m ? m[1] : null
-}
-
-function VideoLessonsTab() {
-  const [videos,       setVideos]       = useState<VideoLesson[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [dbMissing,    setDbMissing]    = useState(false)
-  const [saving,       setSaving]       = useState(false)
-  const [deletingVid,  setDeletingVid]  = useState(false)
-  const [showDeleteVid,setShowDeleteVid]= useState(false)
-  const [message,      setMessage]      = useState<{ ok: boolean; text: string } | null>(null)
-  const [selectedId,   setSelectedId]   = useState('')
-  const [editTitle,    setEditTitle]    = useState('')
-  const [editUrl,      setEditUrl]      = useState('')
-  const [editRec,      setEditRec]      = useState('')
-  const [showCreate,   setShowCreate]   = useState(false)
-  const [newTitle,     setNewTitle]     = useState('')
-  const [newUrl,       setNewUrl]       = useState('')
-  const [newRec,       setNewRec]       = useState('')
-  const [newPremium,   setNewPremium]   = useState(false)
-  const [creating,     setCreating]     = useState(false)
-  const [uploading,   setUploading]   = useState(false)
-  const [uploadError, setUploadError] = useState('')
-  const videoFileRef    = useRef<HTMLInputElement>(null)
-  const newVideoFileRef = useRef<HTMLInputElement>(null)
-
-  const selectedVideo = videos.find(v => v.id === selectedId) ?? null
-
-  const handleFileUpload = async (file: File, setUrl: (url: string) => void) => {
-    if (file.size > 500 * 1024 * 1024) { setUploadError('Fayl hajmi 500MB dan oshmasligi kerak'); return }
-    setUploading(true); setUploadError('')
-    const supabase = createBrowserClient()
-    const ext = file.name.split('.').pop()
-    const fileName = `${Date.now()}.${ext}`
-    const { error } = await supabase.storage.from('videos').upload(fileName, file)
-    if (error) {
-      setUploadError('Yuklashda xato: ' + error.message)
-    } else {
-      const { data: urlData } = supabase.storage.from('videos').getPublicUrl(fileName)
-      setUrl(urlData.publicUrl)
-    }
-    setUploading(false)
-  }
-
-  const load = async () => {
-    setLoading(true)
-    const res = await fetch('/api/admin/video-lessons')
-    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
-    if (res.ok) { const data = await res.json(); setVideos(Array.isArray(data) ? data : []) }
-    setLoading(false)
-  }
-
-  useEffect(() => { load() }, [])
-
-  const handleVideoChange = (id: string) => {
-    setSelectedId(id)
-    const v = videos.find(v => v.id === id)
-    if (v) { setEditTitle(v.title); setEditUrl(v.video_url); setEditRec(v.recommendation ?? '') }
-    else { setEditTitle(''); setEditUrl(''); setEditRec('') }
-    setMessage(null); setShowDeleteVid(false)
-  }
-
-  const handleToggle = async (field: 'is_premium' | 'is_published') => {
-    if (!selectedVideo) return
-    const newVal = !selectedVideo[field]
-    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: newVal }),
-    })
-    if (res.ok) setVideos(prev => prev.map(v => v.id === selectedId ? { ...v, [field]: newVal } : v))
-  }
-
-  const handleSave = async () => {
-    if (!editTitle.trim()) { setMessage({ ok: false, text: 'Sarlavha kiritilishi shart' }); return }
-    if (!editUrl.trim()) { setMessage({ ok: false, text: 'Video URL kiritilishi shart' }); return }
-    setSaving(true); setMessage(null)
-    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: editTitle.trim(), video_url: editUrl.trim(), recommendation: editRec.trim() || null }),
-    })
-    const json = await res.json()
-    if (!res.ok) { setMessage({ ok: false, text: json.error || 'Xatolik' }); setSaving(false); return }
-    setVideos(prev => prev.map(v => v.id === selectedId ? json : v))
-    setMessage({ ok: true, text: 'Saqlandi' })
-    setSaving(false)
-  }
-
-  const handleDeleteVid = async () => {
-    setDeletingVid(true)
-    const res = await fetch(`/api/admin/video-lessons/${selectedId}`, { method: 'DELETE' })
-    if (res.ok || res.status === 204) {
-      setVideos(prev => prev.filter(v => v.id !== selectedId))
-      setSelectedId(''); setEditTitle(''); setEditUrl(''); setEditRec('')
-      setShowDeleteVid(false)
-    }
-    setDeletingVid(false)
-  }
-
-  const handleCreate = async () => {
-    if (!newTitle.trim() || !newUrl.trim()) return
-    setCreating(true)
-    const res = await fetch('/api/admin/video-lessons', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: newTitle.trim(), video_url: newUrl.trim(), recommendation: newRec.trim() || null, is_premium: newPremium }),
-    })
-    const json = await res.json()
-    if (res.ok || res.status === 201) {
-      setVideos(prev => [json, ...prev])
-      setShowCreate(false); setNewTitle(''); setNewUrl(''); setNewRec(''); setNewPremium(false)
-    }
-    setCreating(false)
-  }
-
-  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
-
-  if (dbMissing) return (
-    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
-      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ video_lessons jadvali topilmadi</p>
-      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
-      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-{`CREATE TABLE IF NOT EXISTS video_lessons (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  title TEXT NOT NULL,
-  video_url TEXT NOT NULL,
-  recommendation TEXT,
-  is_premium BOOLEAN DEFAULT false,
-  is_published BOOLEAN DEFAULT true,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE video_lessons ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Video lessons readable" ON video_lessons
-  FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
-  USING (auth.jwt() ->> 'email' IN (
-    'abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com'
-  ));`}
-      </pre>
-    </div>
-  )
-
-  const ytId = selectedVideo ? getYouTubeId(selectedVideo.video_url) : null
-  const thumbUrl = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null
-
-  return (
-    <div className="space-y-4 max-w-lg">
-      <div className="flex items-center justify-between">
-        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
-        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewUrl(''); setNewRec(''); setNewPremium(false) }}
-          className="btn-primary flex items-center gap-2 text-sm">
-          <Plus size={15} /> Yangi video
-        </button>
-      </div>
-
-      <div className="card p-4">
-        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Video tanlang</label>
-        <select value={selectedId} onChange={e => handleVideoChange(e.target.value)} className="input-field">
-          <option value="">— Video tanlang —</option>
-          {videos.map(v => (
-            <option key={v.id} value={v.id}>{v.title}{!v.is_published ? ' (Draft)' : ''}</option>
-          ))}
-        </select>
-      </div>
-
-      {selectedId && selectedVideo && (
-        <div className="card p-5 space-y-4">
-          {thumbUrl && (
-            <div className="rounded-xl overflow-hidden" style={{ aspectRatio: '16/9', background: '#000', border: '1px solid var(--border)' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thumbUrl} alt="thumbnail" className="w-full h-full object-cover" />
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha</label>
-              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input-field w-full text-sm" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL (YouTube)</label>
-              <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
-              <div className="text-center text-xs my-2" style={{ color: 'var(--text-muted)' }}>— yoki —</div>
-              <div
-                onClick={() => !uploading && videoFileRef.current?.click()}
-                className="flex flex-col items-center gap-1.5 p-4 rounded-xl text-center"
-                style={{
-                  border: `2px dashed ${uploading ? 'var(--accent)' : 'var(--border)'}`,
-                  background: uploading ? 'rgba(99,102,241,0.04)' : 'var(--bg-secondary)',
-                  cursor: uploading ? 'not-allowed' : 'pointer',
-                }}>
-                <input ref={videoFileRef} type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/*"
-                  className="hidden" disabled={uploading}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, setEditUrl); e.target.value = '' }} />
-                {uploading ? (
-                  <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--accent)' }}>
-                    <Loader2 size={14} className="animate-spin" /> Yuklanmoqda…
-                  </span>
-                ) : editUrl && !editUrl.includes('youtube') && !editUrl.includes('youtu.be') && editUrl.startsWith('http') ? (
-                  <span className="text-xs font-medium" style={{ color: 'var(--success)' }}>✅ Fayl yuklandi</span>
-                ) : (
-                  <>
-                    <span className="text-sm">📁</span>
-                    <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Video fayl yuklash</span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, MOV, AVI · Max 500MB</span>
-                  </>
-                )}
-              </div>
-              {uploadError && <p className="text-xs mt-1.5" style={{ color: 'var(--error)' }}>❌ {uploadError}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun ko&apos;rish kerak)</label>
-              <textarea value={editRec} onChange={e => setEditRec(e.target.value)}
-                placeholder="Bu video IELTS Writing uchun ideal, chunki..."
-                rows={3} className="input-field w-full text-sm resize-none" />
-            </div>
-          </div>
-
-          <hr style={{ borderColor: 'var(--border)' }} />
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
-              <button onClick={() => handleToggle('is_premium')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={selectedVideo.is_premium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                {selectedVideo.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
-                {selectedVideo.is_premium ? 'Premium' : 'Bepul'}
-              </button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nashr holati</span>
-              <button onClick={() => handleToggle('is_published')}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                style={selectedVideo.is_published ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                {selectedVideo.is_published ? <CheckCircle size={13} /> : <ToggleLeft size={13} />}
-                {selectedVideo.is_published ? 'Published' : 'Draft'}
-              </button>
-            </div>
-          </div>
-
-          <hr style={{ borderColor: 'var(--border)' }} />
-
-          {message && (
-            <div className="p-3 rounded-xl text-sm font-medium"
-              style={{
-                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-                color: message.ok ? 'var(--success)' : 'var(--error)',
-                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
-              }}>
-              {message.ok ? '✅' : '❌'} {message.text}
-            </div>
-          )}
-
-          <div className="flex gap-2">
-            <button onClick={handleSave} disabled={saving}
-              className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
-              style={{ opacity: saving ? 0.6 : 1 }}>
-              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
-            </button>
-            <button onClick={() => setShowDeleteVid(true)}
-              className="px-3 py-2 rounded-xl text-sm font-medium"
-              style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <Trash2 size={15} />
-            </button>
-          </div>
-
-          {showDeleteVid && (
-            <div className="flex items-center justify-between gap-3 p-3 rounded-xl"
-              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
-              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>Videoni o&apos;chirishni tasdiqlaysizmi?</p>
-              <div className="flex gap-2 shrink-0">
-                <button onClick={() => setShowDeleteVid(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  Bekor
-                </button>
-                <button onClick={handleDeleteVid} disabled={deletingVid}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
-                  style={{ background: 'var(--error)', color: '#fff', opacity: deletingVid ? 0.7 : 1 }}>
-                  {deletingVid ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                  Ha, o&apos;chirish
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!selectedId && (
-        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
-          Yuqoridan video tanlang
-        </div>
-      )}
-
-      <AnimatePresence>
-        {showCreate && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0"
-              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-              onClick={() => setShowCreate(false)} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.92, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
-              className="relative card p-6 w-full max-w-sm space-y-4"
-              style={{ zIndex: 51 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi video</h3>
-                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
-                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
-                  <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
-                    placeholder="Video nomi..." className="input-field w-full text-sm" autoFocus />
-                </div>
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Video URL *</label>
-                  <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
-                    placeholder="https://youtube.com/watch?v=..." className="input-field w-full text-sm" />
-                  <div className="text-center text-xs my-2" style={{ color: 'var(--text-muted)' }}>— yoki —</div>
-                  <div
-                    onClick={() => !uploading && newVideoFileRef.current?.click()}
-                    className="flex flex-col items-center gap-1.5 p-4 rounded-xl text-center"
-                    style={{
-                      border: `2px dashed ${uploading ? 'var(--accent)' : 'var(--border)'}`,
-                      background: uploading ? 'rgba(99,102,241,0.04)' : 'var(--bg-secondary)',
-                      cursor: uploading ? 'not-allowed' : 'pointer',
-                    }}>
-                    <input ref={newVideoFileRef} type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/*"
-                      className="hidden" disabled={uploading}
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f, setNewUrl); e.target.value = '' }} />
-                    {uploading ? (
-                      <span className="flex items-center gap-2 text-xs font-medium" style={{ color: 'var(--accent)' }}>
-                        <Loader2 size={14} className="animate-spin" /> Yuklanmoqda…
-                      </span>
-                    ) : newUrl && !newUrl.includes('youtube') && !newUrl.includes('youtu.be') && newUrl.startsWith('http') ? (
-                      <span className="text-xs font-medium" style={{ color: 'var(--success)' }}>✅ Fayl yuklandi</span>
-                    ) : (
-                      <>
-                        <span className="text-sm">📁</span>
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Video fayl yuklash</span>
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, MOV, AVI · Max 500MB</span>
-                      </>
-                    )}
-                    {uploadError && <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>❌ {uploadError}</p>}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya</label>
-                  <textarea value={newRec} onChange={e => setNewRec(e.target.value)}
-                    placeholder="Bu video IELTS uchun foydali..." rows={2}
-                    className="input-field w-full text-sm resize-none" />
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
-                  <button type="button" onClick={() => setNewPremium(p => !p)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
-                    style={newPremium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                    {newPremium ? <Crown size={13} /> : <ToggleLeft size={13} />}
-                    {newPremium ? 'Premium' : 'Bepul'}
-                  </button>
-                </div>
-              </div>
-              <button onClick={handleCreate} disabled={creating || !newTitle.trim() || !newUrl.trim()}
-                className="btn-primary w-full text-sm disabled:opacity-50">
-                {creating ? 'Yaratilyapti...' : 'Yaratish'}
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
 
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
@@ -4642,14 +3784,12 @@ const TABS = [
   { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
   { id: 'music',     label: 'Musiqa',            Icon: Music },
   { id: 'games',         label: 'O\'yinlar',         Icon: Gamepad2 },
-  { id: 'linking-words',        label: 'Linking Words',        Icon: Link2 },
-  { id: 'writing-collocations', label: 'Writing Collocations', Icon: BookOpen },
   { id: 'videos',        label: 'Video darslar',    Icon: Play },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
 
-/* ── Main AdminClient ────────────────────────────────────────────────── */
+/* в”Ђв”Ђ Main AdminClient в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
@@ -4728,8 +3868,6 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'books'    && <BooksTab />}
       {activeTab === 'music'         && <MusicTab />}
       {activeTab === 'games'         && <GamesTab />}
-      {activeTab === 'linking-words'        && <LinkingWordsTab />}
-      {activeTab === 'writing-collocations' && <WritingCollocationTab />}
       {activeTab === 'videos'               && <VideoLessonsTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
     </div>
