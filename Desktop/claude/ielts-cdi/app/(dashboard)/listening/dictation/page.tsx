@@ -14,35 +14,14 @@ export default async function DictationListPage() {
   if (!user) redirect('/login')
 
   const admin = createAdminClient()
+  const profileRes = await admin
+    .from('profiles')
+    .select('is_premium, premium_until')
+    .eq('id', user.id)
+    .single()
 
-  const [dictationsRes, progressRes, profileRes] = await Promise.all([
-    admin.from('dictations').select('*').order('order_index'),
-    admin.from('dictation_progress')
-      .select('dictation_id, best_accuracy, attempts, is_completed, stars')
-      .eq('user_id', user.id),
-    admin.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
-  ])
-
-  const dictations = dictationsRes.data ?? []
-  const progress   = progressRes.data ?? []
-  const profile    = profileRes.data
-  const isPremium  = isActivePremium(profile)
+  const isPremium  = isActivePremium(profileRes.data)
   const isTestUser = user.email === TEST_EMAIL
 
-  const progressMap: Record<number, typeof progress[0]> = {}
-  for (const p of progress) {
-    progressMap[p.dictation_id] = p
-  }
-
-  const totalStars = progress.reduce((sum, p) => sum + (p.stars ?? 0), 0)
-
-  return (
-    <DictationListClient
-      dictations={dictations}
-      progressMap={progressMap}
-      isPremium={isPremium}
-      isTestUser={isTestUser}
-      totalStars={totalStars}
-    />
-  )
+  return <DictationListClient isPremium={isPremium} isTestUser={isTestUser} />
 }

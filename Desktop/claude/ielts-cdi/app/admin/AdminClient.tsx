@@ -3474,6 +3474,292 @@ CREATE POLICY "game_progress_rw" ON game_progress FOR ALL TO authenticated USING
   )
 }
 
+/* ── Dictations tab ──────────────────────────────────────────────────── */
+interface AdminDictation {
+  id: number
+  title: string
+  description: string | null
+  audio_url: string
+  transcript: string
+  order_index: number
+  difficulty: 'easy' | 'medium' | 'hard'
+  is_premium: boolean
+  is_active: boolean
+  duration_seconds: number | null
+}
+
+const DICTATION_BLANK: Omit<AdminDictation, 'id'> = {
+  title: '', description: '', audio_url: '', transcript: '',
+  order_index: 1, difficulty: 'medium', is_premium: false, is_active: true, duration_seconds: null,
+}
+
+function DictationsTab() {
+  const [dicts,     setDicts]     = useState<AdminDictation[]>([])
+  const [loadingD,  setLoadingD]  = useState(true)
+  const [editing,   setEditing]   = useState<Partial<AdminDictation> | null>(null)
+  const [saving,    setSaving]    = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [deleteId,  setDeleteId]  = useState<number | null>(null)
+
+  useEffect(() => { reloadD() }, [])
+
+  async function reloadD() {
+    setLoadingD(true)
+    const res = await fetch('/api/admin/dictations')
+    if (res.ok) setDicts(await res.json())
+    setLoadingD(false)
+  }
+
+  async function handleSaveD() {
+    if (!editing) return
+    setSaving(true)
+    try {
+      const isEdit = !!(editing as AdminDictation).id
+      if (isEdit) {
+        await fetch(`/api/admin/dictations/${(editing as AdminDictation).id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing),
+        })
+      } else {
+        await fetch('/api/admin/dictations', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editing),
+        })
+      }
+      await reloadD()
+      setEditing(null)
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggleD(d: AdminDictation) {
+    await fetch(`/api/admin/dictations/${d.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !d.is_active }),
+    })
+    setDicts(prev => prev.map(x => x.id === d.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  async function handleDeleteD(id: number) {
+    await fetch(`/api/admin/dictations/${id}`, { method: 'DELETE' })
+    await reloadD()
+    setDeleteId(null)
+  }
+
+  async function handleUploadD(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !editing) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/dictations/upload', { method: 'POST', body: fd })
+      if (res.ok) { const { url } = await res.json(); setEditing(p => ({ ...p, audio_url: url })) }
+    } finally { setUploading(false) }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>✍️ Diktantlar</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>BBC Listening audiolarini boshqaring</p>
+        </div>
+        <button
+          onClick={() => setEditing({ ...DICTATION_BLANK, order_index: dicts.length + 1 })}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          <Plus size={15} /> Yangi diktant
+        </button>
+      </div>
+
+      {loadingD ? (
+        <div className="card p-12 flex items-center justify-center gap-2" style={{ color: 'var(--text-muted)' }}>
+          <Loader2 size={20} className="animate-spin" /> Yuklanmoqda...
+        </div>
+      ) : dicts.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Edit3 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali diktantlar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+                  {['#','Tartib','Sarlavha','Davomiyligi','Turi','Holat',''].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {dicts.map((d, i) => (
+                  <tr key={d.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td className="px-4 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>{d.order_index}</span>
+                    </td>
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{d.title}</p>
+                      {d.audio_url
+                        ? <p className="text-xs mt-0.5" style={{ color: '#10b981' }}>🎵 Audio bor</p>
+                        : <p className="text-xs mt-0.5" style={{ color: '#ef4444' }}>⚠️ Audio yo&apos;q</p>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                      {d.duration_seconds
+                        ? `${Math.floor(d.duration_seconds / 60)}:${String(d.duration_seconds % 60).padStart(2,'0')}`
+                        : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      {d.is_premium
+                        ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--premium)', border: '1px solid rgba(245,158,11,0.3)' }}><Crown size={10} /> Premium</span>
+                        : <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>Bepul</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => handleToggleD(d)} title={d.is_active ? 'Faol' : 'Nofaol'}>
+                        {d.is_active
+                          ? <ToggleRight size={22} style={{ color: 'var(--success)' }} />
+                          : <ToggleLeft size={22} style={{ color: 'var(--text-muted)' }} />}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => setEditing(d)} className="p-1.5 rounded-lg hover:opacity-70 transition-opacity" style={{ color: 'var(--accent)' }}><Edit3 size={15} /></button>
+                        <button onClick={() => setDeleteId(d.id)} className="p-1.5 rounded-lg hover:opacity-70 transition-opacity" style={{ color: '#ef4444' }}><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={() => setEditing(null)} />
+          <div className="relative card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ zIndex: 51 }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+                {(editing as AdminDictation).id ? 'Diktant tahrirlash' : 'Yangi diktant'}
+              </h2>
+              <button onClick={() => setEditing(null)} className="p-1.5 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                <input value={editing.title ?? ''} onChange={e => setEditing(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Tavsif (ixtiyoriy)</label>
+                <textarea value={editing.description ?? ''} onChange={e => setEditing(p => ({ ...p, description: e.target.value }))}
+                  rows={2} className="w-full px-3 py-2 rounded-lg text-sm border resize-none"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Tartib raqami</label>
+                <input type="number" value={editing.order_index ?? 1} onChange={e => setEditing(p => ({ ...p, order_index: parseInt(e.target.value) || 1 }))}
+                  className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Audio fayl (MP3) *</label>
+                <div className="flex gap-2">
+                  <input value={editing.audio_url ?? ''} onChange={e => setEditing(p => ({ ...p, audio_url: e.target.value }))}
+                    placeholder="URL kiriting yoki yuklang..."
+                    className="flex-1 px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
+                  <label className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer shrink-0"
+                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)', opacity: uploading ? 0.6 : 1 }}>
+                    {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                    {uploading ? '...' : 'MP3'}
+                    <input type="file" accept=".mp3,audio/*" className="hidden" onChange={handleUploadD} disabled={uploading} />
+                  </label>
+                </div>
+                {editing.audio_url && (
+                  <p className="text-xs mt-1 truncate" style={{ color: '#10b981' }}>✓ {editing.audio_url}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>
+                  Matn — to&apos;g&apos;ri javob *
+                  <span className="ml-2 font-normal" style={{ color: 'var(--text-muted)' }}>(audiodagi so&apos;zma-so&apos;z)</span>
+                </label>
+                <textarea value={editing.transcript ?? ''} onChange={e => setEditing(p => ({ ...p, transcript: e.target.value }))}
+                  rows={12} className="w-full px-3 py-2 rounded-lg text-sm border resize-y"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)', minHeight: 300 }}
+                  placeholder="Audiodagi to'liq matn..." />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Qiyinlik</label>
+                  <select value={editing.difficulty ?? 'medium'} onChange={e => setEditing(p => ({ ...p, difficulty: e.target.value as 'easy'|'medium'|'hard' }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
+                    <option value="easy">Oson</option>
+                    <option value="medium">O&apos;rta</option>
+                    <option value="hard">Qiyin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Davomiyligi (soniya)</label>
+                  <input type="number" value={editing.duration_seconds ?? ''} placeholder="360"
+                    onChange={e => setEditing(p => ({ ...p, duration_seconds: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="w-full px-3 py-2 rounded-lg text-sm border" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }} />
+                </div>
+              </div>
+
+              <div className="flex gap-6 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={editing.is_premium ?? false} onChange={e => setEditing(p => ({ ...p, is_premium: e.target.checked }))} className="w-4 h-4 rounded" />
+                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Premium</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={editing.is_active ?? true} onChange={e => setEditing(p => ({ ...p, is_active: e.target.checked }))} className="w-4 h-4 rounded" />
+                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Faol</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSaveD} disabled={saving || !editing.title?.trim() || !editing.transcript?.trim()}
+                className="flex-1 py-2.5 rounded-lg text-sm font-semibold"
+                style={{ background: 'var(--accent)', color: '#fff', opacity: (saving || !editing.title?.trim() || !editing.transcript?.trim()) ? 0.6 : 1 }}>
+                {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+              </button>
+              <button onClick={() => setEditing(null)} className="px-5 py-2.5 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>
+                Bekor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteId !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteId(null)} />
+          <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>Diktantni o&apos;chirish?</p>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi.</p>
+            <div className="flex gap-3">
+              <button onClick={() => handleDeleteD(deleteId)} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteId(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Tab definitions ─────────────────────────────────────────────────── */
 /* ── WritingCollocationTab ───────────────────────────────────────────── */
 const WC_CATEGORIES = ['Task 1', 'Task 2', 'Both']
@@ -4345,8 +4631,9 @@ CREATE POLICY "Video lessons admin" ON video_lessons FOR ALL TO authenticated
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
-  { id: 'listening', label: 'Listening Tests',  Icon: Headphones },
-  { id: 'mock',      label: 'Mock Test',        Icon: Calendar },
+  { id: 'listening',   label: 'Listening Tests',  Icon: Headphones },
+  { id: 'dictations', label: 'Diktantlar',       Icon: Edit3 },
+  { id: 'mock',       label: 'Mock Test',        Icon: Calendar },
   { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
   { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
@@ -4423,6 +4710,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'listening' && (
         <TestFileUploader type="listening" tests={listeningTests} accept=".mp3,.zip,.pdf" />
       )}
+      {activeTab === 'dictations' && <DictationsTab />}
       {activeTab === 'mock' && (
         <MockScheduleEditor initialSchedules={initialSchedules} />
       )}
