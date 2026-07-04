@@ -3781,27 +3781,36 @@ function DictationsTab() {
   async function handleTranscriptFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { alert('Fayl hajmi 5MB dan oshmasligi kerak'); return }
+    if (file.size > 5 * 1024 * 1024) { setTranscriptFileMsg("Fayl juda katta (max 5 MB)"); return }
     setTranscriptFileMsg(null)
     const ext = file.name.split('.').pop()?.toLowerCase()
     try {
       let text = ''
-      if (ext === 'txt') {
-        text = await file.text()
-      } else if (ext === 'docx') {
+      if (ext === 'docx') {
         const mammoth = (await import('mammoth')).default
         const arrayBuffer = await file.arrayBuffer()
         const result = await mammoth.extractRawText({ arrayBuffer })
         text = result.value
+      } else if (ext === 'doc') {
+        try {
+          const mammoth = (await import('mammoth')).default
+          const arrayBuffer = await file.arrayBuffer()
+          const result = await mammoth.extractRawText({ arrayBuffer })
+          text = result.value
+        } catch { text = await file.text() }
+      } else if (ext === 'html' || ext === 'htm') {
+        const raw = await file.text()
+        text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       } else {
-        alert("Faqat .txt yoki .docx fayllar qabul qilinadi")
-        return
+        text = await file.text()
       }
+      if (!text.trim()) { setTranscriptFileMsg("Fayldan matn olinmadi. Boshqa fayl tanlang yoki qo'lda yozing."); return }
       setEditing(p => ({ ...p, transcript: text.trim() }))
       const wc = text.trim().split(/\s+/).filter(Boolean).length
       setTranscriptFileMsg("Fayl yuklandi (" + wc + " so'z)")
     } catch (err) {
-      alert("Fayl o'qishda xato: " + (err instanceof Error ? err.message : "Noma'lum xato"))
+      console.error('File parse error:', err)
+      setTranscriptFileMsg("Faylni o'qib bo'lmadi. Boshqa fayl sinab ko'ring.")
     }
   }
 
@@ -3977,13 +3986,13 @@ function DictationsTab() {
                       <FileText size={14} style={{ color: 'var(--accent)' }} />
                       {transcriptFileMsg
                         ? <span style={{ color: '#10b981' }}>✓ {transcriptFileMsg}</span>
-                        : <span style={{ color: 'var(--text-muted)' }}>TXT yoki DOCX fayl tanlang</span>}
-                      <input type="file" accept=".txt,.docx" className="hidden" onChange={handleTranscriptFile} />
+                        : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, DOC, RTF, HTML)</span>}
+                      <input type="file" accept=".txt,.docx,.doc,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
                     </label>
                     {transcriptFileMsg && (
                       <label className="mt-1.5 flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>
                         <Upload size={11} /> Boshqa fayl tanlash
-                        <input type="file" accept=".txt,.docx" className="hidden" onChange={handleTranscriptFile} />
+                        <input type="file" accept=".txt,.docx,.doc,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
                       </label>
                     )}
                   </div>
