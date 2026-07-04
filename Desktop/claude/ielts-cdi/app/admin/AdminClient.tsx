@@ -3592,7 +3592,7 @@ function VideoLessonsTab() {
     const isUpload = modal.data.video_source === 'upload'
     if (isUpload && !videoFile && !modal.data.video_url) { setFormError('Video fayl tanlanishi shart'); return }
     if (!isUpload && !modal.data.video_url.trim())        { setFormError('YouTube URL kiritilishi shart'); return }
-    if (videoFile && videoFile.size > 500 * 1024 * 1024) { setFormError('Fayl hajmi 500MB dan oshmasligi kerak'); return }
+    if (videoFile && videoFile.size > 5 * 1024 * 1024 * 1024) { setFormError('Fayl hajmi 5GB dan oshmasligi kerak'); return }
     if (posterFile && posterFile.size > 5 * 1024 * 1024) { setFormError('Poster hajmi 5MB dan oshmasligi kerak'); return }
 
     setSaving(true); setFormError('')
@@ -3784,11 +3784,20 @@ function VideoLessonsTab() {
             {modal.data.video_source === 'upload' && (
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
-                  Video fayl * (.mp4, .webm, .mov — maks 500MB)
+                  Video fayl * (.mp4, .webm, .mov — maks 5GB)
                 </label>
-                <p className="text-xs mb-2" style={{ color: 'rgba(245,158,11,0.85)' }}>
-                  ⚠️ Supabase Storage odatiy holda 50MB gacha qo&apos;yadi. Katta fayllar uchun Supabase → Storage → Policies da limitni oshiring yoki YouTube ishlating.
-                </p>
+                <div className="mb-2 p-3 rounded-xl text-xs space-y-1"
+                  style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    📌 Katta video yuklashdan oldin:
+                  </p>
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    Supabase Dashboard → Project Settings → Storage → <strong style={{ color: 'var(--text-secondary)' }}>File upload size limit</strong> ni <strong style={{ color: 'var(--text-secondary)' }}>5000 MB (5GB)</strong> ga o&apos;zgartiring. Bu bir marta sozlanadi.
+                  </p>
+                  <p style={{ color: 'rgba(245,158,11,0.85)' }}>
+                    ⚠️ Supabase Storage odatiy holda fayl hajmini cheklaydi. Katta fayllar uchun Supabase Dashboard → Project Settings → Storage → File upload size limit ni 5GB gacha oshiring.
+                  </p>
+                </div>
 
                 {/* Show existing uploaded video */}
                 {modal.data.video_url && !videoFile ? (
@@ -3809,8 +3818,10 @@ function VideoLessonsTab() {
                         <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{videoFile.name}</p>
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(videoFile.size / (1024 * 1024)).toFixed(1)} MB
-                            {videoFile.size > 50 * 1024 * 1024 && <span style={{ color: '#f59e0b' }}> — 50MB limitdan katta</span>}
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {videoFile.size >= 1024 * 1024 * 1024
+                              ? `${(videoFile.size / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                              : `${(videoFile.size / (1024 * 1024)).toFixed(1)} MB`}
                           </p>
                         </div>
                         <button type="button"
