@@ -9,6 +9,8 @@ interface VideoLesson {
   id: string
   title: string
   video_url: string
+  video_source: 'youtube' | 'upload' | null
+  thumbnail_url: string | null
   recommendation: string | null
   is_premium: boolean
 }
@@ -48,9 +50,9 @@ export default function VideoDetailPage() {
     </div>
   )
 
-  const ytId  = getYouTubeId(video.video_url)
-  const locked = video.is_premium && !userPremium
-  const thumbSrc = ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null
+  const ytId    = getYouTubeId(video.video_url)
+  const locked  = video.is_premium && !userPremium
+  const thumbSrc = video.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#000', overflow: 'hidden' }}>
@@ -94,6 +96,13 @@ export default function VideoDetailPage() {
               )}
             </div>
           </>
+        ) : (video.video_source === 'upload' || (!ytId && video.video_url)) ? (
+          <video
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            src={video.video_url}
+            poster={video.thumbnail_url ?? undefined}
+            controls autoPlay
+          />
         ) : ytId ? (
           <iframe
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
@@ -101,10 +110,7 @@ export default function VideoDetailPage() {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen title={video.title}
           />
-        ) : (
-          <video style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            src={video.video_url} controls autoPlay />
-        )}
+        ) : null}
       </div>
     </div>
   )

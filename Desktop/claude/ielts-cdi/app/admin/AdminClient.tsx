@@ -3492,13 +3492,25 @@ interface AdminVideo {
   id: string
   title: string
   video_url: string
+  video_source: 'youtube' | 'upload' | null
+  thumbnail_url: string | null
   recommendation: string | null
   is_premium: boolean
   is_published: boolean
   created_at: string
 }
 
-const VL_BLANK = { title: '', video_url: '', recommendation: '', is_premium: false, is_published: true }
+type VideoSource = 'youtube' | 'upload'
+
+const VL_BLANK = {
+  title:         '',
+  video_url:     '',
+  recommendation:'',
+  is_premium:    false,
+  is_published:  true,
+  video_source:  'youtube' as VideoSource,
+  thumbnail_url: null as string | null,
+}
 
 function getYtId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
@@ -3506,12 +3518,19 @@ function getYtId(url: string): string | null {
 }
 
 function VideoLessonsTab() {
-  const [videos,   setVideos]   = useState<AdminVideo[]>([])
-  const [loading,  setLoading]  = useState(true)
-  const [saving,   setSaving]   = useState(false)
-  const [deleting, setDeleting] = useState<string | null>(null)
-  const [formError, setFormError] = useState('')
-  const [modal, setModal] = useState<{ mode: 'add' | 'edit'; data: typeof VL_BLANK & { id?: string } } | null>(null)
+  const [videos,         setVideos]         = useState<AdminVideo[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState<string | null>(null)
+  const [formError,      setFormError]      = useState('')
+  const [modal,          setModal]          = useState<{ mode: 'add' | 'edit'; data: typeof VL_BLANK & { id?: string } } | null>(null)
+  const [videoFile,      setVideoFile]      = useState<File | null>(null)
+  const [posterFile,     setPosterFile]     = useState<File | null>(null)
+  const [videoProgress,  setVideoProgress]  = useState(0)
+  const [posterProgress, setPosterProgress] = useState(0)
+  const videoXhrRef   = useRef<XMLHttpRequest | null>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+  const posterInputRef= useRef<HTMLInputElement>(null)
 
   const load = async () => {
     setLoading(true)
@@ -3522,35 +3541,94 @@ function VideoLessonsTab() {
 
   useEffect(() => { load() }, [])
 
-  const openAdd  = () => { setFormError(''); setModal({ mode: 'add', data: { ...VL_BLANK } }) }
-  const openEdit = (v: AdminVideo) => {
-    setFormError('')
-    setModal({ mode: 'edit', data: { id: v.id, title: v.title, video_url: v.video_url, recommendation: v.recommendation ?? '', is_premium: v.is_premium, is_published: v.is_published } })
+  function resetFiles() {
+    setVideoFile(null); setPosterFile(null); setVideoProgress(0); setPosterProgress(0)
+    if (videoInputRef.current)  videoInputRef.current.value  = ''
+    if (posterInputRef.current) posterInputRef.current.value = ''
   }
-  const closeModal = () => { setModal(null); setFormError('') }
+  function openAdd() {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'add', data: { ...VL_BLANK } })
+  }
+  function openEdit(v: AdminVideo) {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'edit', data: {
+      id: v.id, title: v.title, video_url: v.video_url,
+      recommendation: v.recommendation ?? '',
+      is_premium: v.is_premium, is_published: v.is_published,
+      video_source:  (v.video_source as VideoSource) ?? 'youtube',
+      thumbnail_url: v.thumbnail_url ?? null,
+    }})
+  }
+  function closeModal() {
+    if (videoXhrRef.current) { videoXhrRef.current.abort(); videoXhrRef.current = null }
+    setModal(null); setFormError(''); resetFiles()
+  }
 
-  const handleSave = async () => {
+  async function uploadToStorage(file: File, type: 'video' | 'poster', onProgress: (p: number) => void): Promise<string> {
+    const urlRes = await fetch('/api/admin/video-lessons/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, fileName: file.name, contentType: file.type }),
+    })
+    if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+    const { signedUrl, publicUrl } = await urlRes.json()
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      if (type === 'video') videoXhrRef.current = xhr
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`))
+      xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+      xhr.open('PUT', signedUrl)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.send(file)
+    })
+    return publicUrl
+  }
+
+  async function handleSave() {
     if (!modal) return
-    if (!modal.data.title.trim())     { setFormError('Sarlavha kiritilishi shart'); return }
-    if (!modal.data.video_url.trim()) { setFormError('Video URL kiritilishi shart'); return }
+    if (!modal.data.title.trim()) { setFormError('Sarlavha kiritilishi shart'); return }
+    const isUpload = modal.data.video_source === 'upload'
+    if (isUpload && !videoFile && !modal.data.video_url) { setFormError('Video fayl tanlanishi shart'); return }
+    if (!isUpload && !modal.data.video_url.trim())        { setFormError('YouTube URL kiritilishi shart'); return }
+    if (videoFile && videoFile.size > 500 * 1024 * 1024) { setFormError('Fayl hajmi 500MB dan oshmasligi kerak'); return }
+    if (posterFile && posterFile.size > 5 * 1024 * 1024) { setFormError('Poster hajmi 5MB dan oshmasligi kerak'); return }
+
     setSaving(true); setFormError('')
-    const body = {
-      title:          modal.data.title.trim(),
-      video_url:      modal.data.video_url.trim(),
-      recommendation: modal.data.recommendation?.trim() || null,
-      is_premium:     modal.data.is_premium,
-      is_published:   modal.data.is_published,
-    }
+    let videoUrl  = modal.data.video_url
+    let thumbUrl  = modal.data.thumbnail_url
+
     try {
+      if (isUpload && videoFile) {
+        setVideoProgress(0)
+        videoUrl = await uploadToStorage(videoFile, 'video', p => setVideoProgress(p))
+      }
+      if (posterFile) {
+        setPosterProgress(0)
+        thumbUrl = await uploadToStorage(posterFile, 'poster', p => setPosterProgress(p))
+      }
+
+      const body = {
+        title:          modal.data.title.trim(),
+        video_url:      videoUrl.trim(),
+        video_source:   modal.data.video_source,
+        thumbnail_url:  thumbUrl || null,
+        recommendation: modal.data.recommendation?.trim() || null,
+        is_premium:     modal.data.is_premium,
+        is_published:   modal.data.is_published,
+      }
       const res = modal.mode === 'add'
-        ? await fetch('/api/admin/video-lessons',               { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        : await fetch(`/api/admin/video-lessons/${modal.data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        ? await fetch('/api/admin/video-lessons',                    { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(`/api/admin/video-lessons/${modal.data.id}`,   { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const json = await res.json()
       if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
       if (modal.mode === 'add') setVideos(prev => [json, ...prev])
       else setVideos(prev => prev.map(v => v.id === modal.data.id ? json : v))
       closeModal()
-    } catch { setFormError('Tarmoq xatosi') }
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Xatolik')
+    }
     setSaving(false)
   }
 
@@ -3574,7 +3652,6 @@ function VideoLessonsTab() {
 
   return (
     <div className="space-y-5">
-      {/* Header row */}
       <div className="flex items-center justify-between">
         <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
         <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
@@ -3582,7 +3659,6 @@ function VideoLessonsTab() {
         </button>
       </div>
 
-      {/* List */}
       {videos.length === 0 ? (
         <div className="card p-16 text-center">
           <div className="text-4xl mb-3">🎬</div>
@@ -3597,36 +3673,26 @@ function VideoLessonsTab() {
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {videos.map(v => {
               const ytId = getYtId(v.video_url)
-              const thumb = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null
+              const thumb = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
               return (
                 <div key={v.id} className="grid items-center px-4 py-3"
                   style={{ gridTemplateColumns: '88px 1fr 90px 80px 72px', gap: 8 }}>
-                  {/* Thumbnail */}
                   <div className="rounded-lg overflow-hidden shrink-0"
                     style={{ width: 88, height: 50, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
-                    {thumb ? (
-                      <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Play size={14} style={{ color: 'var(--text-muted)' }} />
-                      </div>
-                    )}
+                    {thumb
+                      ? <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      : <div className="w-full h-full flex items-center justify-center"><Play size={14} style={{ color: 'var(--text-muted)' }} /></div>}
                   </div>
-                  {/* Title + recommendation */}
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
-                    {v.recommendation && (
-                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{v.recommendation}</p>
-                    )}
+                    {v.recommendation && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{v.recommendation}</p>}
                   </div>
-                  {/* Premium/Free badge */}
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
                     style={v.is_premium
                       ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
                       : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
                     {v.is_premium ? '👑 Premium' : 'Bepul'}
                   </span>
-                  {/* Published toggle */}
                   <button onClick={() => handleTogglePublish(v)}
                     className="text-xs px-2 py-1 rounded-lg font-medium text-center"
                     style={v.is_published
@@ -3634,7 +3700,6 @@ function VideoLessonsTab() {
                       : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
                     {v.is_published ? 'Chop' : 'Draft'}
                   </button>
-                  {/* Actions */}
                   <div className="flex items-center gap-1.5 justify-end">
                     <button onClick={() => openEdit(v)} title="Tahrirlash"
                       className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
@@ -3654,71 +3719,223 @@ function VideoLessonsTab() {
         </div>
       )}
 
-      {/* Add / Edit modal */}
+      {/* ── Add / Edit modal ───────────────────────────────────────────── */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
-          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+
+            {/* Header */}
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
                 {modal.mode === 'add' ? '🎬 Yangi video qo\'shish' : '✏️ Videoni tahrirlash'}
               </h3>
-              <button onClick={closeModal} className="p-1 rounded-lg hover:opacity-70"
+              <button onClick={closeModal} disabled={saving} className="p-1 rounded-lg hover:opacity-70"
                 style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
             </div>
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
-                <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 1 dars..."
-                  value={modal.data.title}
-                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            {/* 1. Title */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 1 dars..."
+                value={modal.data.title}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            </div>
+
+            {/* 2. Source toggle */}
+            <div>
+              <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--text-secondary)' }}>Video manbasi</label>
+              <div className="flex gap-2">
+                {(['youtube', 'upload'] as VideoSource[]).map(src => (
+                  <button key={src} type="button" disabled={saving}
+                    onClick={() => {
+                      resetFiles()
+                      setModal(m => m ? { ...m, data: { ...m.data, video_source: src, video_url: src === 'upload' ? '' : m.data.video_url } } : m)
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={modal.data.video_source === src
+                      ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
+                      : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {src === 'youtube' ? <><Play size={14} /> YouTube URL</> : <><Upload size={14} /> Fayl yuklash</>}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            {/* 3a. YouTube URL */}
+            {modal.data.video_source === 'youtube' && (
               <div>
                 <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>YouTube URL *</label>
                 <input className="input-field text-sm w-full" placeholder="https://www.youtube.com/watch?v=..."
                   value={modal.data.video_url}
                   onChange={e => setModal(m => m ? { ...m, data: { ...m.data, video_url: e.target.value } } : m)} />
-                {getYtId(modal.data.video_url) && (
+                {getYtId(modal.data.video_url) && !modal.data.thumbnail_url && !posterFile && (
                   <div className="mt-2 rounded-lg overflow-hidden" style={{ maxWidth: 180, border: '1px solid var(--border)' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`https://img.youtube.com/vi/${getYtId(modal.data.video_url)}/mqdefault.jpg`}
-                      alt="preview" style={{ width: '100%', display: 'block' }} />
+                      alt="YT preview" style={{ width: '100%', display: 'block' }} />
                   </div>
                 )}
               </div>
+            )}
+
+            {/* 3b. File upload */}
+            {modal.data.video_source === 'upload' && (
               <div>
-                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsiya (ixtiyoriy)</label>
-                <textarea className="input-field text-sm w-full resize-none" rows={3}
-                  placeholder="Bu dars IELTS Writing uchun foydali, chunki..."
-                  value={modal.data.recommendation}
-                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, recommendation: e.target.value } } : m)} />
-              </div>
-              <div className="flex items-center gap-6 pt-1">
-                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" className="rounded" checked={modal.data.is_premium}
-                    onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
-                  Premium
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                  Video fayl * (.mp4, .webm, .mov — maks 500MB)
                 </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" className="rounded" checked={modal.data.is_published}
-                    onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_published: e.target.checked } } : m)} />
-                  Nashr etilgan
-                </label>
+                <p className="text-xs mb-2" style={{ color: 'rgba(245,158,11,0.85)' }}>
+                  ⚠️ Supabase Storage odatiy holda 50MB gacha qo&apos;yadi. Katta fayllar uchun Supabase → Storage → Policies da limitni oshiring yoki YouTube ishlating.
+                </p>
+
+                {/* Show existing uploaded video */}
+                {modal.data.video_url && !videoFile ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                    style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <Play size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                    <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--success)' }}>Yuklangan video mavjud</span>
+                    <button type="button" onClick={() => setModal(m => m ? { ...m, data: { ...m.data, video_url: '' } } : m)}
+                      className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                    style={{ border: `2px dashed ${videoFile ? 'var(--accent)' : 'var(--border)'}`, background: videoFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                    onClick={() => !saving && videoInputRef.current?.click()}>
+                    {videoFile ? (
+                      <>
+                        <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{videoFile.name}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(videoFile.size / (1024 * 1024)).toFixed(1)} MB
+                            {videoFile.size > 50 * 1024 * 1024 && <span style={{ color: '#f59e0b' }}> — 50MB limitdan katta</span>}
+                          </p>
+                        </div>
+                        <button type="button"
+                          onClick={e => { e.stopPropagation(); setVideoFile(null); if (videoInputRef.current) videoInputRef.current.value = '' }}
+                          className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={14} /></button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 py-1">
+                        <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, WebM yoki MOV tanlang</span>
+                      </div>
+                    )}
+                    <input ref={videoInputRef} type="file" accept=".mp4,.webm,.mov,video/*" className="hidden"
+                      onChange={e => setVideoFile(e.target.files?.[0] ?? null)} />
+                  </div>
+                )}
+
+                {/* Upload progress */}
+                {saving && videoFile && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Video yuklanmoqda... {videoProgress}%</span>
+                      <button type="button" onClick={closeModal} className="text-xs hover:opacity-70" style={{ color: 'var(--error)' }}>
+                        Yuklashni bekor qilish
+                      </button>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${videoProgress}%`, background: 'var(--accent)' }} />
+                    </div>
+                  </div>
+                )}
               </div>
+            )}
+
+            {/* 4. Poster */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Poster (ixtiyoriy — .jpg .png .webp, maks 5MB)
+              </label>
+
+              {(modal.data.thumbnail_url || posterFile) && (
+                <div className="mb-2 relative rounded-xl overflow-hidden" style={{ maxWidth: 200, border: '1px solid var(--border)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={posterFile ? URL.createObjectURL(posterFile) : modal.data.thumbnail_url!}
+                    alt="poster" style={{ width: '100%', display: 'block' }}
+                  />
+                  <button type="button"
+                    onClick={() => {
+                      setPosterFile(null)
+                      if (posterInputRef.current) posterInputRef.current.value = ''
+                      if (!posterFile) setModal(m => m ? { ...m, data: { ...m.data, thumbnail_url: null } } : m)
+                    }}
+                    className="absolute top-1 right-1 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                    <X size={11} /> O&apos;chirish
+                  </button>
+                </div>
+              )}
+
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                style={{ border: `2px dashed ${posterFile ? 'var(--accent)' : 'var(--border)'}`, background: posterFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                onClick={() => !saving && posterInputRef.current?.click()}>
+                <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {posterFile ? posterFile.name : (modal.data.thumbnail_url ? 'Posterni almashtirish' : 'Poster yuklash')}
+                </span>
+                <input ref={posterInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/*" className="hidden"
+                  onChange={e => setPosterFile(e.target.files?.[0] ?? null)} />
+              </div>
+
+              {saving && posterFile && (
+                <div className="mt-2 space-y-1">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Poster yuklanmoqda... {posterProgress}%</span>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${posterProgress}%`, background: '#10b981' }} />
+                  </div>
+                </div>
+              )}
+
+              {modal.data.video_source === 'youtube' && !modal.data.thumbnail_url && !posterFile && getYtId(modal.data.video_url) && (
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Bo&apos;sh qoldirilsa, YouTube thumbnali avtomatik ishlatiladi.
+                </p>
+              )}
+            </div>
+
+            {/* 5. Recommendation */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsiya (ixtiyoriy)</label>
+              <textarea className="input-field text-sm w-full resize-none" rows={3}
+                placeholder="Bu dars IELTS Writing uchun foydali, chunki..."
+                value={modal.data.recommendation}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, recommendation: e.target.value } } : m)} />
+            </div>
+
+            {/* 6–7. Checkboxes */}
+            <div className="flex items-center gap-6 pt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_premium}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
+                Premium
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_published}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_published: e.target.checked } } : m)} />
+                Nashr etilgan
+              </label>
             </div>
 
             {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
 
+            {/* 8. Buttons */}
             <div className="flex gap-2 pt-1">
               <button onClick={handleSave} disabled={saving}
                 className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
                 {saving
-                  ? <><Loader2 size={14} className="animate-spin" /> Saqlanmoqda...</>
+                  ? <><Loader2 size={14} className="animate-spin" />
+                      {videoFile && videoProgress < 100 ? `Video ${videoProgress}%...` : posterFile && posterProgress < 100 ? `Poster ${posterProgress}%...` : 'Saqlanmoqda...'}</>
                   : <><Plus size={14} /> {modal.mode === 'add' ? 'Qo\'shish' : 'Saqlash'}</>}
               </button>
-              <button onClick={closeModal} className="btn-outline text-sm">Bekor qilish</button>
+              <button onClick={closeModal} disabled={saving} className="btn-outline text-sm disabled:opacity-50">
+                {saving ? 'Bekor qilish' : 'Yopish'}
+              </button>
             </div>
           </div>
         </div>

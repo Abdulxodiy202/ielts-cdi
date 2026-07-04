@@ -8,6 +8,8 @@ interface VideoLesson {
   id: string
   title: string
   video_url: string
+  video_source: 'youtube' | 'upload' | null
+  thumbnail_url: string | null
   recommendation: string | null
   is_premium: boolean
 }
@@ -65,7 +67,7 @@ export default function VideoLessonsPage() {
         <div className="space-y-3">
           {videos.map(v => {
             const ytId     = getYouTubeId(v.video_url)
-            const thumbSrc = ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null
+            const thumbSrc = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
             const locked   = v.is_premium && !userPremium
 
             return (

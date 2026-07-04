@@ -22,6 +22,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const allowed: Record<string, unknown> = {}
   if ('title' in body)          allowed.title          = String(body.title).trim()
   if ('video_url' in body)      allowed.video_url      = String(body.video_url).trim()
+  if ('video_source' in body)   allowed.video_source   = String(body.video_source)
+  if ('thumbnail_url' in body)  allowed.thumbnail_url  = body.thumbnail_url ? String(body.thumbnail_url) : null
   if ('recommendation' in body) allowed.recommendation = body.recommendation ? String(body.recommendation).trim() : null
   if ('is_premium' in body)     allowed.is_premium     = Boolean(body.is_premium)
   if ('is_published' in body)   allowed.is_published   = Boolean(body.is_published)
@@ -30,7 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from('video_lessons')
     .update(allowed)
     .eq('id', id)
-    .select('id, title, video_url, recommendation, is_premium, is_published, created_at')
+    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
