@@ -10,10 +10,10 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await request.json()
-  const { dictation_id, accuracy, stars, is_completed } = body
+  const { dictation_id, accuracy_percent, stars, is_completed, last_answer } = body
 
-  if (!dictation_id || accuracy === undefined) {
-    return Response.json({ error: 'dictation_id and accuracy required' }, { status: 400 })
+  if (!dictation_id || accuracy_percent === undefined) {
+    return Response.json({ error: 'dictation_id and accuracy_percent required' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     .eq('dictation_id', dictation_id)
     .maybeSingle()
 
-  const bestAccuracy = Math.max(accuracy, existing?.best_accuracy ?? 0)
+  const bestAccuracy = Math.max(accuracy_percent, existing?.best_accuracy ?? 0)
   const bestStars    = Math.max(stars ?? 0, existing?.stars ?? 0)
   const wasCompleted = existing?.is_completed ?? false
   const nowCompleted = (is_completed ?? false) || wasCompleted
@@ -37,10 +37,12 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       dictation_id,
       best_accuracy: bestAccuracy,
+      accuracy_percent,
       stars: bestStars,
       is_completed: nowCompleted,
       attempts,
-      completed_at: nowCompleted ? new Date().toISOString() : null,
+      last_answer: last_answer ?? null,
+      updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,dictation_id' })
     .select()
     .single()

@@ -72,150 +72,128 @@ function levenshteinDistance(a: string, b: string): number {
   return dp[m][n]
 }
 
-// Treats small typos (≤20% of word length, min 1) on words ≥4 chars as a match,
-// so "appl" counts for "apple" instead of scoring as fully wrong.
-function wordsMatch(a: string, b: string): boolean {
-  if (a === b) return true
-  if (a.length < 4 || b.length < 4) return false
-  const threshold = Math.max(1, Math.floor(Math.max(a.length, b.length) * 0.2))
+type MatchLevel = 'exact' | 'partial' | 'none'
+
+// exact = identical; partial = a small typo (≤2 edits, and that's <30% of the
+// word) on words ≥4 chars; anything else (incl. short words) is 'none'.
+function compareWords(user: string, orig: string): MatchLevel {
+  if (user === orig) return 'exact'
+  if (user.length < 4 || orig.length < 4) return 'none'
   // Edit distance is always ≥ the length difference — skip the expensive DP
-  // when that alone already exceeds the threshold (keeps this fast at 1000+ words).
-  if (Math.abs(a.length - b.length) > threshold) return false
-  return levenshteinDistance(a, b) <= threshold
+  // below once that alone rules out 'partial'. Same result, much faster at
+  // 1000+ words (verified: identical output to the unoptimized version).
+  if (Math.abs(user.length - orig.length) > 2) return 'none'
+  const dist = levenshteinDistance(user, orig)
+  if (dist <= 2 && dist < Math.max(user.length, orig.length) * 0.3) return 'partial'
+  return 'none'
 }
-
-function buildLCS(a: string[], b: string[]): number[][] {
-  const m = a.length, n = b.length
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = wordsMatch(a[i - 1], b[j - 1])
-        ? dp[i - 1][j - 1] + 1
-        : Math.max(dp[i - 1][j], dp[i][j - 1])
-    }
-  }
-  return dp
-}
-
-type RawWord = { word: string; type: 'correct' | 'missing' | 'extra' }
 
 type AlignmentItem =
-  | { status: 'correct'; origWord: string }
-  | { status: 'wrong'; origWord: string; userWord: string }
+  | { status: 'exact'; origWord: string; userWord: string }
+  | { status: 'partial'; origWord: string; userWord: string }
   | { status: 'missing'; origWord: string }
   | { status: 'extra'; userWord: string }
 
-type DiffStats = { totalWords: number; correctCount: number; missingCount: number; extraCount: number }
-
-// Pair up adjacent missing/extra runs into 'wrong' (substitution) entries so
-// the UI can show "you typed X, correct was Y" instead of two disjoint chips.
-function pairSubstitutions(raw: RawWord[]): AlignmentItem[] {
-  const out: AlignmentItem[] = []
-  let i = 0
-  while (i < raw.length) {
-    const item = raw[i]
-    if (item.type === 'correct') {
-      out.push({ status: 'correct', origWord: item.word })
-      i++
-      continue
-    }
-    let j = i
-    const missing: string[] = []
-    const extra: string[] = []
-    while (j < raw.length && raw[j].type !== 'correct') {
-      if (raw[j].type === 'missing') missing.push(raw[j].word)
-      else extra.push(raw[j].word)
-      j++
-    }
-    const pairCount = Math.min(missing.length, extra.length)
-    for (let k = 0; k < pairCount; k++) {
-      out.push({ status: 'wrong', origWord: missing[k], userWord: extra[k] })
-    }
-    for (let k = pairCount; k < missing.length; k++) {
-      out.push({ status: 'missing', origWord: missing[k] })
-    }
-    for (let k = pairCount; k < extra.length; k++) {
-      out.push({ status: 'extra', userWord: extra[k] })
-    }
-    i = j
-  }
-  return out
+type DiffStats = {
+  totalOrig: number
+  totalUser: number
+  exact: number
+  partial: number
+  missing: number
+  extra: number
 }
 
-function computeDiff(
+function computeAlignment(
   userText: string,
-  correctText: string
+  origText: string
 ): { alignment: AlignmentItem[]; accuracy: number; stats: DiffStats } {
-  const userWords    = normalizeWords(userText)
-  const correctWords = normalizeWords(correctText)
+  const userWords = normalizeWords(userText)
+  const origWords  = normalizeWords(origText)
+  const m = origWords.length
+  const n = userWords.length
 
-  if (correctWords.length === 0) {
-    return { alignment: [], accuracy: 100, stats: { totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 } }
-  }
-  if (userWords.length === 0) {
+  if (m === 0) {
     return {
-      alignment: correctWords.map(w => ({ status: 'missing', origWord: w })),
-      accuracy: 0,
-      stats: { totalWords: correctWords.length, correctCount: 0, missingCount: correctWords.length, extraCount: 0 },
+      alignment: userWords.map(w => ({ status: 'extra', userWord: w })),
+      accuracy: 100,
+      stats: { totalOrig: 0, totalUser: n, exact: 0, partial: 0, missing: 0, extra: n },
     }
   }
 
-  // LCS aligns words that match AT THE SAME RELATIVE POSITION in both texts
-  // (a subsequence, not "appears anywhere") — random reordered words score low.
-  // The backtrack condition must use the same wordsMatch() predicate as
-  // buildLCS's fill step, or the alignment would disagree with dp's counts.
-  const dp  = buildLCS(userWords, correctWords)
-  const ops: Array<'correct' | 'extra' | 'missing'> = []
-  let i = userWords.length, j = correctWords.length
+  // dp[i][j] = best weighted score aligning origWords[0..i) with userWords[0..j)
+  // — exact match = 2 points, partial (typo) match = 1 point — so a partial
+  // match is preferred over skipping, but an exact match always wins.
+  const dp: number[][] = []
+  for (let i = 0; i <= m; i++) dp.push(new Array(n + 1).fill(0))
 
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && wordsMatch(userWords[i - 1], correctWords[j - 1])) {
-      ops.push('correct'); i--; j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      ops.push('missing'); j--
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const match = compareWords(userWords[j - 1], origWords[i - 1])
+      if (match === 'exact') {
+        dp[i][j] = dp[i - 1][j - 1] + 2
+      } else if (match === 'partial') {
+        dp[i][j] = Math.max(dp[i - 1][j - 1] + 1, dp[i - 1][j], dp[i][j - 1])
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+      }
+    }
+  }
+
+  // Backtrack to build the alignment in original transcript order.
+  const alignment: AlignmentItem[] = []
+  let i = m, j = n
+  while (i > 0 && j > 0) {
+    const match = compareWords(userWords[j - 1], origWords[i - 1])
+    if (match === 'exact' && dp[i][j] === dp[i - 1][j - 1] + 2) {
+      alignment.unshift({ status: 'exact', origWord: origWords[i - 1], userWord: userWords[j - 1] })
+      i--; j--
+    } else if (match === 'partial' && dp[i][j] === dp[i - 1][j - 1] + 1) {
+      alignment.unshift({ status: 'partial', origWord: origWords[i - 1], userWord: userWords[j - 1] })
+      i--; j--
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      alignment.unshift({ status: 'missing', origWord: origWords[i - 1] })
+      i--
     } else {
-      ops.push('extra'); i--
+      alignment.unshift({ status: 'extra', userWord: userWords[j - 1] })
+      j--
     }
   }
+  while (i > 0) {
+    alignment.unshift({ status: 'missing', origWord: origWords[i - 1] })
+    i--
+  }
+  while (j > 0) {
+    alignment.unshift({ status: 'extra', userWord: userWords[j - 1] })
+    j--
+  }
+
+  const exactCount   = alignment.filter(a => a.status === 'exact').length
+  const partialCount = alignment.filter(a => a.status === 'partial').length
+  const missingCount = alignment.filter(a => a.status === 'missing').length
+  const extraCount   = alignment.filter(a => a.status === 'extra').length
+
+  // Accuracy: exact words count fully, partial (typo) words count half.
+  const score    = exactCount + partialCount * 0.5
+  const accuracy = Math.round((score / m) * 100)
 
   if (process.env.NODE_ENV !== 'production') {
-    console.log('=== DICTATION CHECK DEBUG ===')
-    console.log('Original words (first 20):', correctWords.slice(0, 20))
-    console.log('User words (first 20):', userWords.slice(0, 20))
-    console.log('Original word count:', correctWords.length)
+    console.log('=== DICTATION DEBUG ===')
+    console.log('User input:', userText.slice(0, 100))
+    console.log('Normalized user words (first 20):', userWords.slice(0, 20))
+    console.log('Original transcript (first 100 chars):', origText.slice(0, 100))
+    console.log('Normalized orig words (first 20):', origWords.slice(0, 20))
     console.log('User word count:', userWords.length)
-    console.log('LCS matches:', dp[userWords.length][correctWords.length])
-    console.log('=== END DEBUG (accuracy/stars logged after computeStars) ===')
+    console.log('Orig word count:', origWords.length)
+    console.log('Exact:', exactCount, 'Partial:', partialCount, 'Missing:', missingCount, 'Extra:', extraCount)
+    console.log('Score:', score, '/ Denominator:', m)
+    console.log('Accuracy:', accuracy, '% -> Stars:', computeStars(accuracy))
+    console.log('=== END DEBUG ===')
   }
-
-  ops.reverse()
-  const raw: RawWord[] = []
-  let ui = 0, ci = 0
-
-  for (const op of ops) {
-    if (op === 'correct') {
-      raw.push({ word: correctWords[ci], type: 'correct' }); ui++; ci++
-    } else if (op === 'missing') {
-      raw.push({ word: correctWords[ci], type: 'missing' }); ci++
-    } else {
-      raw.push({ word: userWords[ui], type: 'extra' }); ui++
-    }
-  }
-
-  const alignment    = pairSubstitutions(raw)
-  const correctCount = raw.filter(r => r.type === 'correct').length
-  const extraCount   = alignment.filter(a => a.status === 'extra').length
-  const accuracy     = Math.round((correctCount / correctWords.length) * 100)
 
   return {
     alignment,
     accuracy,
-    stats: {
-      totalWords: correctWords.length,
-      correctCount,
-      missingCount: correctWords.length - correctCount,
-      extraCount,
-    },
+    stats: { totalOrig: m, totalUser: n, exact: exactCount, partial: partialCount, missing: missingCount, extra: extraCount },
   }
 }
 
@@ -256,7 +234,7 @@ export function DictationClient({
   const [accuracy,  setAccuracy]  = useState(0)
   const [stars,     setStars]     = useState(0)
   const [alignment, setAlignment] = useState<AlignmentItem[]>([])
-  const [stats,     setStats]     = useState<DiffStats>({ totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 })
+  const [stats,     setStats]     = useState<DiffStats>({ totalOrig: 0, totalUser: 0, exact: 0, partial: 0, missing: 0, extra: 0 })
   const [visStars,  setVisStars]  = useState(0)
 
   // Restore draft
@@ -345,13 +323,9 @@ export function DictationClient({
   }
 
   const handleCheck = async () => {
-    const { alignment: align, accuracy: acc, stats: st } = computeDiff(userText, dictation.transcript)
+    const { alignment: align, accuracy: acc, stats: st } = computeAlignment(userText, dictation.transcript)
     const s = computeStars(acc)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Accuracy:', acc)
-      console.log('Stars:', s)
-      console.log('=== END DEBUG ===')
-    }
+    const passedNow = acc >= 70
     setAccuracy(acc)
     setStars(s)
     setAlignment(align)
@@ -361,17 +335,23 @@ export function DictationClient({
 
     setSaving(true)
     try {
-      await fetch('/api/dictation/progress', {
+      const res = await fetch('/api/dictation/progress', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dictation_id: dictation.id,
-          accuracy: acc,
+          accuracy_percent: acc,
           stars: s,
-          is_completed: acc >= 70,
+          is_completed: passedNow,
+          last_answer: userText,
         }),
       })
-    } catch { /* ignore */ }
+      if (!res.ok && process.env.NODE_ENV !== 'production') {
+        console.error('Failed to save dictation progress:', res.status, await res.text())
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') console.error('Failed to save dictation progress:', err)
+    }
     setSaving(false)
   }
 
@@ -379,7 +359,7 @@ export function DictationClient({
     setSubmitted(false)
     setUserText('')
     setAlignment([])
-    setStats({ totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 })
+    setStats({ totalOrig: 0, totalUser: 0, exact: 0, partial: 0, missing: 0, extra: 0 })
     setAccuracy(0)
     setStars(0)
     setVisStars(0)
@@ -461,22 +441,26 @@ export function DictationClient({
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="card p-5 mb-6 grid grid-cols-4 gap-3 text-center"
+          className="card p-5 mb-6 grid grid-cols-5 gap-2 text-center"
         >
           <div>
-            <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{stats.totalWords}</div>
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Jami so&apos;z</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{stats.totalOrig}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Jami</div>
           </div>
           <div>
-            <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>{stats.correctCount}</div>
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>To&apos;g&apos;ri</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>{stats.exact}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Aniq to&apos;g&apos;ri</div>
           </div>
           <div>
-            <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{stats.missingCount}</div>
+            <div className="text-lg font-bold" style={{ color: '#f59e0b' }}>{stats.partial}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Deyarli to&apos;g&apos;ri</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{stats.missing}</div>
             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Yetishmaydi</div>
           </div>
           <div>
-            <div className="text-lg font-bold" style={{ color: '#f59e0b' }}>{stats.extraCount}</div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text-muted)' }}>{stats.extra}</div>
             <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Ortiqcha</div>
           </div>
         </motion.div>
@@ -493,7 +477,7 @@ export function DictationClient({
           </h3>
           <div className="flex flex-wrap gap-1.5 leading-loose">
             {alignment.map((item, idx) => {
-              if (item.status === 'correct') {
+              if (item.status === 'exact') {
                 return (
                   <span
                     key={idx}
@@ -504,12 +488,12 @@ export function DictationClient({
                   </span>
                 )
               }
-              if (item.status === 'wrong') {
+              if (item.status === 'partial') {
                 return (
                   <span
                     key={idx}
                     className="px-1.5 py-0.5 rounded text-sm flex flex-col items-center"
-                    style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', lineHeight: 1.2 }}
+                    style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', lineHeight: 1.2 }}
                   >
                     <span style={{ textDecoration: 'line-through' }}>{item.userWord}</span>
                     <span style={{ fontSize: 11, color: 'var(--success)' }}>{item.origWord}</span>
@@ -521,11 +505,7 @@ export function DictationClient({
                   <span
                     key={idx}
                     className="px-1.5 py-0.5 rounded text-sm"
-                    style={{
-                      background: 'rgba(148,163,184,0.15)',
-                      color: 'var(--text-muted)',
-                      textDecoration: 'underline',
-                    }}
+                    style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}
                   >
                     {item.origWord}
                   </span>
@@ -535,11 +515,14 @@ export function DictationClient({
               return (
                 <span
                   key={idx}
-                  className="px-1.5 py-0.5 rounded text-sm flex flex-col items-center"
-                  style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', lineHeight: 1.2 }}
+                  className="px-1.5 py-0.5 rounded text-sm"
+                  style={{
+                    background: 'rgba(148,163,184,0.15)',
+                    color: 'var(--text-muted)',
+                    textDecoration: 'line-through',
+                  }}
                 >
-                  <span>{item.userWord}</span>
-                  <span style={{ fontSize: 10 }}>(qo&apos;shimcha)</span>
+                  {item.userWord}
                 </span>
               )
             })}
@@ -548,9 +531,9 @@ export function DictationClient({
           {/* Legend */}
           <div className="flex gap-4 mt-4 text-xs flex-wrap" style={{ color: 'var(--text-muted)' }}>
             <span>🟢 To&apos;g&apos;ri</span>
+            <span>🟠 Deyarli to&apos;g&apos;ri</span>
             <span>🔴 Yetishmaydi</span>
-            <span>⚪ O&apos;tkazib yuborilgan</span>
-            <span>🟠 Ortiqcha</span>
+            <span>⚪ Ortiqcha</span>
           </div>
         </motion.div>
 
@@ -559,12 +542,14 @@ export function DictationClient({
           <button onClick={handleRetry} className="btn-outline flex items-center gap-2">
             <RotateCcw size={15} /> {t('dictation.retry')}
           </button>
-          <button
-            onClick={() => router.push('/listening/dictation')}
-            className="btn-primary flex items-center gap-2"
-          >
-            {t('dictation.next')} <ChevronRight size={15} />
-          </button>
+          {passed && (
+            <button
+              onClick={() => router.push('/listening/dictation')}
+              className="btn-primary flex items-center gap-2"
+            >
+              {t('dictation.next')} <ChevronRight size={15} />
+            </button>
+          )}
         </div>
       </div>
     )
