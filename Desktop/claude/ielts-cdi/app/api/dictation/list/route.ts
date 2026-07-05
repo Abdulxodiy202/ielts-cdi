@@ -16,7 +16,8 @@ export async function GET() {
   const [dictationsRes, progressRes] = await Promise.all([
     admin
       .from('dictations')
-      .select('id, title, description, order_index, is_premium, difficulty, duration_seconds')
+      .select('id, title, description, order_index, is_premium')
+      .eq('is_active', true)
       .order('order_index'),
     admin
       .from('dictation_progress')

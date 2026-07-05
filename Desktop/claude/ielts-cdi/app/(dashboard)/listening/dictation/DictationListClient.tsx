@@ -13,8 +13,6 @@ interface DictationItem {
   description: string | null
   order_index: number
   is_premium: boolean
-  difficulty: string
-  duration_seconds: number | null
   // progress (null if never attempted)
   best_accuracy: number | null
   stars: number | null
@@ -24,12 +22,6 @@ interface DictationItem {
 interface DictationListClientProps {
   isPremium: boolean
   isTestUser: boolean
-}
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy:   '#10b981',
-  medium: '#f59e0b',
-  hard:   '#ef4444',
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -60,12 +52,21 @@ export function DictationListClient({ isPremium, isTestUser }: DictationListClie
 
   useEffect(() => {
     fetch('/api/dictation/list')
-      .then(r => r.ok ? r.json() : [])
+      .then(async r => {
+        if (!r.ok) {
+          console.error('Failed to load dictations:', r.status, await r.text())
+          return []
+        }
+        return r.json()
+      })
       .then((data: DictationItem[]) => {
         setDictations(data)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(err => {
+        console.error('Failed to load dictations:', err)
+        setLoading(false)
+      })
   }, [])
 
   const totalStars = dictations.reduce((sum, d) => sum + (d.stars ?? 0), 0)
@@ -197,24 +198,6 @@ export function DictationListClient({ isPremium, isTestUser }: DictationListClie
                 <h3 className="font-semibold text-sm mb-2 line-clamp-2" style={{ color: 'var(--text-primary)' }}>
                   {dictation.title}
                 </h3>
-
-                {/* Difficulty + duration */}
-                <div className="flex items-center gap-2 mb-3">
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-                    style={{
-                      background: `${DIFFICULTY_COLORS[dictation.difficulty] ?? '#888'}20`,
-                      color: DIFFICULTY_COLORS[dictation.difficulty] ?? 'var(--text-muted)',
-                    }}
-                  >
-                    {dictation.difficulty}
-                  </span>
-                  {dictation.duration_seconds && (
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {Math.round(dictation.duration_seconds / 60)} min
-                    </span>
-                  )}
-                </div>
 
                 {/* Stars */}
                 <div className="flex gap-0.5 mb-1">
