@@ -3786,7 +3786,22 @@ function DictationsTab() {
     const ext = file.name.split('.').pop()?.toLowerCase()
     try {
       let text = ''
-      if (ext === 'docx') {
+      if (ext === 'pdf') {
+        // @ts-expect-error pdfjs-dist ships no type declarations for this subpath
+        const pdfjsLib: any = await import('pdfjs-dist/build/pdf.mjs')
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        let fullText = ''
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          const pageText = content.items.map((item: any) => item.str).join(' ')
+          fullText += pageText + '\n'
+        }
+        text = fullText.replace(/\s+/g, ' ').trim()
+      } else if (ext === 'docx') {
         const mammoth = (await import('mammoth')).default
         const arrayBuffer = await file.arrayBuffer()
         const result = await mammoth.extractRawText({ arrayBuffer })
@@ -3803,6 +3818,11 @@ function DictationsTab() {
         text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
       } else {
         text = await file.text()
+        const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F�]/g) || []).length
+        if (nonPrintable > text.length * 0.05) {
+          setTranscriptFileMsg("Bu fayl matn emas. Boshqa fayl sinab ko'ring yoki qo'lda yozing.")
+          return
+        }
       }
       if (!text.trim()) { setTranscriptFileMsg("Fayldan matn olinmadi. Boshqa fayl tanlang yoki qo'lda yozing."); return }
       setEditing(p => ({ ...p, transcript: text.trim() }))
@@ -3986,13 +4006,13 @@ function DictationsTab() {
                       <FileText size={14} style={{ color: 'var(--accent)' }} />
                       {transcriptFileMsg
                         ? <span style={{ color: '#10b981' }}>✓ {transcriptFileMsg}</span>
-                        : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, DOC, RTF, HTML)</span>}
-                      <input type="file" accept=".txt,.docx,.doc,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
+                        : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, PDF, RTF, HTML)</span>}
+                      <input type="file" accept=".txt,.docx,.doc,.pdf,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
                     </label>
                     {transcriptFileMsg && (
                       <label className="mt-1.5 flex items-center gap-1.5 text-xs cursor-pointer" style={{ color: 'var(--accent)' }}>
                         <Upload size={11} /> Boshqa fayl tanlash
-                        <input type="file" accept=".txt,.docx,.doc,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
+                        <input type="file" accept=".txt,.docx,.doc,.pdf,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
                       </label>
                     )}
                   </div>
