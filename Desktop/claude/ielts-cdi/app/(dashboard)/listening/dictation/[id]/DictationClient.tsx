@@ -40,11 +40,48 @@ interface DictationClientProps {
 function normalizeWords(text: string): string[] {
   return text
     .toLowerCase()
-    .replace(/[^\w\s']/g, ' ')
+    // Curly/smart quotes (common in Word-sourced .docx transcripts) → straight,
+    // so "I'm" (student typing) matches "I'm" (admin's Word autocorrect output).
+    .replace(/[‘’ʼ]/g, "'")
+    .replace(/[“”]/g, '"')
+    // Hyphens/dashes → space, so "stress-free" and "stress free" both work
+    .replace(/[—–-]/g, ' ')
+    // Strip remaining punctuation entirely (not replaced with space), so
+    // "don't"/"it's" collapse to "dont"/"its" — punctuation is never penalized
+    .replace(/['".,?!:;()]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .split(' ')
-    .filter(Boolean)
+    .filter(w => w.length > 0)
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  const m = a.length, n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = 0; i <= m; i++) dp[i][0] = i
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
+    }
+  }
+  return dp[m][n]
+}
+
+// Treats small typos (≤20% of word length, min 1) on words ≥4 chars as a match,
+// so "appl" counts for "apple" instead of scoring as fully wrong.
+function wordsMatch(a: string, b: string): boolean {
+  if (a === b) return true
+  if (a.length < 4 || b.length < 4) return false
+  const threshold = Math.max(1, Math.floor(Math.max(a.length, b.length) * 0.2))
+  // Edit distance is always ≥ the length difference — skip the expensive DP
+  // when that alone already exceeds the threshold (keeps this fast at 1000+ words).
+  if (Math.abs(a.length - b.length) > threshold) return false
+  return levenshteinDistance(a, b) <= threshold
 }
 
 function buildLCS(a: string[], b: string[]): number[][] {
@@ -52,7 +89,7 @@ function buildLCS(a: string[], b: string[]): number[][] {
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
+      dp[i][j] = wordsMatch(a[i - 1], b[j - 1])
         ? dp[i - 1][j - 1] + 1
         : Math.max(dp[i - 1][j], dp[i][j - 1])
     }
@@ -125,18 +162,30 @@ function computeDiff(
 
   // LCS aligns words that match AT THE SAME RELATIVE POSITION in both texts
   // (a subsequence, not "appears anywhere") — random reordered words score low.
+  // The backtrack condition must use the same wordsMatch() predicate as
+  // buildLCS's fill step, or the alignment would disagree with dp's counts.
   const dp  = buildLCS(userWords, correctWords)
   const ops: Array<'correct' | 'extra' | 'missing'> = []
   let i = userWords.length, j = correctWords.length
 
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && userWords[i - 1] === correctWords[j - 1]) {
+    if (i > 0 && j > 0 && wordsMatch(userWords[i - 1], correctWords[j - 1])) {
       ops.push('correct'); i--; j--
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
       ops.push('missing'); j--
     } else {
       ops.push('extra'); i--
     }
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('=== DICTATION CHECK DEBUG ===')
+    console.log('Original words (first 20):', correctWords.slice(0, 20))
+    console.log('User words (first 20):', userWords.slice(0, 20))
+    console.log('Original word count:', correctWords.length)
+    console.log('User word count:', userWords.length)
+    console.log('LCS matches:', dp[userWords.length][correctWords.length])
+    console.log('=== END DEBUG (accuracy/stars logged after computeStars) ===')
   }
 
   ops.reverse()
@@ -298,6 +347,11 @@ export function DictationClient({
   const handleCheck = async () => {
     const { alignment: align, accuracy: acc, stats: st } = computeDiff(userText, dictation.transcript)
     const s = computeStars(acc)
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Accuracy:', acc)
+      console.log('Stars:', s)
+      console.log('=== END DEBUG ===')
+    }
     setAccuracy(acc)
     setStars(s)
     setAlignment(align)
