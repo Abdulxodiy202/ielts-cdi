@@ -60,23 +60,71 @@ function buildLCS(a: string[], b: string[]): number[][] {
   return dp
 }
 
-type WordResult = { word: string; type: 'correct' | 'missing' | 'extra' }
+type RawWord = { word: string; type: 'correct' | 'missing' | 'extra' }
+
+type AlignmentItem =
+  | { status: 'correct'; origWord: string }
+  | { status: 'wrong'; origWord: string; userWord: string }
+  | { status: 'missing'; origWord: string }
+  | { status: 'extra'; userWord: string }
+
+type DiffStats = { totalWords: number; correctCount: number; missingCount: number; extraCount: number }
+
+// Pair up adjacent missing/extra runs into 'wrong' (substitution) entries so
+// the UI can show "you typed X, correct was Y" instead of two disjoint chips.
+function pairSubstitutions(raw: RawWord[]): AlignmentItem[] {
+  const out: AlignmentItem[] = []
+  let i = 0
+  while (i < raw.length) {
+    const item = raw[i]
+    if (item.type === 'correct') {
+      out.push({ status: 'correct', origWord: item.word })
+      i++
+      continue
+    }
+    let j = i
+    const missing: string[] = []
+    const extra: string[] = []
+    while (j < raw.length && raw[j].type !== 'correct') {
+      if (raw[j].type === 'missing') missing.push(raw[j].word)
+      else extra.push(raw[j].word)
+      j++
+    }
+    const pairCount = Math.min(missing.length, extra.length)
+    for (let k = 0; k < pairCount; k++) {
+      out.push({ status: 'wrong', origWord: missing[k], userWord: extra[k] })
+    }
+    for (let k = pairCount; k < missing.length; k++) {
+      out.push({ status: 'missing', origWord: missing[k] })
+    }
+    for (let k = pairCount; k < extra.length; k++) {
+      out.push({ status: 'extra', userWord: extra[k] })
+    }
+    i = j
+  }
+  return out
+}
 
 function computeDiff(
   userText: string,
   correctText: string
-): { results: WordResult[]; accuracy: number } {
+): { alignment: AlignmentItem[]; accuracy: number; stats: DiffStats } {
   const userWords    = normalizeWords(userText)
   const correctWords = normalizeWords(correctText)
 
-  if (correctWords.length === 0) return { results: [], accuracy: 100 }
+  if (correctWords.length === 0) {
+    return { alignment: [], accuracy: 100, stats: { totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 } }
+  }
   if (userWords.length === 0) {
     return {
-      results: correctWords.map(w => ({ word: w, type: 'missing' })),
+      alignment: correctWords.map(w => ({ status: 'missing', origWord: w })),
       accuracy: 0,
+      stats: { totalWords: correctWords.length, correctCount: 0, missingCount: correctWords.length, extraCount: 0 },
     }
   }
 
+  // LCS aligns words that match AT THE SAME RELATIVE POSITION in both texts
+  // (a subsequence, not "appears anywhere") — random reordered words score low.
   const dp  = buildLCS(userWords, correctWords)
   const ops: Array<'correct' | 'extra' | 'missing'> = []
   let i = userWords.length, j = correctWords.length
@@ -92,22 +140,34 @@ function computeDiff(
   }
 
   ops.reverse()
-  const results: WordResult[] = []
+  const raw: RawWord[] = []
   let ui = 0, ci = 0
 
   for (const op of ops) {
     if (op === 'correct') {
-      results.push({ word: correctWords[ci], type: 'correct' }); ui++; ci++
+      raw.push({ word: correctWords[ci], type: 'correct' }); ui++; ci++
     } else if (op === 'missing') {
-      results.push({ word: correctWords[ci], type: 'missing' }); ci++
+      raw.push({ word: correctWords[ci], type: 'missing' }); ci++
     } else {
-      results.push({ word: userWords[ui], type: 'extra' }); ui++
+      raw.push({ word: userWords[ui], type: 'extra' }); ui++
     }
   }
 
-  const correctCount = results.filter(r => r.type === 'correct').length
+  const alignment    = pairSubstitutions(raw)
+  const correctCount = raw.filter(r => r.type === 'correct').length
+  const extraCount   = alignment.filter(a => a.status === 'extra').length
   const accuracy     = Math.round((correctCount / correctWords.length) * 100)
-  return { results, accuracy }
+
+  return {
+    alignment,
+    accuracy,
+    stats: {
+      totalWords: correctWords.length,
+      correctCount,
+      missingCount: correctWords.length - correctCount,
+      extraCount,
+    },
+  }
 }
 
 function computeStars(accuracy: number): number {
@@ -146,7 +206,8 @@ export function DictationClient({
   const [saving,    setSaving]    = useState(false)
   const [accuracy,  setAccuracy]  = useState(0)
   const [stars,     setStars]     = useState(0)
-  const [diff,      setDiff]      = useState<WordResult[]>([])
+  const [alignment, setAlignment] = useState<AlignmentItem[]>([])
+  const [stats,     setStats]     = useState<DiffStats>({ totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 })
   const [visStars,  setVisStars]  = useState(0)
 
   // Restore draft
@@ -235,11 +296,12 @@ export function DictationClient({
   }
 
   const handleCheck = async () => {
-    const { results, accuracy: acc } = computeDiff(userText, dictation.transcript)
+    const { alignment: align, accuracy: acc, stats: st } = computeDiff(userText, dictation.transcript)
     const s = computeStars(acc)
     setAccuracy(acc)
     setStars(s)
-    setDiff(results)
+    setAlignment(align)
+    setStats(st)
     setSubmitted(true)
     localStorage.removeItem(`dictation_${dictation.id}_draft`)
 
@@ -262,7 +324,8 @@ export function DictationClient({
   const handleRetry = () => {
     setSubmitted(false)
     setUserText('')
-    setDiff([])
+    setAlignment([])
+    setStats({ totalWords: 0, correctCount: 0, missingCount: 0, extraCount: 0 })
     setAccuracy(0)
     setStars(0)
     setVisStars(0)
@@ -339,6 +402,31 @@ export function DictationClient({
           <p style={{ color: 'var(--text-muted)' }}>{RESULT_MSGS[stars]}</p>
         </motion.div>
 
+        {/* Detailed stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="card p-5 mb-6 grid grid-cols-4 gap-3 text-center"
+        >
+          <div>
+            <div className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>{stats.totalWords}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Jami so&apos;z</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold" style={{ color: 'var(--success)' }}>{stats.correctCount}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>To&apos;g&apos;ri</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{stats.missingCount}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Yetishmaydi</div>
+          </div>
+          <div>
+            <div className="text-lg font-bold" style={{ color: '#f59e0b' }}>{stats.extraCount}</div>
+            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>Ortiqcha</div>
+          </div>
+        </motion.div>
+
         {/* Word diff */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -350,36 +438,65 @@ export function DictationClient({
             {t('dictation.yourAnswer')}
           </h3>
           <div className="flex flex-wrap gap-1.5 leading-loose">
-            {diff.map((item, idx) => (
-              <span
-                key={idx}
-                className="px-1.5 py-0.5 rounded text-sm"
-                style={{
-                  background:
-                    item.type === 'correct'
-                      ? 'rgba(34,197,94,0.15)'
-                      : item.type === 'missing'
-                        ? 'rgba(239,68,68,0.12)'
-                        : 'rgba(245,158,11,0.15)',
-                  color:
-                    item.type === 'correct'
-                      ? 'var(--success)'
-                      : item.type === 'missing'
-                        ? '#ef4444'
-                        : '#f59e0b',
-                  textDecoration: item.type === 'missing' ? 'underline dotted' : 'none',
-                }}
-              >
-                {item.word}
-              </span>
-            ))}
+            {alignment.map((item, idx) => {
+              if (item.status === 'correct') {
+                return (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 rounded text-sm"
+                    style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
+                  >
+                    {item.origWord}
+                  </span>
+                )
+              }
+              if (item.status === 'wrong') {
+                return (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 rounded text-sm flex flex-col items-center"
+                    style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', lineHeight: 1.2 }}
+                  >
+                    <span style={{ textDecoration: 'line-through' }}>{item.userWord}</span>
+                    <span style={{ fontSize: 11, color: 'var(--success)' }}>{item.origWord}</span>
+                  </span>
+                )
+              }
+              if (item.status === 'missing') {
+                return (
+                  <span
+                    key={idx}
+                    className="px-1.5 py-0.5 rounded text-sm"
+                    style={{
+                      background: 'rgba(148,163,184,0.15)',
+                      color: 'var(--text-muted)',
+                      textDecoration: 'underline',
+                    }}
+                  >
+                    {item.origWord}
+                  </span>
+                )
+              }
+              // extra
+              return (
+                <span
+                  key={idx}
+                  className="px-1.5 py-0.5 rounded text-sm flex flex-col items-center"
+                  style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', lineHeight: 1.2 }}
+                >
+                  <span>{item.userWord}</span>
+                  <span style={{ fontSize: 10 }}>(qo&apos;shimcha)</span>
+                </span>
+              )
+            })}
           </div>
 
           {/* Legend */}
-          <div className="flex gap-4 mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <span style={{ color: 'var(--success)' }}>● To&apos;g&apos;ri</span>
-            <span style={{ color: '#ef4444' }}>● Yetishmaydi</span>
-            <span style={{ color: '#f59e0b' }}>● Ortiqcha</span>
+          <div className="flex gap-4 mt-4 text-xs flex-wrap" style={{ color: 'var(--text-muted)' }}>
+            <span>🟢 To&apos;g&apos;ri</span>
+            <span>🔴 Yetishmaydi</span>
+            <span>⚪ O&apos;tkazib yuborilgan</span>
+            <span>🟠 Ortiqcha</span>
           </div>
         </motion.div>
 
