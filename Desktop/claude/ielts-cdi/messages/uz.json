@@ -86,9 +86,7 @@
     "trainingTitle": "Bo'limlar bilan mashq",
     "trainingDesc": "Bir vaqtda bitta bo'limni mashq qiling — zaif tomonlaringizga e'tibor bering",
     "freeBadge": "{count} ta bepul",
-    "premiumBadge": "{count} ta premium",
-    "dictationTitle": "Diktant",
-    "dictationDesc": "BBC 'Six Minute English' audio kliplarini eshiting va matnni yozing"
+    "premiumBadge": "{count} ta premium"
   },
   "mock": {
     "title": "Mock IELTS Test",
@@ -296,39 +294,5 @@
   "community": {
     "title": "Community",
     "soon": "Tez kunda..."
-  },
-  "dictation": {
-    "title": "Diktant",
-    "subtitle": "BBC 'Six Minute English' audiolarini eshiting va matnni yozing",
-    "cardTitle": "Diktant",
-    "cardSubtitle": "Eshiting va yozing",
-    "listTitle": "Diktant mashqlari",
-    "listSubtitle": "Har bir diktantni eshiting va matnni iloji boricha aniq yozing",
-    "instructions": "Audioni eshiting va eshitganingizni yozing",
-    "check": "Tekshirish",
-    "clear": "Tozalash",
-    "retry": "Qayta urinish",
-    "next": "Keyingi",
-    "totalStars": "{n} ta yulduz",
-    "bestAccuracy": "Eng yaxshi aniqlik",
-    "passThreshold": "O'tish chegarasi: 70%",
-    "failMessage": "70% dan past. Yana bir marta urinib ko'ring!",
-    "accuracy": "Aniqlik",
-    "attempts": "Urinishlar",
-    "yourAnswer": "Sizning javobingiz",
-    "correctAnswer": "To'g'ri matn",
-    "result5": "Ajoyib! Mukammal natija! 🎉",
-    "result4": "Juda yaxshi! Deyarli to'g'ri! 🌟",
-    "result3": "Yaxshi! Biroz mashq qiling 💪",
-    "result2": "Qoniqarli. Ko'proq eshiting 🎧",
-    "result1": "Davom eting! Harakat qiling 🔥",
-    "result0": "Qayta urinib ko'ring. O'tmadingiz ❌",
-    "passed": "O'tdingiz!",
-    "failed": "O'tmadingiz",
-    "premiumTitle": "Premium Diktant",
-    "premiumDesc": "Bu diktant premium foydalanuvchilar uchun. Premium oling!",
-    "locked": "Qulflangan",
-    "lockedDesc": "Oldingi diktantda 70% dan yuqori ball oling",
-    "free": "Bepul"
   }
 }

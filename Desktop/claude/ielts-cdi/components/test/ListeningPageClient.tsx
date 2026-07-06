@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X,
-  ChevronLeft, ChevronRight, Headphones, Zap, PenLine,
+  ChevronLeft, ChevronRight, Headphones, Zap,
   MessageSquare, Mic, GraduationCap, BookOpen,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
@@ -240,7 +240,7 @@ export function ListeningPageClient({
     <>
       {/* Mode selector */}
       {mode === 'select' && (
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           {/* Full Test card */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
@@ -318,46 +318,6 @@ export function ListeningPageClient({
             </div>
           </motion.button>
 
-          {/* Dictation card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.14 }}
-            className="cursor-pointer"
-            onClick={() => window.location.href = '/listening/dictation'}
-          >
-            <div className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] h-full">
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                style={{ background: 'rgba(16,185,129,0.15)' }}
-              >
-                <PenLine size={28} style={{ color: '#10b981' }} />
-              </div>
-              <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                ✍️ {t('listening.dictationTitle')}
-              </h2>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                {t('listening.dictationDesc')}
-              </p>
-              <div className="flex flex-wrap gap-2 mb-5">
-                {['BBC clips', '6 min audio', 'LCS scoring', '30 levels'].map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-2 py-1 rounded-lg"
-                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div
-                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
-                style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}
-              >
-                {t('dictation.cardTitle')} <ChevronRight size={15} />
-              </div>
-            </div>
-          </motion.div>
         </div>
       )}
 
