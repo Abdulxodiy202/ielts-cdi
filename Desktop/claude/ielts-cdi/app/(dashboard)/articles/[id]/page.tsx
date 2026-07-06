@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
+import MusicPlayer from '@/components/MusicPlayer'
 
 export default function ArticlePage() {
   const params = useParams()
@@ -68,13 +69,14 @@ export default function ArticlePage() {
 
   const fileUrl = article.file_url || article.pdf_url
   return (
-    <div style={{width:'100vw',height:'100vh',display:'flex',flexDirection:'column',background:'#0f0f1a'}}>
+    <div className="fixed inset-0 z-[100]" style={{display:'flex',flexDirection:'column',background:'#0f0f1a'}}>
       <div style={{height:'48px',display:'flex',alignItems:'center',padding:'0 16px',background:'#1e1e30',borderBottom:'1px solid #2d2d4e',flexShrink:0}}>
         <button onClick={() => router.push('/articles')} style={{background:'none',border:'none',color:'white',cursor:'pointer',fontSize:'14px'}}>
           ← {article.title}
         </button>
       </div>
       <iframe src={fileUrl} style={{flex:1,border:'none',width:'100%'}} title={article.title} />
+      <MusicPlayer autoPlay defaultMinimized />
     </div>
   )
 }
