@@ -59,7 +59,7 @@ export default function ArticlesPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto">
+    <div className="px-4 sm:px-6 lg:px-8 py-6 md:py-8 max-w-[1600px] mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('articles.title')}</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('articles.subtitle')}</p>
@@ -71,7 +71,7 @@ export default function ArticlesPage() {
           <p className="font-medium">{t('articles.empty')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4 lg:gap-5">
           {articles.map(article => {
             const locked = article.is_premium && !isPremium
             const canRead = !locked && !!article.file_url
@@ -99,10 +99,10 @@ export default function ArticlesPage() {
                 }}
               >
                 {/* ── TOP: Title + Badge ── */}
-                <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
+                <div className="flex items-start justify-between gap-2 sm:gap-3 px-3 pt-3 pb-2 sm:px-4 sm:pt-4 sm:pb-3">
                   <h3
-                    className="font-bold leading-snug line-clamp-2"
-                    style={{ fontSize: 17, color: 'var(--text-primary)', lineHeight: 1.35 }}
+                    className="font-bold leading-snug line-clamp-2 text-sm sm:text-base lg:text-[17px]"
+                    style={{ color: 'var(--text-primary)', lineHeight: 1.35 }}
                   >
                     {article.title}
                   </h3>
@@ -120,7 +120,7 @@ export default function ArticlesPage() {
                 </div>
 
                 {/* ── MIDDLE: Cover image ── */}
-                <div className="relative mx-4 rounded-xl overflow-hidden" style={{ maxHeight: 200, flexShrink: 0 }}>
+                <div className="relative mx-3 sm:mx-4 rounded-xl overflow-hidden max-h-36 sm:max-h-44 lg:max-h-52" style={{ flexShrink: 0 }}>
                   {article.cover_image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={article.cover_image_url} alt={article.title} className="w-full h-full object-cover" />
@@ -145,23 +145,23 @@ export default function ArticlesPage() {
                 </div>
 
                 {/* ── BOTTOM: Action button ── */}
-                <div className="px-4 pt-3 pb-4" style={{ marginTop: 'auto' }}>
+                <div className="px-3 pt-2 pb-3 sm:px-4 sm:pt-3 sm:pb-4" style={{ marginTop: 'auto' }}>
                   {locked ? (
                     <button
                       onClick={e => { e.stopPropagation(); router.push(`/articles/${article.id}`) }}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+                      className="w-full flex items-center justify-center gap-2 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     >
                       <Lock size={13} /> {t('articles.premium')}
                     </button>
                   ) : !article.file_url ? (
-                    <div className="w-full py-2.5 text-center text-sm rounded-xl"
+                    <div className="w-full py-2 sm:py-2.5 text-center text-xs sm:text-sm rounded-xl"
                       style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
                       {t('articles.soon')}
                     </div>
                   ) : (
                     <button
-                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
+                      className="w-full flex items-center justify-center gap-1.5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-semibold"
                       style={{ background: 'var(--accent)', color: 'white' }}
                     >
                       {t('articles.read')} <ChevronRight size={15} />
