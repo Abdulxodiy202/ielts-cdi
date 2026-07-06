@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, Lock } from 'lucide-react'
@@ -27,6 +27,40 @@ export default function VideoDetailPage() {
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
   const [notFound,    setNotFound]    = useState(false)
+
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [hasAutoFullscreened, setHasAutoFullscreened] = useState(false)
+
+  // Browsers block requestFullscreen() without a user gesture, and the
+  // <video> below autoplays — so the first `play` event usually has no
+  // gesture behind it and the request is silently rejected. Only latch
+  // hasAutoFullscreened on SUCCESS, so the next genuine user-initiated
+  // play (e.g. clicking the native play button after a pause) still
+  // triggers fullscreen instead of being permanently skipped.
+  const handlePlay = async () => {
+    if (hasAutoFullscreened) return
+    const el = videoRef.current
+    if (!el) return
+    try {
+      if (el.requestFullscreen) {
+        await el.requestFullscreen()
+      } else if ((el as any).webkitRequestFullscreen) {
+        await (el as any).webkitRequestFullscreen()
+      } else if ((el as any).webkitEnterFullscreen) {
+        // iOS Safari
+        ;(el as any).webkitEnterFullscreen()
+      } else if ((el as any).msRequestFullscreen) {
+        await (el as any).msRequestFullscreen()
+      } else {
+        return
+      }
+      setHasAutoFullscreened(true)
+    } catch (err) {
+      // Fullscreen blocked (e.g. no user gesture yet) — leave the flag
+      // false so we retry on the next play.
+      console.log('Fullscreen request failed:', err)
+    }
+  }
 
   useEffect(() => {
     if (!id) return
@@ -98,10 +132,12 @@ export default function VideoDetailPage() {
           </>
         ) : (video.video_source === 'upload' || (!ytId && video.video_url)) ? (
           <video
+            ref={videoRef}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
             src={video.video_url}
             poster={video.thumbnail_url ?? undefined}
             controls autoPlay
+            onPlay={handlePlay}
           />
         ) : ytId ? (
           <iframe
