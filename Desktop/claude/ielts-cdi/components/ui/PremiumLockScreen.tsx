@@ -1,8 +1,9 @@
 'use client'
 
-import Link from 'next/link'
+import { useState } from 'react'
 import { Lock } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { PaymentModal } from '@/components/PaymentModal'
 
 interface Props {
   descKey: 'premium.bookDesc' | 'premium.articleDesc'
@@ -10,6 +11,8 @@ interface Props {
 
 export function PremiumLockScreen({ descKey }: Props) {
   const { t } = useLanguage()
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center gap-6">
       <div
@@ -26,9 +29,17 @@ export function PremiumLockScreen({ descKey }: Props) {
           {t(descKey)}
         </p>
       </div>
-      <Link href="/dashboard" className="btn-primary px-6 py-2.5 text-sm font-semibold">
+      <button onClick={() => setShowPaymentModal(true)} className="btn-primary px-6 py-2.5 text-sm font-semibold">
         {t('premium.getBtn')}
-      </Link>
+      </button>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </div>
   )
 }

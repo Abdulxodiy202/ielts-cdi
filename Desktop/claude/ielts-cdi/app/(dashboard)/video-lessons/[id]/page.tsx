@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, Lock } from 'lucide-react'
+import { PaymentModal } from '@/components/PaymentModal'
 
 interface VideoLesson {
   id: string
@@ -27,6 +27,7 @@ export default function VideoDetailPage() {
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
   const [notFound,    setNotFound]    = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const [hasAutoFullscreened, setHasAutoFullscreened] = useState(false)
@@ -117,12 +118,12 @@ export default function VideoDetailPage() {
                 <p style={{ fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 8 }}>Premium kontent</p>
                 <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 24 }}>Bu video faqat premium foydalanuvchilar uchun</p>
               </div>
-              <Link href="/premium"
-                style={{ padding: '12px 28px', borderRadius: 50, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', textDecoration: 'none', display: 'inline-block', transition: 'opacity .15s' }}
-                onMouseEnter={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.opacity = '0.85')}
-                onMouseLeave={(e: React.MouseEvent<HTMLAnchorElement>) => (e.currentTarget.style.opacity = '1')}>
+              <button onClick={() => setShowPaymentModal(true)}
+                style={{ padding: '12px 28px', borderRadius: 50, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', border: 'none', cursor: 'pointer', display: 'inline-block', transition: 'opacity .15s' }}
+                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.opacity = '0.85')}
+                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.opacity = '1')}>
                 👑 Premiumga o&apos;tish
-              </Link>
+              </button>
               {video.recommendation && (
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>
                   💡 {video.recommendation}
@@ -148,6 +149,14 @@ export default function VideoDetailPage() {
           />
         ) : null}
       </div>
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </div>
   )
 }

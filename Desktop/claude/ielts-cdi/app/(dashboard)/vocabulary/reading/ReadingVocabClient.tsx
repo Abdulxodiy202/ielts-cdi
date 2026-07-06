@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Crown, Lock, BookOpen } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { PaymentModal } from '@/components/PaymentModal'
 
 interface Test {
   id: string
@@ -16,6 +18,7 @@ interface Test {
 export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]; isPremium: boolean }) {
   const { t } = useLanguage()
   const router = useRouter()
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
@@ -86,8 +89,8 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
 
                 <div className="shrink-0">
                   {locked ? (
-                    <Link
-                      href="/premium"
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:opacity-80"
                       style={{
                         background: 'rgba(245,158,11,0.15)',
@@ -96,7 +99,7 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
                       }}
                     >
                       <Lock size={14} /> {t('test.unlock')}
-                    </Link>
+                    </button>
                   ) : (
                     <Link
                       href={`/vocabulary/reading/${test.id}`}
@@ -111,6 +114,14 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
           })}
         </div>
       )}
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </div>
   )
 }
