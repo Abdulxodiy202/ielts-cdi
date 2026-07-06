@@ -71,7 +71,7 @@ export default function ArticlesPage() {
           <p className="font-medium">{t('articles.empty')}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {articles.map(article => {
             const locked = article.is_premium && !isPremium
             const canRead = !locked && !!article.file_url
@@ -101,7 +101,7 @@ export default function ArticlesPage() {
                 {/* ── TOP: Title + Badge ── */}
                 <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
                   <h3
-                    className="font-bold leading-snug"
+                    className="font-bold leading-snug line-clamp-2"
                     style={{ fontSize: 17, color: 'var(--text-primary)', lineHeight: 1.35 }}
                   >
                     {article.title}
