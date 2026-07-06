@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isActivePremium } from '@/lib/utils/premium'
+import { canUnlockLevel } from '@/lib/utils/gameUnlock'
 import GameClient from './GameClient'
 
 export default async function GameLevelPage({ params }: { params: Promise<{ level: string }> }) {
@@ -15,6 +17,11 @@ export default async function GameLevelPage({ params }: { params: Promise<{ leve
   if (isNaN(levelNum) || levelNum < 1 || levelNum > 100) redirect('/vocabulary/games')
 
   const admin = createAdminClient()
+
+  const profileRes = await supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single()
+  const isPremium = isActivePremium(profileRes.data)
+  const unlockCheck = await canUnlockLevel(admin, user.id, levelNum, isPremium, user.email)
+  if (!unlockCheck.canUnlock) redirect(`/vocabulary/games?locked=${unlockCheck.reason}`)
 
   // Single round-trip: level + questions together, parallel with progress
   const [levelRes, progressRes] = await Promise.all([

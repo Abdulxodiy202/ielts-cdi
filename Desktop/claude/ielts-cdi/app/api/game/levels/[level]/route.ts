@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isActivePremium } from '@/lib/utils/premium'
+import { canUnlockLevel } from '@/lib/utils/gameUnlock'
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ level: string }> }) {
   const supabase = await createClient()
@@ -16,6 +18,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ lev
   }
 
   const admin = createAdminClient()
+
+  const profileRes = await supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single()
+  const isPremium = isActivePremium(profileRes.data)
+  const unlockCheck = await canUnlockLevel(admin, user.id, levelNum, isPremium, user.email)
+  if (!unlockCheck.canUnlock) {
+    if (unlockCheck.reason === 'daily_limit_reached') {
+      return Response.json({
+        error: 'daily_limit_reached',
+        unlockedToday: unlockCheck.unlockedToday,
+        dailyLimit: unlockCheck.dailyLimit,
+        isPremium,
+      }, { status: 403 })
+    }
+    return Response.json({ error: 'previous_level_locked' }, { status: 403 })
+  }
 
   const { data: levelData } = await admin
     .from('game_levels')

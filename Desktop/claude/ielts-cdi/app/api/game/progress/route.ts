@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { recordLevelUnlock } from '@/lib/utils/gameUnlock'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -46,5 +47,12 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
+
+  // Count this level toward today's daily unlock quota only the first time
+  // it's completed — replays and already-completed levels never re-count.
+  if (nowCompleted && !wasCompleted) {
+    await recordLevelUnlock(admin, user.id, user.email)
+  }
+
   return Response.json(data)
 }

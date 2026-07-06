@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PaymentModal } from '@/components/PaymentModal'
 
 const TEST_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
@@ -12,8 +13,25 @@ interface Level {
   level_number: number
   title: string
   category: string | null
-  status: 'completed' | 'current' | 'locked'
+  status: 'completed' | 'current' | 'locked' | 'daily_limit'
   stars: number
+}
+
+interface DailyStatus {
+  unlockedToday: number
+  dailyLimit: number
+  isPremium: boolean
+  isAdmin: boolean
+  nextResetAt: string
+}
+
+/** "HH:MM:SS" remaining until `resetIso`. */
+function formatCountdown(resetIso: string): string {
+  const diff = Math.max(0, new Date(resetIso).getTime() - Date.now())
+  const h = Math.floor(diff / 3_600_000)
+  const m = Math.floor((diff % 3_600_000) / 60_000)
+  const s = Math.floor((diff % 60_000) / 1000)
+  return [h, m, s].map(n => String(n).padStart(2, '0')).join(':')
 }
 
 /* ── Layout constants ─────────────────────────────────────────────── */
@@ -117,7 +135,13 @@ export default function GamesPage() {
   const [stars,     setStars]     = useState<{ id: number; x: number; y: number; r: number; dur: string; del: string }[]>([])
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const router     = useRouter()
+  const searchParams = useSearchParams()
   const currentRef = useRef<HTMLDivElement | null>(null)
+
+  const [dailyStatus,     setDailyStatus]     = useState<DailyStatus | null>(null)
+  const [countdown,       setCountdown]       = useState('')
+  const [showLimitModal,  setShowLimitModal]  = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   /* Stars — client-only */
   useEffect(() => {
@@ -134,6 +158,27 @@ export default function GamesPage() {
     const sb = createClient()
     sb.auth.getUser().then(({ data: { user } }) => setUserEmail(user?.email ?? null))
   }, [])
+
+  /* Daily unlock status */
+  useEffect(() => {
+    fetch('/api/game/daily-status')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setDailyStatus(d) })
+      .catch(() => {})
+  }, [])
+
+  /* Live countdown to next Tashkent midnight reset */
+  useEffect(() => {
+    if (!dailyStatus?.nextResetAt) return
+    setCountdown(formatCountdown(dailyStatus.nextResetAt))
+    const id = setInterval(() => setCountdown(formatCountdown(dailyStatus.nextResetAt)), 1000)
+    return () => clearInterval(id)
+  }, [dailyStatus?.nextResetAt])
+
+  /* Direct-URL access to a blocked level redirects here with ?locked=<reason> */
+  useEffect(() => {
+    if (searchParams.get('locked')) setShowLimitModal(true)
+  }, [searchParams])
 
   /* Levels — sessionStorage 30 s cache, bust after level completion */
   useEffect(() => {
@@ -180,7 +225,7 @@ export default function GamesPage() {
   const lvlMap     = useMemo(() => new Map(levels.map(l => [l.level_number, l])), [levels])
   const doneN      = levels.filter(l => l.status === 'completed').length
   const totalStars = levels.reduce((sum, l) => sum + (l.stars ?? 0), 0)
-  const curN       = levels.find(l => l.status === 'current')?.level_number ?? 1
+  const curN       = levels.find(l => l.status === 'current' || l.status === 'daily_limit')?.level_number ?? 1
   const curPos = stonePos(curN)
 
   /* Completed path segment */
@@ -260,6 +305,41 @@ export default function GamesPage() {
           </div>
         </div>
 
+        {/* Daily unlock status */}
+        {dailyStatus && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '14px 20px 0' }}>
+            {dailyStatus.isAdmin ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+                borderRadius: 12, padding: '8px 16px',
+                fontSize: 13, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
+              }}>
+                🔧 Test Mode — cheksiz kirish
+              </div>
+            ) : (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'center',
+                background: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)',
+                border: `1px solid ${dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.35)' : 'rgba(99,102,241,0.25)'}`,
+                borderRadius: 12, padding: '8px 16px',
+                fontSize: 13, fontWeight: 700,
+                color: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? '#fb923c' : '#a5b4fc',
+              }}>
+                <span>
+                  Bugun: {dailyStatus.unlockedToday}/{dailyStatus.dailyLimit} level
+                  {dailyStatus.unlockedToday >= dailyStatus.dailyLimit && ' — chegara tugadi'}
+                </span>
+                {countdown && (
+                  <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, fontSize: 12 }}>
+                    Yangi levelgacha: {countdown}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Canvas */}
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 28, paddingBottom: 64 }}>
           <div style={{ position: 'relative', width: CW, height: CH, zIndex: 1 }}>
@@ -329,6 +409,7 @@ export default function GamesPage() {
               const isDone         = st === 'completed'
               const isCur          = st === 'current'
               const isLocked       = st === 'locked'
+              const isDailyLimited = st === 'daily_limit'
               const isTestUnlocked = isTestUser && isLocked   // test bypass: treat as unlocked
               const effectiveLock  = isLocked && !isTestUnlocked
               const cat            = lvl?.category ?? null
@@ -361,6 +442,11 @@ export default function GamesPage() {
                 bg   = 'linear-gradient(135deg,#6366f1 0%,#7c3aed 100%)'
                 bord = '2px solid rgba(129,140,248,0.7)'
                 anim = 'nodeGlow 2s ease-in-out infinite'
+              } else if (isDailyLimited) {
+                bg   = isMilestone
+                  ? 'linear-gradient(135deg,#2a2a3e 0%,#1a1a2e 100%)'
+                  : '#1a1a2e'
+                bord = '2px solid rgba(249,115,22,0.5)'
               } else if (isTestUnlocked) {
                 bg   = 'linear-gradient(135deg,#3730a3 0%,#312e81 100%)'
                 bord = '1px solid rgba(99,102,241,0.4)'
@@ -371,13 +457,16 @@ export default function GamesPage() {
                 bord = isMilestone ? '2px solid rgba(245,158,11,0.18)' : '1px solid rgba(255,255,255,0.06)'
               }
 
-              const opacity = effectiveLock ? (isMilestone ? 0.6 : 0.5) : 1
+              const opacity = effectiveLock ? (isMilestone ? 0.6 : 0.5) : isDailyLimited ? 0.75 : 1
 
               return (
                 <div
                   key={n}
-                  ref={isCur ? currentRef : undefined}
-                  onClick={() => { if (!effectiveLock) router.push(`/vocabulary/games/${n}`) }}
+                  ref={(isCur || isDailyLimited) ? currentRef : undefined}
+                  onClick={() => {
+                    if (isDailyLimited) { setShowLimitModal(true); return }
+                    if (!effectiveLock) router.push(`/vocabulary/games/${n}`)
+                  }}
                   style={{
                     position: 'absolute',
                     left: x - nodeHalf,
@@ -392,15 +481,19 @@ export default function GamesPage() {
                     alignItems: 'center', justifyContent: 'center',
                     gap: 3,
                     padding: '0 6px',
-                    zIndex: isCur ? 20 : isMilestone ? 15 : 10,
+                    zIndex: (isCur || isDailyLimited) ? 20 : isMilestone ? 15 : 10,
                     transition: 'transform .15s, opacity .15s',
                     userSelect: 'none', boxSizing: 'border-box',
                   }}
-                  title={isPerfectMilestone ? `Level ${n} — Mukammal!` : undefined}
+                  title={
+                    isPerfectMilestone ? `Level ${n} — Mukammal!` :
+                    isDailyLimited ? "Bugungi chegara tugadi — ertaga ochiladi" :
+                    undefined
+                  }
                   onMouseEnter={e => {
                     const el = e.currentTarget as HTMLDivElement
                     el.style.transform = effectiveLock ? 'scale(1.02)' : 'scale(1.08)'
-                    if (!effectiveLock) {
+                    if (!effectiveLock && !isDailyLimited) {
                       el.style.opacity = '1'
                       router.prefetch(`/vocabulary/games/${n}`)
                     }
@@ -432,6 +525,12 @@ export default function GamesPage() {
                     }}>
                       {MILESTONE[n] ?? '⭐'}
                     </span>
+                  ) : isMilestone && !isDone && isDailyLimited ? (
+                    /* ── Case C, blocked by today's unlock limit — orange lock instead of the icon ─── */
+                    <>
+                      <span style={{ fontSize: 15, lineHeight: 1, filter: 'drop-shadow(0 0 4px rgba(249,115,22,0.6))' }}>🔒</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1, color: 'rgba(249,115,22,0.85)', letterSpacing: '-.2px' }}>{n}</span>
+                    </>
                   ) : isMilestone && !isDone ? (
                     /* ── Case C: Uncompleted milestone — circular stone with icon ─── */
                     <>
@@ -466,6 +565,12 @@ export default function GamesPage() {
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: '#c4b5fd', letterSpacing: '-.2px' }}>{n}</span>
                       <span style={{ fontSize: 16, lineHeight: 1, color: 'rgba(196,181,253,0.85)' }}>▶</span>
                     </>
+                  ) : isDailyLimited ? (
+                    /* ── Locked by today's unlock limit — orange lock, distinct from gray ─── */
+                    <>
+                      <span style={{ fontSize: 15, lineHeight: 1, filter: 'drop-shadow(0 0 4px rgba(249,115,22,0.6))' }}>🔒</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1, color: 'rgba(249,115,22,0.85)', letterSpacing: '-.2px' }}>{n}</span>
+                    </>
                   ) : (
                     /* ── Locked content ─── */
                     <>
@@ -497,6 +602,78 @@ export default function GamesPage() {
           </div>
         </div>
       </div>
+
+      {/* Daily-limit-reached modal */}
+      {showLimitModal && dailyStatus && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: 20,
+          }}
+          onClick={() => setShowLimitModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 400, borderRadius: 20, padding: 28,
+              background: '#15152a', border: '1px solid rgba(249,115,22,0.25)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{
+              width: 56, height: 56, margin: '0 auto 16px', borderRadius: '50%',
+              background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+            }}>
+              🔒
+            </div>
+            <h2 style={{ color: '#fff', fontSize: 19, fontWeight: 800, marginBottom: 10 }}>
+              Bugungi chegara tugadi
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>
+              Sen bugun {dailyStatus.dailyLimit} ta yangi level{dailyStatus.dailyLimit > 1 ? 'larni' : 'ni'} ochding. Ertaga soat 00:00 (Toshkent vaqti) da yangi level{dailyStatus.dailyLimit > 1 ? 'lar' : ''} ochiladi.
+            </p>
+            {countdown && (
+              <p style={{ color: 'rgba(249,115,22,0.8)', fontSize: 13, fontWeight: 700, marginBottom: 20 }}>
+                Yangi levelgacha: {countdown}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 10, flexDirection: dailyStatus.isPremium ? 'column' : 'row' }}>
+              <button
+                onClick={() => setShowLimitModal(false)}
+                style={{
+                  flex: 1, padding: '11px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+                  border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+                }}
+              >
+                Yopish
+              </button>
+              {!dailyStatus.isPremium && (
+                <button
+                  onClick={() => { setShowLimitModal(false); setShowPaymentModal(true) }}
+                  style={{
+                    flex: 1, padding: '11px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+                    background: 'linear-gradient(135deg,#f97316,#ea580c)', color: '#fff',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  👑 Premiumga o&apos;tish
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </>
   )
 }
