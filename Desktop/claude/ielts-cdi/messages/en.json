@@ -8,6 +8,7 @@
     "freePlan": "Free Plan",
     "premiumBadge": "Premium",
     "vocabulary": "Vocabulary",
+    "typing": "Typing Practice",
     "community": "Community",
     "books": "Books",
     "articles": "Articles",
@@ -532,5 +533,28 @@
     "premiumLockTitle": "Premium content",
     "premiumLockDesc": "This video is for premium users only",
     "upgradeBtn": "👑 Upgrade to Premium"
+  },
+  "typing": {
+    "title": "Typing Practice",
+    "tapToType": "Tap to type...",
+    "startBtn": "Start Typing",
+    "noEssays": "No essays available yet. Check back later.",
+    "loadError": "Couldn't load words. Please try again.",
+    "restartHint": "restart",
+    "configHint": "config",
+    "accuracy": "Accuracy",
+    "characters": "characters",
+    "correct": "correct",
+    "incorrect": "incorrect",
+    "extra": "extra",
+    "missed": "missed",
+    "tryAgain": "Try Again",
+    "newConfig": "New Config",
+    "wordSet": {
+      "common_english": "Common English",
+      "ielts_vocabulary": "IELTS Vocabulary",
+      "task1": "Writing Task 1",
+      "task2": "Writing Task 2"
+    }
   }
 }

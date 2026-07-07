@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Play,
+  Loader2, Upload, FileText, X, Music, Play, Keyboard,
 } from 'lucide-react'
 import { formatDate, formatPrice } from '@/lib/utils/formatters'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
@@ -3658,6 +3658,276 @@ function VideoLessonsTab() {
   )
 }
 
+/* в”Ђв”Ђ Typing Essays tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+interface TypingEssay {
+  id: number
+  title: string
+  content: string
+  task_type: 'task1' | 'task2'
+  is_active: boolean
+  word_count: number
+  created_at: string
+}
+
+const TYPING_ESSAY_BLANK: Omit<TypingEssay, 'id' | 'created_at' | 'word_count'> = {
+  title: '', content: '', task_type: 'task1', is_active: true,
+}
+
+function TypingEssaysTab() {
+  const [essays,       setEssays]       = useState<TypingEssay[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [editing,      setEditing]      = useState<Partial<TypingEssay> | null>(null)
+  const [saving,       setSaving]       = useState(false)
+  const [formError,    setFormError]    = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<TypingEssay | null>(null)
+
+  async function load() {
+    setLoading(true)
+    const res = await fetch('/api/admin/typing-essays')
+    if (res.ok) setEssays(await res.json())
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const task1Essays = essays.filter(e => e.task_type === 'task1')
+  const task2Essays = essays.filter(e => e.task_type === 'task2')
+
+  function openAdd() {
+    setFormError('')
+    setEditing({ ...TYPING_ESSAY_BLANK })
+  }
+  function openEdit(e: TypingEssay) {
+    setFormError('')
+    setEditing({ ...e })
+  }
+
+  async function handleSave() {
+    if (!editing) return
+    const title = editing.title?.trim() ?? ''
+    const content = editing.content?.trim() ?? ''
+    const wc = content.split(/\s+/).filter(Boolean).length
+    if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+    if (wc < 50) { setFormError("Matn kamida 50 so'zdan iborat bo'lishi kerak"); return }
+    setSaving(true)
+    try {
+      const isEdit = !!(editing as TypingEssay).id
+      const payload = { title, content, task_type: editing.task_type ?? 'task1', is_active: editing.is_active ?? true }
+      const res = isEdit
+        ? await fetch(`/api/admin/typing-essays/${(editing as TypingEssay).id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+          })
+        : await fetch('/api/admin/typing-essays', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+          })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setFormError(e.error ?? 'Xatolik yuz berdi'); return }
+      await load()
+      setEditing(null)
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggle(e: TypingEssay) {
+    await fetch(`/api/admin/typing-essays/${e.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !e.is_active }),
+    })
+    setEssays(prev => prev.map(x => x.id === e.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    await fetch(`/api/admin/typing-essays/${deleteTarget.id}`, { method: 'DELETE' })
+    await load()
+    setDeleteTarget(null)
+  }
+
+  const editWordCount = editing?.content ? editing.content.trim().split(/\s+/).filter(Boolean).length : 0
+
+  function renderSection(label: string, list: TypingEssay[]) {
+    return (
+      <div className="mb-8">
+        <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{label}</h3>
+        {list.length === 0 ? (
+          <p className="text-sm py-6 text-center rounded-xl" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+            Hali essaylar yo&apos;q
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            {list.map(e => (
+              <div key={e.id} className="card p-4 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  {e.id}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {e.task_type === 'task1' ? 'Task 1' : 'Task 2'} В· {e.word_count} so&apos;z
+                  </p>
+                </div>
+                <span
+                  className="text-xs px-2 py-1 rounded-full font-medium text-center shrink-0"
+                  style={{
+                    background: e.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
+                    color: e.is_active ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                >
+                  {e.is_active ? 'Faol' : "O'chiq"}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end shrink-0">
+                  <button
+                    onClick={() => handleToggle(e)}
+                    title={e.is_active ? "O'chirish" : 'Yoqish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: e.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: e.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {e.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(e)}
+                    title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(e)}
+                    title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <div className="py-16 flex justify-center"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--text-muted)' }} /></div>
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Typing Essays</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>Task 1 va Task 2 essaylarini boshqaring</p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          <Plus size={16} /> Yangi essay qo&apos;shish
+        </button>
+      </div>
+
+      {renderSection('Task 1 Essaylari', task1Essays)}
+      {renderSection('Task 2 Essaylari', task2Essays)}
+
+      {/* Add / Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setEditing(null)} />
+          <div className="relative card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" style={{ zIndex: 51 }}>
+            <h2 className="text-lg font-bold mb-5" style={{ color: 'var(--text-primary)' }}>
+              {(editing as TypingEssay).id ? 'Essayni tahrirlash' : 'Yangi essay'}
+            </h2>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                <input
+                  value={editing.title ?? ''}
+                  onChange={e => setEditing(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Task turi *</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input type="radio" checked={editing.task_type === 'task1'}
+                      onChange={() => setEditing(p => ({ ...p, task_type: 'task1' }))} className="w-3.5 h-3.5" />
+                    <span style={{ color: 'var(--text-primary)' }}>Task 1</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input type="radio" checked={editing.task_type === 'task2'}
+                      onChange={() => setEditing(p => ({ ...p, task_type: 'task2' }))} className="w-3.5 h-3.5" />
+                    <span style={{ color: 'var(--text-primary)' }}>Task 2</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Matn *</label>
+                  <span className="text-xs" style={{ color: editWordCount >= 50 ? '#10b981' : '#ef4444' }}>
+                    So&apos;zlar: {editWordCount}{editWordCount < 50 ? ' (min 50)' : ''}
+                  </span>
+                </div>
+                <textarea
+                  value={editing.content ?? ''}
+                  onChange={e => setEditing(p => ({ ...p, content: e.target.value }))}
+                  rows={16}
+                  style={{ minHeight: 400, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-y"
+                  placeholder="Essayning to'liq matnini yozing yoki yopishtiring"
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Tavsiya: Task 1 = 150-200 so&apos;z, Task 2 = 250-300 so&apos;z
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={editing.is_active ?? true}
+                  onChange={e => setEditing(p => ({ ...p, is_active: e.target.checked }))}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Faol</span>
+              </label>
+
+              {formError && (
+                <p className="text-sm" style={{ color: 'var(--error)' }}>{formError}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+                {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+              </button>
+              <button onClick={() => setEditing(null)} className="btn-outline">Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteTarget(null)} />
+          <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              Essay &apos;{deleteTarget.title}&apos; o&apos;chirilsinmi?
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi.</p>
+            <div className="flex gap-3">
+              <button onClick={handleDelete} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -3671,6 +3941,7 @@ const TABS = [
   { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
   { id: 'music',     label: 'Musiqa',            Icon: Music },
   { id: 'videos',        label: 'Video darslar',    Icon: Play },
+  { id: 'typing',        label: 'Typing',           Icon: Keyboard },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
 ] as const
 type TabId = typeof TABS[number]['id']
@@ -3753,6 +4024,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'books'    && <BooksTab />}
       {activeTab === 'music'         && <MusicTab />}
       {activeTab === 'videos'               && <VideoLessonsTab />}
+      {activeTab === 'typing'               && <TypingEssaysTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
     </div>
   )

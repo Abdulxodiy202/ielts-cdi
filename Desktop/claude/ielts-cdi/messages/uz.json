@@ -8,6 +8,7 @@
     "freePlan": "Bepul tarif",
     "premiumBadge": "Premium",
     "vocabulary": "Lug'at",
+    "typing": "Typing amaliyoti",
     "community": "Jamiyat",
     "books": "Kitoblar",
     "articles": "Maqolalar",
@@ -532,5 +533,28 @@
     "premiumLockTitle": "Premium kontent",
     "premiumLockDesc": "Bu video faqat premium foydalanuvchilar uchun",
     "upgradeBtn": "👑 Premiumga o'tish"
+  },
+  "typing": {
+    "title": "Typing amaliyoti",
+    "tapToType": "Yozish uchun bosing...",
+    "startBtn": "Boshlash",
+    "noEssays": "Hali essaylar mavjud emas. Keyinroq qayta urinib ko'ring.",
+    "loadError": "So'zlarni yuklab bo'lmadi. Qayta urinib ko'ring.",
+    "restartHint": "qayta boshlash",
+    "configHint": "sozlamalar",
+    "accuracy": "Accuracy",
+    "characters": "characters",
+    "correct": "correct",
+    "incorrect": "incorrect",
+    "extra": "extra",
+    "missed": "missed",
+    "tryAgain": "Qayta urinish",
+    "newConfig": "Sozlamalar",
+    "wordSet": {
+      "common_english": "Umumiy inglizcha",
+      "ielts_vocabulary": "IELTS lug'ati",
+      "task1": "Writing Task 1",
+      "task2": "Writing Task 2"
+    }
   }
 }

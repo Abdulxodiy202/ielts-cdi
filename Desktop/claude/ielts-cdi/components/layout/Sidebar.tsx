@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
+  LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
   PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
 } from 'lucide-react'
@@ -108,6 +108,7 @@ export function Sidebar() {
       label: t('nav.resourcesGroup'),
       items: [
         { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null },
+        { href: '/typing',      label: t('nav.typing'),       icon: Keyboard,            badge: null },
         { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null },
         { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null },
         { href: '/video-lessons', label: t('nav.videoCourses'), icon: Video,               badge: null },
