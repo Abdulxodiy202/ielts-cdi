@@ -103,8 +103,12 @@ function typingReducer(state: TypingState, action: TypingAction): TypingState {
     case 'SPACE': {
       if (state.finished || (state.inputs[state.currentIndex] ?? '').length === 0) return state
       const atLastWord = state.currentIndex >= state.words.length - 1
-      if (atLastWord) {
-        return state.endless ? state : { ...state, started: true, finished: true }
+      // In endless (time) mode there is no "last word" to freeze at — always
+      // advance and trust the buffer-extend effect to keep words ahead of the
+      // cursor. Freezing here (as before) could permanently strand the user
+      // on the final word if the extend effect ever ran a beat late.
+      if (atLastWord && !state.endless) {
+        return { ...state, started: true, finished: true }
       }
       return { ...state, currentIndex: state.currentIndex + 1, started: true }
     }
@@ -179,8 +183,21 @@ export default function TypingPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const currentWordRef = useRef<HTMLSpanElement>(null)
   const linesWrapRef = useRef<HTMLDivElement>(null)
+  const cursorAnchorRef = useRef<HTMLSpanElement>(null)
   const [scrollLines, setScrollLines] = useState(0)
-  const LINE_HEIGHT = 48
+  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
+
+  /* ── Responsive type size, kept in sync between CSS and the JS scroll math ── */
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  const FONT_SIZE = isMobile ? 28 : 40
+  const LINE_HEIGHT = Math.round(FONT_SIZE * 1.5)
+  const VISIBLE_LINES = 4
 
   /* ── Fetch words/essay for the selected config ─────────────────── */
   const loadTest = useCallback(async () => {
@@ -232,8 +249,11 @@ export default function TypingPage() {
   /* ── Extend the word buffer for time mode as the user approaches the end ── */
   useEffect(() => {
     if (!typingState.endless) return
-    if (typingState.words.length - typingState.currentIndex < 40 && wordPoolRef.current.length > 0) {
-      dispatch({ type: 'EXTEND', words: shuffleNoAdjacentDupes(wordPoolRef.current) })
+    if (typingState.words.length - typingState.currentIndex <= 20 && wordPoolRef.current.length > 0) {
+      const pool = wordPoolRef.current
+      const batch: string[] = []
+      while (batch.length < 100) batch.push(...shuffleNoAdjacentDupes(pool))
+      dispatch({ type: 'EXTEND', words: batch.slice(0, 100) })
     }
   }, [typingState.endless, typingState.currentIndex, typingState.words.length])
 
@@ -263,16 +283,26 @@ export default function TypingPage() {
     }
   }, [typingState.finished, endedAt])
 
-  /* ── Auto-scroll the word lines so the current line stays near the top ── */
+  /* ── Auto-scroll the word lines: current line is pinned to the top, always
+     leaving VISIBLE_LINES-1 (3) untyped lines visible ahead ── */
   useEffect(() => {
     if (!currentWordRef.current || !linesWrapRef.current) return
     const wrapTop = linesWrapRef.current.getBoundingClientRect().top
     const wordTop = currentWordRef.current.getBoundingClientRect().top
     const relativeLine = Math.round((wordTop - wrapTop) / LINE_HEIGHT) + scrollLines
-    if (relativeLine - scrollLines >= 2) {
-      setScrollLines(relativeLine - 1)
+    if (relativeLine > scrollLines) {
+      setScrollLines(relativeLine)
     }
-  }, [typingState.currentIndex, scrollLines])
+  }, [typingState.currentIndex, scrollLines, LINE_HEIGHT])
+
+  /* ── Track the cursor's target position so it can animate smoothly via a
+     CSS transform transition, instead of jumping as an inline element ── */
+  useEffect(() => {
+    if (!cursorAnchorRef.current || !linesWrapRef.current) return
+    const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
+    const wrapRect = linesWrapRef.current.getBoundingClientRect()
+    setCursorPos({ x: anchorRect.left - wrapRect.left, y: anchorRect.top - wrapRect.top })
+  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], scrollLines])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -456,13 +486,14 @@ export default function TypingPage() {
           <div
             ref={linesWrapRef}
             className="w-full overflow-hidden relative"
-            style={{ height: LINE_HEIGHT * 3, cursor: 'text' }}
+            style={{ height: LINE_HEIGHT * VISIBLE_LINES, cursor: 'text' }}
             onClick={() => inputRef.current?.focus()}
           >
             <div
-              className="flex flex-wrap content-start gap-x-3 gap-y-2 transition-transform duration-200"
+              className="flex flex-wrap content-start transition-transform duration-200"
               style={{
-                fontSize: 28, lineHeight: `${LINE_HEIGHT}px`,
+                fontSize: FONT_SIZE, lineHeight: 1.5, letterSpacing: '0.02em',
+                rowGap: '0.3em',
                 transform: `translateY(-${scrollLines * LINE_HEIGHT}px)`,
               }}
             >
@@ -471,22 +502,14 @@ export default function TypingPage() {
                 const isCurrent = i === typingState.currentIndex
                 const isDone = i < typingState.currentIndex
                 const len = Math.max(word.length, typed.length)
-                const cursor = (
-                  <span
-                    key="cursor"
-                    style={{
-                      display: 'inline-block', width: 2, height: '1.2em',
-                      background: '#e2b714', verticalAlign: 'middle', position: 'relative', top: -2,
-                      animation: 'typingCursorBlink 1s step-end infinite',
-                    }}
-                  />
-                )
+                // Invisible, zero-width position marker — measured (not
+                // rendered as the visible cursor) so the real cursor can be
+                // absolutely positioned and animate smoothly between spots
+                // instead of jumping as an inline element would.
+                const anchor = <span key="anchor" ref={cursorAnchorRef} style={{ display: 'inline-block', width: 0 }} />
                 const chars = []
                 for (let j = 0; j < len; j++) {
-                  // Cursor sits BEFORE the next character to be typed, so it
-                  // advances one position per keystroke instead of staying
-                  // pinned to the start of the word.
-                  if (isCurrent && j === typed.length) chars.push(cursor)
+                  if (isCurrent && j === typed.length) chars.push(anchor)
 
                   const targetCh = word[j]
                   const typedCh = typed[j]
@@ -507,21 +530,32 @@ export default function TypingPage() {
                     </span>,
                   )
                 }
-                // Cursor at the very end: word typed exactly in full, or past
+                // Anchor at the very end: word typed exactly in full, or past
                 // the end with extra characters already appended.
-                if (isCurrent && typed.length === len) chars.push(cursor)
+                if (isCurrent && typed.length === len) chars.push(anchor)
 
                 return (
                   <span
                     key={i}
                     ref={isCurrent ? currentWordRef : undefined}
-                    style={{ opacity: isDone || isCurrent ? 1 : 0.4 }}
+                    style={{ opacity: isDone || isCurrent ? 1 : 0.4, marginRight: '0.5em' }}
                   >
                     {chars}
                   </span>
                 )
               })}
             </div>
+
+            {/* Smoothly-animated cursor, positioned via the measured anchor above */}
+            <div
+              style={{
+                position: 'absolute', top: 0, left: 0, width: 3, height: FONT_SIZE,
+                background: '#e2b714', pointerEvents: 'none',
+                transform: `translate(${cursorPos.x}px, ${cursorPos.y}px)`,
+                transition: 'transform 0.1s ease-out',
+                animation: 'typingCursorBlink 1s step-end infinite',
+              }}
+            />
           </div>
 
           <div className="flex items-center gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
