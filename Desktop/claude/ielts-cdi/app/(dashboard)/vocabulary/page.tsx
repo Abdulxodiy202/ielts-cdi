@@ -8,6 +8,7 @@ export default function VocabularyPage() {
   const { t } = useLanguage()
   const [lwCount, setLwCount] = useState<number | null>(null)
   const [wcCount, setWcCount] = useState<number | null>(null)
+  const [rvCount, setRvCount] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
@@ -17,6 +18,10 @@ export default function VocabularyPage() {
     fetch('/api/vocabulary/writing-collocations')
       .then(r => r.ok ? r.json() : {})
       .then((d: { words?: unknown[] }) => setWcCount(d.words?.length ?? 0))
+      .catch(() => {})
+    fetch('/api/vocabulary/reading/count')
+      .then(r => r.ok ? r.json() : {})
+      .then((d: { count?: number }) => setRvCount(d.count ?? 0))
       .catch(() => {})
   }, [])
 
@@ -46,7 +51,7 @@ export default function VocabularyPage() {
       emoji: '📖',
       titleKey: 'vocabulary.library',
       descKey:  'vocabulary.libraryDesc',
-      count:    t('vocabulary.aiPowered'),
+      count:    null,
       color: '#10b981',
       bg:    'rgba(16,185,129,0.08)',
       border:'rgba(16,185,129,0.25)',
@@ -56,7 +61,7 @@ export default function VocabularyPage() {
       emoji: '📑',
       titleKey: 'vocabulary.readingVocab',
       descKey:  'vocabulary.readingVocabDesc',
-      count:    t('vocabulary.perTest'),
+      count:    rvCount !== null ? t('vocabulary.wordCount', { count: rvCount }) : '...',
       color: '#f59e0b',
       bg:    'rgba(245,158,11,0.08)',
       border:'rgba(245,158,11,0.25)',
@@ -104,12 +109,14 @@ export default function VocabularyPage() {
           >
             <div className="flex items-start justify-between mb-3">
               <span className="text-3xl">{cat.emoji}</span>
-              <span
-                className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                style={{ background: cat.bg, color: cat.color, border: `1px solid ${cat.border}` }}
-              >
-                {cat.count}
-              </span>
+              {cat.count !== null && (
+                <span
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                  style={{ background: cat.bg, color: cat.color, border: `1px solid ${cat.border}` }}
+                >
+                  {cat.count}
+                </span>
+              )}
             </div>
             <h2 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
               {(cat as any).title ?? t((cat as any).titleKey)}
