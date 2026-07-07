@@ -471,17 +471,32 @@ export default function TypingPage() {
                 const isCurrent = i === typingState.currentIndex
                 const isDone = i < typingState.currentIndex
                 const len = Math.max(word.length, typed.length)
+                const cursor = (
+                  <span
+                    key="cursor"
+                    style={{
+                      display: 'inline-block', width: 2, height: '1.2em',
+                      background: '#e2b714', verticalAlign: 'middle', position: 'relative', top: -2,
+                      animation: 'typingCursorBlink 1s step-end infinite',
+                    }}
+                  />
+                )
                 const chars = []
                 for (let j = 0; j < len; j++) {
+                  // Cursor sits BEFORE the next character to be typed, so it
+                  // advances one position per keystroke instead of staying
+                  // pinned to the start of the word.
+                  if (isCurrent && j === typed.length) chars.push(cursor)
+
                   const targetCh = word[j]
                   const typedCh = typed[j]
                   let color = 'rgba(255,255,255,0.35)'
                   let underline = false
                   if (typedCh !== undefined && targetCh !== undefined) {
-                    color = typedCh === targetCh ? '#fff' : '#f87171'
+                    color = typedCh === targetCh ? '#fff' : '#ca4754'
                     underline = typedCh !== targetCh
                   } else if (typedCh !== undefined && targetCh === undefined) {
-                    color = '#f87171' // extra char
+                    color = '#ca4754' // extra char
                   } else if (typedCh === undefined && targetCh !== undefined && isDone) {
                     color = 'rgba(255,255,255,0.35)' // missed char (word already passed)
                     underline = true
@@ -492,21 +507,16 @@ export default function TypingPage() {
                     </span>,
                   )
                 }
+                // Cursor at the very end: word typed exactly in full, or past
+                // the end with extra characters already appended.
+                if (isCurrent && typed.length === len) chars.push(cursor)
+
                 return (
                   <span
                     key={i}
                     ref={isCurrent ? currentWordRef : undefined}
-                    className="relative"
                     style={{ opacity: isDone || isCurrent ? 1 : 0.4 }}
                   >
-                    {isCurrent && (
-                      <span
-                        style={{
-                          position: 'absolute', left: -2, top: 2, bottom: 2, width: 2,
-                          background: '#a5b4fc', animation: 'typingCursorBlink 1s step-end infinite',
-                        }}
-                      />
-                    )}
                     {chars}
                   </span>
                 )
