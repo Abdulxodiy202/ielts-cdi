@@ -10,6 +10,7 @@ import {
   ChevronRight, Play, Pause, Info, Volume2, Maximize,
   XCircle, X,
 } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 /* ─────────────────────────────── Types ─────────────────────────────── */
 export interface MockScheduleForFlow {
@@ -200,6 +201,7 @@ function WarningModal({
   onDismiss: () => void
   onRequestFullscreen: () => void
 }) {
+  const { t } = useLanguage()
   const isLast = count >= 2
 
   return (
@@ -225,16 +227,14 @@ function WarningModal({
           color: 'var(--error)',
           marginBottom: 10,
         }}>
-          Ogohlantirish {count}/2
+          {t('mockFlow.warningTitle', { count })}
         </h2>
         <p style={{
           fontSize: 14, color: 'var(--text-secondary)',
           lineHeight: 1.65,
           marginBottom: fullscreenExited ? 20 : 28,
         }}>
-          {isLast
-            ? 'Oxirgi ogohlantirish! Keyingi qoidabuzarlik testni bekor qiladi.'
-            : 'Boshqa oynaga o\'tish qayd etildi. Yana bir marta takrorlansa, test bekor qilinadi.'}
+          {isLast ? t('mockFlow.warningLast') : t('mockFlow.warningFirst')}
         </p>
 
         {fullscreenExited ? (
@@ -246,7 +246,7 @@ function WarningModal({
             marginBottom: 0,
           }}>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>
-              Iltimos, to&apos;liq ekranga qayting
+              {t('mockFlow.returnToFullscreen')}
             </p>
             <button
               onClick={() => { onRequestFullscreen(); onDismiss() }}
@@ -266,7 +266,7 @@ function WarningModal({
                 gap: 8,
               }}
             >
-              <Maximize size={16} /> To&apos;liq ekran
+              <Maximize size={16} /> {t('mockFlow.fullscreenBtn')}
             </button>
           </div>
         ) : (
@@ -284,7 +284,7 @@ function WarningModal({
               cursor: 'pointer',
             }}
           >
-            Tushundim
+            {t('mockFlow.understood')}
           </button>
         )}
       </div>
@@ -304,6 +304,7 @@ function AudioPlayer({
   src: string
   onEnded: () => void
 }) {
+  const { t } = useLanguage()
   const audioRef     = useRef<HTMLAudioElement>(null)
   const onEndedRef   = useRef(onEnded)
   onEndedRef.current = onEnded
@@ -369,19 +370,19 @@ function AudioPlayer({
           </div>
           <div>
             <p className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              Listening Audio
+              {t('mockFlow.listeningAudio')}
             </p>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Brauzer audio avtomatik boshlashga ruxsat bermadi
+              {t('mockFlow.autoplayBlocked')}
             </p>
           </div>
           <button type="button" onClick={startAudio}
             className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, var(--success), #059669)' }}>
-            <Play size={22} /> ▶ Audio boshlash
+            <Play size={22} /> {t('mockFlow.startAudio')}
           </button>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Audio bir marta eshitiladi — orqaga qaytib bo&apos;lmaydi
+            {t('mockFlow.audioOnceNotice')}
           </p>
         </div>
       )}
@@ -399,7 +400,7 @@ function AudioPlayer({
                 <span>{fmtMmSs(current)}</span>
                 <span>{duration > 0 ? fmtMmSs(duration) : '--:--'}</span>
               </div>
-              <div title="Orqaga qaytib bo'lmaydi"
+              <div title={t('mockFlow.cannotGoBack')}
                 style={{
                   height: 6, background: 'var(--bg-secondary)',
                   borderRadius: 9999, cursor: 'not-allowed', overflow: 'hidden',
@@ -412,7 +413,7 @@ function AudioPlayer({
               </div>
             </div>
             {!ended ? (
-              <button type="button" aria-label={playing ? 'Pauza' : 'Davom ettirish'} onClick={toggle}
+              <button type="button" aria-label={playing ? t('mockFlow.pause') : t('mockFlow.resume')} onClick={toggle}
                 className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all hover:opacity-80 active:scale-95"
                 style={{ background: 'var(--success)', color: 'white' }}>
                 {playing ? <Pause size={17} /> : <Play size={17} />}
@@ -425,9 +426,7 @@ function AudioPlayer({
             )}
           </div>
           <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            {ended
-              ? 'Audio yakunlandi'
-              : 'Faqat pauza tugmasi mavjud · Orqaga qaytib bo\'lmaydi'}
+            {ended ? t('mockFlow.audioFinished') : t('mockFlow.onlyPauseAvailable')}
           </p>
         </div>
       )}
@@ -461,6 +460,7 @@ function ListeningSection({
   onAudioEnd: () => void
   reviewSecsLeft: number | null
 }) {
+  const { t } = useLanguage()
   const ext      = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
   const isAudio  = ['mp3', 'wav', 'ogg', 'm4a'].includes(ext)
   const isHtml   = ext === 'html' || ext === 'htm'
@@ -508,9 +508,9 @@ function ListeningSection({
       <div className="flex flex-col items-center justify-center h-full gap-4"
         style={{ color: 'var(--text-muted)' }}>
         <AlertTriangle size={36} className="opacity-30" />
-        <p className="text-sm">Listening fayli yuklanmagan</p>
+        <p className="text-sm">{t('mockFlow.listeningNotUploaded')}</p>
         <button type="button" onClick={onNext} className="btn-primary mt-2">
-          Reading ga o&apos;tish <ChevronRight size={15} />
+          {t('mockFlow.goToReading')} <ChevronRight size={15} />
         </button>
       </div>
     )
@@ -542,7 +542,7 @@ function ListeningSection({
                 background: reviewSecsLeft !== null && reviewSecsLeft < 15 ? 'var(--error)' : 'var(--accent)',
                 fontSize: 15,
               }}>
-              Readingga o&apos;tish
+              {t('mockFlow.goToReading')}
               {reviewSecsLeft !== null && (
                 <span style={{ fontFamily: 'monospace' }}>
                   ({Math.floor(reviewSecsLeft / 60)}:{String(reviewSecsLeft % 60).padStart(2, '0')})
@@ -577,10 +577,10 @@ function ListeningSection({
             <div>
               <p className="font-semibold text-sm"
                 style={{ color: reviewSecs < 30 ? 'var(--error)' : 'var(--warning)' }}>
-                Javoblaringizni tekshiring
+                {t('mockFlow.reviewAnswers')}
               </p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Vaqt tugagach Reading bo&apos;limiga o&apos;tiladi
+                {t('mockFlow.autoAdvanceToReading')}
               </p>
             </div>
             <div
@@ -596,7 +596,7 @@ function ListeningSection({
 
         {/* ── 40 answer inputs ── */}
         <div className="card p-5 space-y-4">
-          <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Javoblar (1–40)</h3>
+          <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('mockFlow.answersHeader')}</h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {Array.from({ length: 40 }, (_, i) => {
               const q = String(i + 1)
@@ -637,7 +637,7 @@ function ListeningSection({
               letterSpacing: '0.01em',
             }}
           >
-            Readingga o&apos;tish
+            {t('mockFlow.goToReading')}
             <span style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 900 }}>
               ({fmtMmSs(reviewSecs)})
             </span>
@@ -677,6 +677,7 @@ function ReadingSection({
   secsLeft: number
   reviewSecsLeft: number | null
 }) {
+  const { t } = useLanguage()
   const ext    = fileUrl?.split('?')[0].split('.').pop()?.toLowerCase() ?? ''
   const isHtml = ext === 'html' || ext === 'htm'
   const { blobUrl, loading } = useHtmlBlobUrl(isHtml ? fileUrl : null)
@@ -723,9 +724,9 @@ function ReadingSection({
       <div className="flex flex-col items-center justify-center h-full gap-4"
         style={{ color: 'var(--text-muted)' }}>
         <AlertTriangle size={36} className="opacity-30" />
-        <p className="text-sm">Reading fayli yuklanmagan</p>
+        <p className="text-sm">{t('mockFlow.readingNotUploaded')}</p>
         <button type="button" onClick={onNext} className="btn-primary mt-2">
-          Writing ga o&apos;tish <ChevronRight size={15} />
+          {t('mockFlow.goToWriting')} <ChevronRight size={15} />
         </button>
       </div>
     )
@@ -742,7 +743,7 @@ function ReadingSection({
       {/* SectionTimer — only during active reading, not during review */}
       {!inReview && (
         <div style={{ padding: '10px 16px', flexShrink: 0 }}>
-          <SectionTimer secsLeft={secsLeft} totalSecs={READ_MINS * 60} label="Reading vaqti" />
+          <SectionTimer secsLeft={secsLeft} totalSecs={READ_MINS * 60} label={t('mockFlow.readingTimeLabel')} />
         </div>
       )}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -756,7 +757,7 @@ function ReadingSection({
           <button type="button" onClick={() => onReadingDoneRef.current()}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95"
             style={{ position: 'absolute', bottom: 16, right: 16, background: 'var(--accent)', zIndex: 10 }}>
-            Writing ga o&apos;tish <ArrowRight size={15} />
+            {t('mockFlow.goToWriting')} <ArrowRight size={15} />
           </button>
         )}
         {/* Overlay button — review phase; timer ticking inside; click = go directly to Writing */}
@@ -782,7 +783,7 @@ function ReadingSection({
               boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
             }}
           >
-            Writingga o&apos;tish
+            {t('mockFlow.goToWriting')}
             <span style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 900 }}>
               ({fmtMmSs(reviewSecs)})
             </span>
@@ -814,6 +815,7 @@ function WritingSection({
   submitting: boolean
   secsLeft: number
 }) {
+  const { t } = useLanguage()
   const timerWarn   = secsLeft < 10 * 60
   const timerDanger = secsLeft < 5 * 60
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -828,7 +830,7 @@ function WritingSection({
           }}>
           <div className="flex items-center gap-2">
             <Clock size={15} style={{ color: timerDanger ? 'var(--error)' : timerWarn ? 'var(--warning)' : 'var(--text-muted)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Writing vaqti qoldi</span>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{t('mockFlow.writingTimeLeft')}</span>
           </div>
           <div className={`font-mono font-bold text-lg tabular-nums ${timerDanger ? 'animate-pulse' : ''}`}
             style={{ color: timerDanger ? 'var(--error)' : timerWarn ? 'var(--warning)' : 'var(--text-primary)' }}>
@@ -863,7 +865,7 @@ function WritingSection({
               <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                 <span className="text-xs px-2 py-1 rounded-lg font-medium"
                   style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>
-                  Kattalashtirish uchun bosing
+                  {t('mockFlow.clickToZoom')}
                 </span>
               </div>
             </div>
@@ -898,7 +900,7 @@ function WritingSection({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={lightboxUrl}
-                alt="Task rasm (katta)"
+                alt={t('mockFlow.taskImageLarge')}
                 style={{
                   maxWidth: '95vw', maxHeight: '95vh',
                   objectFit: 'contain', borderRadius: 12,
@@ -915,13 +917,13 @@ function WritingSection({
           )}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Sizning javobingiz</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{t('mockFlow.yourAnswer')}</label>
               <span className="text-xs" style={{ color: wordCount(task1) >= 150 ? 'var(--success)' : 'var(--warning)' }}>
-                {wordCount(task1)} so&apos;z (min. 150)
+                {t('mockFlow.wordsMin', { count: wordCount(task1), min: 150 })}
               </span>
             </div>
             <textarea className="input-field text-sm resize-none leading-relaxed" rows={10}
-              placeholder="Task 1 javobingizni shu yerga yozing..."
+              placeholder={t('mockFlow.task1Placeholder')}
               value={task1} onChange={e => onChangeTask1(e.target.value)} />
           </div>
         </div>
@@ -940,13 +942,13 @@ function WritingSection({
           )}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Sizning javobingiz</label>
+              <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{t('mockFlow.yourAnswer')}</label>
               <span className="text-xs" style={{ color: wordCount(task2) >= 250 ? 'var(--success)' : 'var(--warning)' }}>
-                {wordCount(task2)} so&apos;z (min. 250)
+                {t('mockFlow.wordsMin', { count: wordCount(task2), min: 250 })}
               </span>
             </div>
             <textarea className="input-field text-sm resize-none leading-relaxed" rows={14}
-              placeholder="Task 2 javobingizni shu yerga yozing..."
+              placeholder={t('mockFlow.task2Placeholder')}
               value={task2} onChange={e => onChangeTask2(e.target.value)} />
           </div>
         </div>
@@ -955,8 +957,8 @@ function WritingSection({
           className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
           style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
           {submitting
-            ? <><Loader2 size={18} className="animate-spin" /> Topshirilmoqda…</>
-            : <><Send size={18} /> Mock Test ni topshirish</>}
+            ? <><Loader2 size={18} className="animate-spin" /> {t('mockFlow.submittingMock')}</>
+            : <><Send size={18} /> {t('mockFlow.submitMockBtn')}</>}
         </button>
       </div>
     </div>
@@ -967,6 +969,7 @@ function WritingSection({
    MockTestFlow — main export
    ═══════════════════════════════════════════════════════════════════════ */
 export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
+  const { t } = useLanguage()
   const storageKey     = `mock_draft_${schedule.id}`
   const violationsKey  = `mock_violations_${schedule.id}`
 
@@ -1043,7 +1046,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         if (draft.listenReviewEndMs <= Date.now()) {
           resumeStep = 'reading'
           setReadingStartedAt(new Date())
-          setSkippedNotice("Listening bo'limi tugadi. Reading boshlandi.")
+          setSkippedNotice(t('mockFlow.listeningEndedReadingStarted'))
         } else {
           setListenReviewEndMs(draft.listenReviewEndMs)
         }
@@ -1053,7 +1056,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           if (draft.readingReviewEndMs <= Date.now()) {
             resumeStep = 'writing'
             setWritingStartedAt(new Date())
-            setSkippedNotice("Reading bo'limi tugadi. Writing boshlandi.")
+            setSkippedNotice(t('mockFlow.readingEndedWritingStarted'))
           } else {
             setReadingReviewEndMs(draft.readingReviewEndMs)
           }
@@ -1415,11 +1418,10 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         </div>
         <div style={{ maxWidth: 400 }}>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--error)', marginBottom: 12 }}>
-            🚫 Testdan chetlatildingiz
+            {t('mockFlow.disqualifiedTitle')}
           </h2>
           <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Siz noqonuniy harakat tufayli testdan chetlatildingiz.
-            Dashboard&apos;ga yo&apos;naltirilmoqda…
+            {t('mockFlow.disqualifiedBody')}
           </p>
         </div>
         <div style={{
@@ -1447,7 +1449,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           </div>
           <div>
             <h2 className="text-xl font-black mb-1" style={{ color: 'var(--text-primary)' }}>
-              Mock IELTS Test
+              {t('mockFlow.preStartTitle')}
             </h2>
             <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               {schedule.date} — {schedule.time.slice(0, 5)}
@@ -1456,9 +1458,9 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           <div className="space-y-2 text-sm text-left rounded-xl p-4"
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
             {[
-              { icon: Headphones, label: 'Listening', desc: 'Audio tugaguncha',   color: 'var(--success)' },
-              { icon: BookOpen,   label: 'Reading',   desc: `${READ_MINS} daqiqa`,  color: 'var(--accent)'  },
-              { icon: PenTool,    label: 'Writing',   desc: `${WRITE_MINS} daqiqa`, color: 'var(--warning)' },
+              { icon: Headphones, label: 'Listening', desc: t('mockFlow.untilAudioEnds'),   color: 'var(--success)' },
+              { icon: BookOpen,   label: 'Reading',   desc: t('mockFlow.minutesShort', { n: READ_MINS }),  color: 'var(--accent)'  },
+              { icon: PenTool,    label: 'Writing',   desc: t('mockFlow.minutesShort', { n: WRITE_MINS }), color: 'var(--warning)' },
             ].map(({ icon: Icon, label, desc, color }) => (
               <div key={label} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1473,18 +1475,16 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
             style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: 'var(--warning)' }}>
             <Info size={13} className="shrink-0 mt-0.5" />
             <span>
-              Listening tugagach 2 daqiqa javoblarni tekshirishga vaqt beriladi.
-              Test to&apos;liq ekranda (fullscreen) o&apos;tkaziladi.
-              Tab almashtirish yoki ekrandan chiqish ogohlantirish sanaladi.
+              {t('mockFlow.preStartInfo')}
             </span>
           </div>
           <button type="button" onClick={handleStart}
             className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-bold text-white text-base hover:opacity-90 active:scale-95 transition-all"
             style={{ background: 'linear-gradient(135deg, var(--accent), #4f46e5)' }}>
-            <Play size={18} /> Testni boshlash
+            <Play size={18} /> {t('mockFlow.startTestBtn')}
           </button>
           <Link href="/mock-test" className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            ← Orqaga qaytish
+            {t('mockFlow.backBtn')}
           </Link>
         </div>
       </div>
@@ -1502,17 +1502,16 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
         </div>
         <div className="text-center max-w-sm">
           <h2 className="text-2xl font-black mb-2" style={{ color: 'var(--text-primary)' }}>
-            Mock Test yakunlandi! 🎉
+            {t('mockFlow.mockDoneTitle')}
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-            Sizning javoblaringiz muvaffaqiyatli topshirildi.
-            Natijalar tez orada adminlar tomonidan tekshiriladi.
+            {t('mockFlow.mockDoneBody')}
           </p>
         </div>
         <Link href="/mock-test"
           className="flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-white"
           style={{ background: 'var(--accent)' }}>
-          Mock Test sahifasiga qaytish
+          {t('mockFlow.backToMockTest')}
         </Link>
       </div>
     )
@@ -1623,7 +1622,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
           }}>
             <Maximize size={32} className="mx-auto mb-3" style={{ color: 'var(--warning)' }} />
             <p className="font-semibold mb-3" style={{ color: 'var(--text-primary)', fontSize: 15 }}>
-              Iltimos, to&apos;liq ekranga qayting
+              {t('mockFlow.returnToFullscreen')}
             </p>
             <button
               onClick={() => { requestFullscreen(); setFullscreenExited(false) }}
@@ -1635,7 +1634,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               }}
             >
-              <Maximize size={15} /> To&apos;liq ekran
+              <Maximize size={15} /> {t('mockFlow.fullscreenBtn')}
             </button>
           </div>
         </div>

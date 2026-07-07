@@ -32,15 +32,16 @@ interface AdminMessage {
   created_at: string
 }
 
-function fmtMsgTime(iso: string): string {
+function fmtMsgTime(iso: string, lang: 'en' | 'uz', yesterdayLabel: string): string {
+  const locale = lang === 'en' ? 'en-US' : 'uz-UZ'
   const d = new Date(iso)
   const now = new Date()
-  const hhmm = d.toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })
+  const hhmm = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
   const isToday = d.toDateString() === now.toDateString()
   if (isToday) return hhmm
   const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return `Kecha ${hhmm}`
-  return `${d.toLocaleDateString('uz-UZ', { day: '2-digit', month: 'short' })} ${hhmm}`
+  if (d.toDateString() === yesterday.toDateString()) return `${yesterdayLabel} ${hhmm}`
+  return `${d.toLocaleDateString(locale, { day: '2-digit', month: 'short' })} ${hhmm}`
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────── */
@@ -171,7 +172,7 @@ export function Sidebar() {
           const wasPremium = isActivePremium(profileRef.current)
           setProfile(merged)
           if (isActivePremium(updated) && !wasPremium)
-            addToast('🎉 Premium obunangiz faollashtirildi! Barcha testlar ochiq.', 'premium')
+            addToast(t('sidebar.premiumActivatedToast'), 'premium')
         }
       ).subscribe()
 
@@ -182,12 +183,12 @@ export function Sidebar() {
         (payload) => {
           const row = payload.new as { status: string; booking_date: string; time_slot: string }
           if (row.status === 'confirmed')
-            addToast(`✅ Mock Test tasdiqlandi! ${row.booking_date} kuni ${row.time_slot}`, 'booking')
+            addToast(t('sidebar.mockConfirmedToast', { date: row.booking_date, time: row.time_slot }), 'booking')
         }
       ).subscribe()
 
     return () => { supabase.removeChannel(profileCh); supabase.removeChannel(bookingCh) }
-  }, [user?.id, addToast])
+  }, [user?.id, addToast, t])
 
   /* ── Admin messages ────────────────────────────────────────────── */
   useEffect(() => {
@@ -230,16 +231,16 @@ export function Sidebar() {
       if (!res.ok) throw new Error(json.error ?? 'Upload failed')
       setProfile(prev => prev ? { ...prev, avatar_url: json.publicUrl } : prev)
       setLocalAvatarUrl(json.publicUrl)
-      addToast('✅ Rasm yangilandi', 'success')
+      addToast(t('sidebar.photoUpdated'), 'success')
     } catch (err) {
       console.error('[avatar upload]', err)
       setLocalAvatarUrl(null)
-      addToast(err instanceof Error ? err.message : 'Rasm yuklashda xatolik', 'error')
+      addToast(err instanceof Error ? err.message : t('sidebar.photoUploadError'), 'error')
     } finally {
       setAvatarUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }, [user, addToast])
+  }, [user, addToast, t])
 
   /* ── Save name ─────────────────────────────────────────────────── */
   const handleSaveName = useCallback(async () => {
@@ -252,13 +253,13 @@ export function Sidebar() {
     })
     if (res.ok) {
       setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
-      addToast('✅ Ism saqlandi', 'success')
+      addToast(t('sidebar.nameSaved'), 'success')
     } else {
-      addToast('Saqlashda xatolik', 'error')
+      addToast(t('sidebar.nameSaveError'), 'error')
     }
     setNameSaving(false)
     setEditingName(false)
-  }, [nameInput, addToast])
+  }, [nameInput, addToast, t])
 
   /* ── Derived values ────────────────────────────────────────────── */
   const displayName  = profile?.full_name || (user?.user_metadata?.full_name as string | undefined) || 'User'
@@ -346,7 +347,7 @@ export function Sidebar() {
                 >
                   {/* ── PROFIL section ─── */}
                   <div className="mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '2px 4px 6px' }}>
-                    Profil
+                    {t('sidebar.profile')}
                   </div>
 
                   {/* Name row */}
@@ -365,7 +366,7 @@ export function Sidebar() {
                         onBlur={handleSaveName}
                         className="flex-1 text-sm bg-transparent border-none outline-none"
                         style={{ color: 'var(--text-primary)', minWidth: 0 }}
-                        placeholder="Ismingiz"
+                        placeholder={t('sidebar.namePlaceholder')}
                       />
                     ) : (
                       <span
@@ -384,7 +385,7 @@ export function Sidebar() {
                     className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors hover:opacity-80 mb-2"
                     style={{ color: 'var(--text-secondary)' }}>
                     <Camera size={13} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
-                    <span>{avatarUploading ? 'Yuklanmoqda...' : 'Rasm yuklash'}</span>
+                    <span>{avatarUploading ? t('common.loading') : t('sidebar.uploadPhoto')}</span>
                   </button>
 
                   {/* Divider */}
@@ -392,13 +393,13 @@ export function Sidebar() {
 
                   {/* ── SOZLAMALAR section ─── */}
                   <div className="mb-1" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-muted)', padding: '2px 4px 6px' }}>
-                    Sozlamalar
+                    {t('sidebar.settings')}
                   </div>
 
                   {/* Theme row */}
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
                     <Palette size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Mavzu</span>
+                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{t('common.theme')}</span>
                     <div className="flex gap-1.5">
                       {([
                         { id: 'dark'  as const, color: '#6366f1' },
@@ -419,7 +420,7 @@ export function Sidebar() {
                   {/* Language row */}
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
                     <Globe size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>Til</span>
+                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{t('common.language')}</span>
                     <div className="flex gap-1.5">
                       {[
                         { code: 'en' as const, flag: 'us' },
@@ -443,7 +444,7 @@ export function Sidebar() {
                       className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm transition-colors hover:opacity-80"
                       style={{ color: 'var(--text-secondary)' }}>
                       <Bell size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                      <span className="flex-1">Xabarlar</span>
+                      <span className="flex-1">{t('sidebar.messages')}</span>
                       {unreadCount > 0 && (
                         <span className="flex items-center justify-center rounded-full text-white font-bold"
                           style={{ background: '#ef4444', minWidth: 18, height: 18, padding: '0 4px', fontSize: 10 }}>
@@ -461,7 +462,7 @@ export function Sidebar() {
                     className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
                     style={{ color: '#ef4444' }}>
                     <LogOut size={13} style={{ flexShrink: 0 }} />
-                    Chiqish
+                    {t('nav.signOut')}
                   </button>
                 </motion.div>
               )}
@@ -483,13 +484,13 @@ export function Sidebar() {
                   >
                     <div className="px-4 py-2.5 text-xs font-semibold shrink-0"
                       style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                      Admin xabarlari
+                      {t('sidebar.adminMessages')}
                     </div>
                     <div className="overflow-y-auto flex-1">
                       {messages.length === 0 ? (
                         <div className="p-6 text-center">
                           <Bell size={24} className="mx-auto mb-2 opacity-20" style={{ color: 'var(--text-muted)' }} />
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Hali xabar yo&apos;q</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('sidebar.noMessages')}</p>
                         </div>
                       ) : (
                         <div>
@@ -499,7 +500,7 @@ export function Sidebar() {
                               <div className="flex items-center gap-1.5 mb-1">
                                 <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>Admin</span>
                                 {!msg.is_read && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#ef4444' }} />}
-                                <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{fmtMsgTime(msg.created_at)}</span>
+                                <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>{fmtMsgTime(msg.created_at, lang, t('sidebar.yesterday'))}</span>
                               </div>
                               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>{msg.message}</p>
                             </div>

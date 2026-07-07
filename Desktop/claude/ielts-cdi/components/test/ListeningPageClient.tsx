@@ -261,7 +261,7 @@ export function ListeningPageClient({
               {t('listening.fullTestDesc')}
             </p>
             <div className="flex flex-wrap gap-2 mb-5">
-              {[`${fullTests.length} tests`, `40 ${t('test.minutes')}`, `4 ${t('test.sections')}`, `40 ${t('test.questions')}`].map((tag) => (
+              {[`${fullTests.length} ${t('test.tests')}`, `40 ${t('test.minutes')}`, `4 ${t('test.sections')}`, `40 ${t('test.questions')}`].map((tag) => (
                 <span
                   key={tag}
                   className="text-xs px-2 py-1 rounded-lg"
@@ -300,7 +300,7 @@ export function ListeningPageClient({
               {t('listening.trainingDesc')}
             </p>
             <div className="flex flex-wrap gap-2 mb-5">
-              {['4 parts', `10 tests each`, `10 ${t('test.minutes')}`, `10 ${t('test.questions')}`].map((tag) => (
+              {[`4 ${t('test.parts')}`, `10 ${t('test.testsEach')}`, `10 ${t('test.minutes')}`, `10 ${t('test.questions')}`].map((tag) => (
                 <span
                   key={tag}
                   className="text-xs px-2 py-1 rounded-lg"

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ChevronLeft, Lock } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface VideoLesson {
   id: string
@@ -22,6 +23,7 @@ function getYouTubeId(url: string) {
 
 export default function VideoDetailPage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const { id } = useParams<{ id: string }>()
   const [video,       setVideo]       = useState<VideoLesson | null>(null)
   const [userPremium, setUserPremium] = useState(false)
@@ -80,8 +82,8 @@ export default function VideoDetailPage() {
 
   if (notFound || !video) return (
     <div className="p-8 text-center">
-      <p className="text-lg mb-4" style={{ color: 'var(--text-muted)' }}>Video topilmadi</p>
-      <button onClick={() => router.push('/video-lessons')} className="btn-primary text-sm">← Orqaga qaytish</button>
+      <p className="text-lg mb-4" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.notFound')}</p>
+      <button onClick={() => router.push('/video-lessons')} className="btn-primary text-sm">{t('videoLessons.backBtn')}</button>
     </div>
   )
 
@@ -115,14 +117,14 @@ export default function VideoDetailPage() {
                 <Lock size={32} style={{ color: '#f59e0b' }} />
               </div>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 8 }}>Premium kontent</p>
-                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 24 }}>Bu video faqat premium foydalanuvchilar uchun</p>
+                <p style={{ fontWeight: 700, fontSize: 20, color: '#fff', marginBottom: 8 }}>{t('videoLessons.premiumLockTitle')}</p>
+                <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 24 }}>{t('videoLessons.premiumLockDesc')}</p>
               </div>
               <button onClick={() => setShowPaymentModal(true)}
                 style={{ padding: '12px 28px', borderRadius: 50, fontWeight: 700, fontSize: 15, background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff', border: 'none', cursor: 'pointer', display: 'inline-block', transition: 'opacity .15s' }}
                 onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.opacity = '0.85')}
                 onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.opacity = '1')}>
-                👑 Premiumga o&apos;tish
+                {t('videoLessons.upgradeBtn')}
               </button>
               {video.recommendation && (
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', maxWidth: 400, textAlign: 'center', lineHeight: 1.6 }}>

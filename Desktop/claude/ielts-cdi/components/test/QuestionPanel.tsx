@@ -1,5 +1,7 @@
 'use client'
 
+import { useLanguage } from '@/lib/i18n/LanguageContext'
+
 interface Question {
   id: string
   question_number: number
@@ -18,6 +20,7 @@ interface QuestionPanelProps {
 }
 
 export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, onNavigate }: QuestionPanelProps) {
+  const { t } = useLanguage()
   const q = questions[currentQuestion]
   if (!q) return null
 
@@ -26,7 +29,7 @@ export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, o
       {/* Question grid nav */}
       <div className="card p-4">
         <div className="text-xs font-medium mb-3" style={{ color: 'var(--text-muted)' }}>
-          Question Navigation
+          {t('testTaking.questionNav')}
         </div>
         <div className="grid grid-cols-8 gap-1.5">
           {questions.map((qq, i) => {
@@ -59,15 +62,15 @@ export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, o
         <div className="flex gap-4 mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded inline-block" style={{ background: 'var(--accent)' }} />
-            Current
+            {t('testTaking.current')}
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded inline-block" style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid var(--success)' }} />
-            Answered ({Object.keys(answers).length})
+            {t('testTaking.answered', { count: Object.keys(answers).length })}
           </span>
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded inline-block" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }} />
-            Skipped
+            {t('testTaking.skipped')}
           </span>
         </div>
       </div>
@@ -155,7 +158,7 @@ export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, o
         {(q.question_type === 'short_answer' || q.question_type === 'completion') && (
           <input
             className="input-field"
-            placeholder="Type your answer here..."
+            placeholder={t('testTaking.answerPlaceholder')}
             value={answers[q.id] ?? ''}
             onChange={e => onAnswer(q.id, e.target.value)}
           />
@@ -169,7 +172,7 @@ export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, o
             className="btn-outline text-sm"
             style={{ opacity: currentQuestion === 0 ? 0.4 : 1 }}
           >
-            ← Previous
+            {t('testTaking.previous')}
           </button>
           <button
             onClick={() => onNavigate(Math.min(questions.length - 1, currentQuestion + 1))}
@@ -177,7 +180,7 @@ export function QuestionPanel({ questions, answers, onAnswer, currentQuestion, o
             className="btn-primary text-sm"
             style={{ opacity: currentQuestion === questions.length - 1 ? 0.4 : 1 }}
           >
-            Next →
+            {t('testTaking.next')}
           </button>
         </div>
       </div>

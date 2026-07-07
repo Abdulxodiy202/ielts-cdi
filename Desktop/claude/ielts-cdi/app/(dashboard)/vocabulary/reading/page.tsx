@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Heart, ChevronLeft, Pencil } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Word {
@@ -65,6 +66,7 @@ function HighlightedSentence({ sentence, word }: { sentence: string; word: strin
 /* ── Main component ───────────────────────────────────────────────── */
 export default function ReadingVocabPage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const [words,    setWords]    = useState<Word[]>([])
   const [savedIds, setSavedIds] = useState<string[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -176,14 +178,14 @@ export default function ReadingVocabPage() {
       {/* ── Header ─── */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
-          <Link href="/vocabulary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>Lug&apos;at</Link>
+          <Link href="/vocabulary" style={{ color: 'var(--text-muted)', textDecoration: 'none' }}>{t('vocabCard.backToVocab')}</Link>
           <span>/</span>
-          <span style={{ color: 'var(--text-primary)' }}>Reading Vocabulary</span>
+          <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.readingVocab')}</span>
         </div>
         <button onClick={() => router.push('/vocabulary')}
           className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}>
-          <ChevronLeft size={16} /> Lug&apos;at ga qaytish
+          <ChevronLeft size={16} /> {t('vocabCard.backToVocabBtn')}
         </button>
 
         <div className="flex items-start gap-4 mb-5">
@@ -193,8 +195,8 @@ export default function ReadingVocabPage() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
           }}>📖</div>
           <div>
-            <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Reading Vocabulary</h1>
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS Reading testlaridan akademik so&apos;zlar</p>
+            <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('vocabulary.readingVocab')}</h1>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.readingVocabSubtitle')}</p>
           </div>
         </div>
 
@@ -202,7 +204,7 @@ export default function ReadingVocabPage() {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium px-3 py-1.5 rounded-full"
             style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-            Jami: <strong style={{ color: 'var(--text-primary)' }}>{words.length}</strong> so&apos;z
+            {t('vocabCard.totalLabel', { count: words.length })}
           </span>
           {(['A2', 'B1', 'B2', 'C1'] as const).map(lvl => {
             const n = lvlCounts[lvl] ?? 0
@@ -228,7 +230,7 @@ export default function ReadingVocabPage() {
               color:      levelTab === lv ? '#fff' : 'var(--text-secondary)',
               border:     levelTab === lv ? 'none' : '1px solid var(--border)',
             }}>
-            {lv}
+            {lv === 'Barchasi' ? t('vocabCard.all') : lv}
           </button>
         ))}
         <button onClick={() => setLevelTab('saved')}
@@ -239,7 +241,7 @@ export default function ReadingVocabPage() {
             border:     isSavedTab ? '1px solid rgba(239,68,68,0.3)' : '1px solid var(--border)',
           }}>
           <Heart size={11} fill={isSavedTab ? '#ef4444' : 'none'} />
-          Saqlangan{savedIds.length > 0 ? ` (${savedIds.length})` : ''}
+          {t('vocabCard.savedTab')}{savedIds.length > 0 ? ` (${savedIds.length})` : ''}
         </button>
       </div>
 
@@ -257,7 +259,7 @@ export default function ReadingVocabPage() {
                   color:      active ? (cc?.color ?? '#fff') : 'var(--text-muted)',
                   border:     active ? `1px solid ${cc?.color ?? 'var(--accent)'}` : '1px solid var(--border)',
                 }}>
-                {cat}
+                {cat === 'Barchasi' ? t('vocabCard.all') : cat}
               </button>
             )
           })}
@@ -275,7 +277,7 @@ export default function ReadingVocabPage() {
           type="text"
           value={searchRaw}
           onChange={e => handleSearch(e.target.value)}
-          placeholder="So'z yoki tarjima bo'yicha qidirish..."
+          placeholder={t('vocabCard.searchPlaceholder')}
           style={{
             width: '100%', boxSizing: 'border-box',
             paddingLeft: 36, paddingRight: searchRaw ? 32 : 14,
@@ -301,8 +303,8 @@ export default function ReadingVocabPage() {
       {/* ── Filter result count ─── */}
       {!loading && filtered.length > 0 && (
         <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-          {filtered.length} ta so&apos;z topildi
-          {visibleCount < filtered.length && ` · ${visible.length} ta ko'rsatilmoqda`}
+          {t('vocabCard.foundCount', { count: filtered.length })}
+          {visibleCount < filtered.length && ` · ${t('vocabCard.showingCount', { count: visible.length })}`}
         </p>
       )}
 
@@ -320,12 +322,12 @@ export default function ReadingVocabPage() {
           <div className="text-4xl mb-3">{isSavedTab ? '❤️' : '🔍'}</div>
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
             {isSavedTab
-              ? "Hali saqlangan so'zlar yo'q — yurak tugmasini bosing"
+              ? t('vocabCard.emptySaved')
               : words.length === 0
-                ? "Hali so'zlar qo'shilmagan"
+                ? t('vocabCard.emptyAll')
                 : searchQuery.trim()
-                  ? `"${searchQuery}" bo'yicha so'z topilmadi`
-                  : "Bu filtrlarga mos so'z topilmadi"}
+                  ? t('vocabCard.noSearchResults', { query: searchQuery })
+                  : t('vocabCard.noFilterResults')}
           </p>
         </div>
       ) : (
@@ -370,17 +372,17 @@ export default function ReadingVocabPage() {
 
                   <div className="grid sm:grid-cols-2 gap-2 mb-3">
                     <div>
-                      <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>O&apos;zbekcha</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('vocabCard.uzbekLabel')}</span>
                       <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{w.uzbek_translation}</span>
                     </div>
                     <div>
-                      <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>Ta&apos;rif</span>
+                      <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('vocabCard.definitionLabel')}</span>
                       <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{w.english_definition}</span>
                     </div>
                   </div>
 
                   <div style={{ borderLeft: `3px solid ${cc.color}`, paddingLeft: 12, paddingTop: 4, paddingBottom: 4 }}>
-                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>Misol</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('vocabCard.exampleLabel')}</span>
                     <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
                       &ldquo;<HighlightedSentence sentence={w.example_sentence} word={w.word} />&rdquo;
                     </p>
@@ -397,7 +399,7 @@ export default function ReadingVocabPage() {
                           el.style.height = 'auto'
                           el.style.height = Math.min(el.scrollHeight, 200) + 'px'
                         }}
-                        placeholder="Bu so'z haqida eslatma yozing..."
+                        placeholder={t('vocabCard.notePlaceholder')}
                         rows={3}
                         style={{
                           width: '100%', minHeight: 80, maxHeight: 200,
@@ -409,10 +411,10 @@ export default function ReadingVocabPage() {
                       <div className="flex items-center justify-between" style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
                         <button onClick={() => setOpenNoteId(null)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)' }}>
-                          × Yopish
+                          {t('vocabCard.closeNote')}
                         </button>
                         <span style={{ color: saveStatus[w.id] === 'saved' ? '#22c55e' : 'var(--text-muted)' }}>
-                          {saveStatus[w.id] === 'saving' ? 'Saqlanmoqda...' : saveStatus[w.id] === 'saved' ? '✓ Saqlandi' : ''}
+                          {saveStatus[w.id] === 'saving' ? t('vocabulary.saving') : saveStatus[w.id] === 'saved' ? t('vocabCard.savedStatus') : ''}
                         </span>
                       </div>
                     </div>
@@ -429,7 +431,7 @@ export default function ReadingVocabPage() {
                 onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
                 className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all hover:opacity-80"
                 style={{ background: 'var(--accent)', color: '#fff' }}>
-                Ko&apos;proq yuklash ({filtered.length - visibleCount} ta qoldi)
+                {t('vocabCard.loadMore', { count: filtered.length - visibleCount })}
               </button>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {visible.length} / {filtered.length}

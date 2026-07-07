@@ -203,7 +203,7 @@ export default function LibraryPage() {
       setEditingId(null)
     } else {
       const d = await res.json().catch(() => ({}))
-      setEditError(d.error ?? 'Xatolik yuz berdi')
+      setEditError(d.error ?? t('common.error'))
     }
     setEditSaving(false)
   }
@@ -232,7 +232,7 @@ export default function LibraryPage() {
       setShowManual(false)
     } else {
       const d = await res.json().catch(() => ({}))
-      setManualError(d.error ?? 'Xatolik yuz berdi')
+      setManualError(d.error ?? t('common.error'))
     }
     setAddingManual(false)
   }
@@ -482,7 +482,7 @@ export default function LibraryPage() {
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="So'z qidirish..."
+                    placeholder={t('library.searchPlaceholder')}
                     className="input-field w-full text-sm py-2"
                   />
                   <div className="flex flex-wrap gap-1.5">
@@ -496,7 +496,7 @@ export default function LibraryPage() {
                           : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
                         }
                       >
-                        {type || 'Barchasi'}
+                        {type || t('vocabCard.all')}
                       </button>
                     ))}
                   </div>
@@ -540,7 +540,7 @@ export default function LibraryPage() {
                       onChange={e => setManual(p => ({ ...p, word_type: e.target.value }))}
                       className="input-field w-full text-sm py-2"
                     >
-                      <option value="">So&apos;z turi (ixtiyoriy)</option>
+                      <option value="">{t('library.wordTypeOptional')}</option>
                       <option value="noun">noun</option>
                       <option value="verb">verb</option>
                       <option value="adjective">adjective</option>
@@ -590,7 +590,7 @@ export default function LibraryPage() {
               ) : filteredWords.length === 0 ? (
                 <div className="py-8 text-center rounded-xl"
                   style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                  <p className="text-sm">Hech narsa topilmadi</p>
+                  <p className="text-sm">{t('library.noResults')}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -610,7 +610,7 @@ export default function LibraryPage() {
                         <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>So&apos;z</label>
+                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>{t('library.wordLabel')}</label>
                               <input
                                 type="text"
                                 value={editDraft.word}
@@ -619,7 +619,7 @@ export default function LibraryPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Tarjima</label>
+                              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>{t('vocabulary.translation')}</label>
                               <input
                                 type="text"
                                 value={editDraft.uzbek_translation}
@@ -629,13 +629,13 @@ export default function LibraryPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>So&apos;z turi</label>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>{t('library.wordTypeLabel')}</label>
                             <select
                               value={editDraft.word_type}
                               onChange={e => setEditDraft(p => ({ ...p, word_type: e.target.value }))}
                               className="input-field text-sm py-1.5 w-full"
                             >
-                              <option value="">— tanlang —</option>
+                              <option value="">{t('library.selectPlaceholder')}</option>
                               <option value="noun">noun</option>
                               <option value="verb">verb</option>
                               <option value="adjective">adjective</option>
@@ -645,7 +645,7 @@ export default function LibraryPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Ta&apos;rif</label>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>{t('vocabCard.definitionLabel')}</label>
                             <textarea
                               value={editDraft.definition}
                               onChange={e => setEditDraft(p => ({ ...p, definition: e.target.value }))}
@@ -654,7 +654,7 @@ export default function LibraryPage() {
                             />
                           </div>
                           <div>
-                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Misol gap</label>
+                            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>{t('library.exampleSentenceLabel')}</label>
                             <textarea
                               value={editDraft.example}
                               onChange={e => setEditDraft(p => ({ ...p, example: e.target.value }))}

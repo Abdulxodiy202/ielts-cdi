@@ -245,7 +245,7 @@ export function MockTestClient({ userId }: Props) {
 
                   <div>
                     <div className="font-bold text-base mb-1" style={{ color: 'var(--text-primary)' }}>
-                      Mock IELTS Test
+                      {t('mock.title')}
                     </div>
                     <div className="flex items-center gap-1.5 text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
                       <Clock size={13} /> {formatTime(s.time)} &middot; {formatDisplayDate(s.date)}

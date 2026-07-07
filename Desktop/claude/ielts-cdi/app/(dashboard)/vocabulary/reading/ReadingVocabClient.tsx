@@ -33,7 +33,7 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
           className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}
         >
-          <ChevronLeft size={16} /> Vocabulary ga qaytish
+          <ChevronLeft size={16} /> {t('vocabCard.backToVocabBtn')}
         </button>
         <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
           📑 {t('vocabulary.readingVocab')}
@@ -45,7 +45,7 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
 
       {tests.length === 0 ? (
         <div className="py-16 text-center rounded-xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-          <p className="text-sm">Hali reading testlar yo&#39;q.</p>
+          <p className="text-sm">{t('vocabulary.noTestsYet')}</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -71,7 +71,7 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        Reading Test {test.test_number} — Vocabulary
+                        {t('vocabulary.testTitleFormat', { n: test.test_number })}
                       </span>
                       {test.is_premium ? (
                         <span className="badge-premium flex items-center gap-1">
@@ -105,7 +105,7 @@ export default function ReadingVocabClient({ tests, isPremium }: { tests: Test[]
                       href={`/vocabulary/reading/${test.id}`}
                       className="btn-primary text-sm flex items-center gap-2"
                     >
-                      <BookOpen size={14} /> Ko&#39;rish
+                      <BookOpen size={14} /> {t('vocabulary.viewBtn')}
                     </Link>
                   )}
                 </div>

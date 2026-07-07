@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Lock, Play } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface VideoLesson {
   id: string
@@ -21,6 +22,7 @@ function getYouTubeId(url: string) {
 
 export default function VideoLessonsPage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const [videos,      setVideos]      = useState<VideoLesson[]>([])
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
@@ -36,11 +38,11 @@ export default function VideoLessonsPage() {
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
 
       <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>🎬 Video darslar</h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>IELTS bo&apos;yicha video qo&apos;llanmalar va darslar</p>
+        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('videoLessons.title')}</h1>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.subtitle')}</p>
         {!loading && videos.length > 0 && (
           <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-            Jami: <strong style={{ color: 'var(--text-primary)' }}>{videos.length}</strong> video
+            {t('videoLessons.totalLabel', { count: videos.length })}
           </p>
         )}
       </div>
@@ -61,7 +63,7 @@ export default function VideoLessonsPage() {
       ) : videos.length === 0 ? (
         <div className="py-20 text-center rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="text-4xl mb-3">🎬</div>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Hali video darslar qo&apos;shilmagan</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.empty')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -117,7 +119,7 @@ export default function VideoLessonsPage() {
                           style={v.is_premium
                             ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
                             : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                          {v.is_premium ? '👑 Premium' : 'Bepul'}
+                          {v.is_premium ? `👑 ${t('common.premium')}` : t('common.free')}
                         </span>
                       </div>
                       {v.recommendation && (
@@ -128,7 +130,7 @@ export default function VideoLessonsPage() {
                     </div>
                     <div className="mt-3">
                       <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-                        Ko&apos;rish →
+                        {t('videoLessons.watchBtn')}
                       </span>
                     </div>
                   </div>

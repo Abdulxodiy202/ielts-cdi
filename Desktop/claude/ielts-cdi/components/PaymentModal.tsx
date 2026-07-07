@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils/formatters'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface PaymentModalProps {
   isOpen: boolean
@@ -41,6 +42,7 @@ export function PaymentModal({
   initialName = '',
   initialPhone = '',
 }: PaymentModalProps) {
+  const { t } = useLanguage()
   const [fullName, setFullName] = useState(initialName)
   const [phone, setPhone] = useState(initialPhone)
   const [receipt, setReceipt] = useState<File | null>(null)
@@ -86,22 +88,22 @@ export function PaymentModal({
         setAppliedPromo({ code: promoInput.trim().toUpperCase(), discountPercent: json.discount_percent })
         setPromoError('')
       } else {
-        setPromoError(json.error || 'Promokod yaroqsiz yoki muddati o\'tgan')
+        setPromoError(json.error || t('payment.invalidPromo'))
         setAppliedPromo(null)
       }
     } catch {
-      setPromoError('Tarmoq xatosi')
+      setPromoError(t('payment.networkError'))
     }
     setPromoLoading(false)
   }
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setError("Faqat rasm fayllari qabul qilinadi (jpg, png, webp)")
+      setError(t('payment.imageOnlyError'))
       return
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError("Fayl hajmi 10MB dan oshmasligi kerak")
+      setError(t('payment.fileTooLargeError'))
       return
     }
     setError('')
@@ -116,9 +118,9 @@ export function PaymentModal({
   }
 
   const handleSubmit = async () => {
-    if (!fullName.trim()) { setError("Ism-sharif kiritilishi shart"); return }
-    if (!phone.trim()) { setError("Telefon raqam kiritilishi shart"); return }
-    if (!receipt) { setError("Chek rasmi yuklanishi shart"); return }
+    if (!fullName.trim()) { setError(t('payment.nameRequiredError')); return }
+    if (!phone.trim()) { setError(t('payment.phoneRequiredError')); return }
+    if (!receipt) { setError(t('payment.receiptRequiredError')); return }
 
     setLoading(true)
     setError('')
@@ -142,7 +144,7 @@ export function PaymentModal({
       const res = await fetch('/api/payment', { method: 'POST', body: formData })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || "Xatolik yuz berdi")
+        setError(json.error || t('payment.genericError'))
         setLoading(false)
         return
       }
@@ -152,7 +154,7 @@ export function PaymentModal({
         onSuccess()
       }, 3000)
     } catch {
-      setError("Tarmoq xatosi. Qayta urinib ko'ring.")
+      setError(t('payment.networkErrorRetry'))
       setLoading(false)
     }
   }
@@ -173,7 +175,7 @@ export function PaymentModal({
     onClose()
   }
 
-  const typeLabel = type === 'premium' ? 'Premium Obuna' : 'Mock Test'
+  const typeLabel = type === 'premium' ? t('payment.typePremium') : t('payment.typeMockBooking')
 
   return (
     <AnimatePresence>
@@ -230,11 +232,10 @@ export function PaymentModal({
                   className="text-xl font-bold mb-2"
                   style={{ color: 'var(--text-primary)' }}
                 >
-                  To&apos;lov qabul qilindi! ✅
+                  {t('payment.successTitle')}
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  To&apos;lovingiz qabul qilindi! 24 soat ichida{' '}
-                  {type === 'premium' ? 'premium faollashtiriladi' : 'bron tasdiqlanadi'}.
+                  {type === 'premium' ? t('payment.successBodyPremium') : t('payment.successBodyBooking')}
                 </p>
               </motion.div>
             ) : (
@@ -245,10 +246,10 @@ export function PaymentModal({
                     className="text-lg font-bold"
                     style={{ color: 'var(--text-primary)' }}
                   >
-                    To&apos;lov — {typeLabel}
+                    {t('payment.title', { typeLabel })}
                   </h2>
                   <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    Kartaga o&apos;tkazma qiling, so&apos;ng chek rasmini yuboring
+                    {t('payment.instructions')}
                   </p>
                 </div>
 
@@ -266,7 +267,7 @@ export function PaymentModal({
                       className="text-xs font-semibold uppercase tracking-wide"
                       style={{ color: 'var(--text-muted)' }}
                     >
-                      Karta raqami
+                      {t('payment.cardNumberLabel')}
                     </span>
                   </div>
 
@@ -288,7 +289,7 @@ export function PaymentModal({
                         color: copied ? 'var(--success)' : 'var(--text-muted)',
                         border: '1px solid var(--border)',
                       }}
-                      title="Nusxa olish"
+                      title={t('payment.copyTitle')}
                     >
                       {copied ? <CheckCircle size={15} /> : <Copy size={15} />}
                     </button>
@@ -302,7 +303,7 @@ export function PaymentModal({
                     style={{ borderTop: '1px solid var(--border)' }}
                   >
                     <span style={{ color: 'var(--text-muted)' }}>
-                      O&apos;tkazma summasi
+                      {t('payment.transferAmount')}
                     </span>
                     <div className="flex items-center gap-2">
                       {appliedPromo && (
@@ -330,14 +331,14 @@ export function PaymentModal({
                           style={{ color: 'var(--accent)' }}
                         >
                           <Tag size={12} />
-                          Promokod bormi?
+                          {t('payment.promoQuestion')}
                           <ChevronDown size={12} style={{ transform: promoOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                         </button>
                         {promoOpen && (
                           <div className="flex gap-2">
                             <input
                               className="input-field text-sm flex-1 uppercase"
-                              placeholder="PROMO2025"
+                              placeholder={t('payment.promoPlaceholder')}
                               value={promoInput}
                               onChange={e => { setPromoInput(e.target.value.toUpperCase()); setPromoError('') }}
                               onKeyDown={e => e.key === 'Enter' && handleApplyPromo()}
@@ -349,7 +350,7 @@ export function PaymentModal({
                               disabled={promoLoading || !promoInput.trim()}
                               className="btn-primary text-sm px-4 shrink-0 disabled:opacity-50"
                             >
-                              {promoLoading ? <Loader2 size={13} className="animate-spin" /> : "Qo'llash"}
+                              {promoLoading ? <Loader2 size={13} className="animate-spin" /> : t('payment.promoApply')}
                             </button>
                           </div>
                         )}
@@ -365,7 +366,7 @@ export function PaymentModal({
                         style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)' }}
                       >
                         <span style={{ color: 'var(--success)' }}>
-                          ✅ <strong>{appliedPromo.code}</strong> — {appliedPromo.discountPercent}% chegirma qo&apos;llandi
+                          ✅ {t('payment.promoApplied', { code: appliedPromo.code, percent: appliedPromo.discountPercent })}
                         </span>
                         <button
                           type="button"
@@ -384,13 +385,13 @@ export function PaymentModal({
                 {type === 'premium' && (
                   <div className="mb-4">
                     <label className="text-xs font-medium mb-1.5 block" style={{ color: 'var(--text-secondary)' }}>
-                      Referral kod (ixtiyoriy)
+                      {t('payment.referralLabel')}
                     </label>
                     <div className="relative">
                       <Tag size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }} />
                       <input
                         className="input-field pl-9 text-sm uppercase"
-                        placeholder="Masalan: CDI-4X7K"
+                        placeholder={t('payment.referralPlaceholder')}
                         value={referralInput}
                         onChange={e => setReferralInput(e.target.value.toUpperCase())}
                         style={{ letterSpacing: '0.05em' }}
@@ -406,7 +407,7 @@ export function PaymentModal({
                       className="text-xs font-medium mb-1.5 block"
                       style={{ color: 'var(--text-secondary)' }}
                     >
-                      Ism-sharif
+                      {t('payment.fullNameLabel')}
                     </label>
                     <div className="relative">
                       <User
@@ -416,7 +417,7 @@ export function PaymentModal({
                       />
                       <input
                         className="input-field pl-9 text-sm"
-                        placeholder="To'liq ism-sharifingiz"
+                        placeholder={t('payment.fullNamePlaceholder')}
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                       />
@@ -428,7 +429,7 @@ export function PaymentModal({
                       className="text-xs font-medium mb-1.5 block"
                       style={{ color: 'var(--text-secondary)' }}
                     >
-                      Telefon raqam
+                      {t('payment.phoneLabel')}
                     </label>
                     <div className="relative">
                       <Phone
@@ -438,7 +439,7 @@ export function PaymentModal({
                       />
                       <input
                         className="input-field pl-9 text-sm"
-                        placeholder="+998 90 123 45 67"
+                        placeholder={t('payment.phonePlaceholder')}
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         type="tel"
@@ -453,7 +454,7 @@ export function PaymentModal({
                     className="text-xs font-medium mb-1.5 block"
                     style={{ color: 'var(--text-secondary)' }}
                   >
-                    Chek rasmi (screenshot)
+                    {t('payment.receiptLabel')}
                   </label>
 
                   {previewUrl ? (
@@ -495,10 +496,10 @@ export function PaymentModal({
                         className="text-sm font-medium"
                         style={{ color: 'var(--text-secondary)' }}
                       >
-                        Rasm yuklash
+                        {t('payment.receiptUpload')}
                       </p>
                       <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                        Bosing yoki suring · JPG, PNG, WEBP · maks 10MB
+                        {t('payment.receiptInstructions')}
                       </p>
                     </div>
                   )}
@@ -536,7 +537,7 @@ export function PaymentModal({
                     disabled={loading}
                     className="btn-outline flex-1 text-sm"
                   >
-                    Bekor qilish
+                    {t('payment.cancelBtn')}
                   </button>
                   <button
                     onClick={handleSubmit}
@@ -546,12 +547,12 @@ export function PaymentModal({
                     {loading ? (
                       <>
                         <Loader2 size={15} className="animate-spin" />
-                        Yuborilmoqda...
+                        {t('payment.submittingBtn')}
                       </>
                     ) : (
                       <>
                         <Upload size={15} />
-                        Yuborish
+                        {t('payment.submitBtn')}
                       </>
                     )}
                   </button>

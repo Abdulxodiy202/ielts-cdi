@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { TestHistory } from '@/components/dashboard/TestHistory'
 import { StatsCards } from '@/components/dashboard/StatsCards'
+import { ResultsPageTitle } from '@/components/dashboard/ResultsPageTitle'
 
 export default async function ResultsPage() {
   const supabase = await createClient()
@@ -30,7 +31,7 @@ export default async function ResultsPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>My Results</h1>
+      <ResultsPageTitle />
       <div className="mb-6">
         <StatsCards stats={stats} />
       </div>

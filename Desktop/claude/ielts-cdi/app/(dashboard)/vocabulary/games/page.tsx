@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 const TEST_EMAIL = 'abdulxdiymamajonov@gmail.com'
 
@@ -130,6 +131,7 @@ const CSS = `
 
 /* ── Main component ───────────────────────────────────────────────── */
 export default function GamesPage() {
+  const { t } = useLanguage()
   const [levels,    setLevels]    = useState<Level[]>([])
   const [loading,   setLoading]   = useState(true)
   const [stars,     setStars]     = useState<{ id: number; x: number; y: number; r: number; dur: string; del: string }[]>([])
@@ -265,10 +267,10 @@ export default function GamesPage() {
           borderBottom: '1px solid rgba(99,102,241,0.12)',
         }}>
           <Link href="/vocabulary" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontWeight: 700, fontSize: 13 }}>
-            ← Lug&apos;at
+            {t('games.backToVocab')}
           </Link>
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 15, letterSpacing: '-.3px' }}>
-            🎮 So&apos;z O&apos;yini
+            {t('games.title')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isTestUser && (
@@ -315,7 +317,7 @@ export default function GamesPage() {
                 borderRadius: 12, padding: '8px 16px',
                 fontSize: 13, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
               }}>
-                🔧 Test Mode — cheksiz kirish
+                {t('games.testModeText')}
               </div>
             ) : (
               <div style={{
@@ -327,12 +329,12 @@ export default function GamesPage() {
                 color: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? '#fb923c' : '#a5b4fc',
               }}>
                 <span>
-                  Bugun: {dailyStatus.unlockedToday}/{dailyStatus.dailyLimit} level
-                  {dailyStatus.unlockedToday >= dailyStatus.dailyLimit && ' — chegara tugadi'}
+                  {t('games.dailyStatusText', { current: dailyStatus.unlockedToday, limit: dailyStatus.dailyLimit })}
+                  {dailyStatus.unlockedToday >= dailyStatus.dailyLimit && t('games.limitReachedSuffix')}
                 </span>
                 {countdown && (
                   <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, fontSize: 12 }}>
-                    Yangi levelgacha: {countdown}
+                    {t('games.countdownLabel', { countdown })}
                   </span>
                 )}
               </div>
@@ -486,8 +488,8 @@ export default function GamesPage() {
                     userSelect: 'none', boxSizing: 'border-box',
                   }}
                   title={
-                    isPerfectMilestone ? `Level ${n} — Mukammal!` :
-                    isDailyLimited ? "Bugungi chegara tugadi — ertaga ochiladi" :
+                    isPerfectMilestone ? t('games.perfectMilestone', { n }) :
+                    isDailyLimited ? t('games.dailyLimitTooltip') :
                     undefined
                   }
                   onMouseEnter={e => {
@@ -557,7 +559,7 @@ export default function GamesPage() {
                     <>
                       <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1, color: '#e0e7ff', letterSpacing: '-.2px' }}>{n}</span>
                       <span style={{ fontSize: 16, lineHeight: 1, color: '#fff' }}>▶</span>
-                      <span style={{ fontSize: 9, lineHeight: 1, color: 'rgba(224,231,255,0.85)', fontWeight: 600 }}>Boshlash</span>
+                      <span style={{ fontSize: 9, lineHeight: 1, color: 'rgba(224,231,255,0.85)', fontWeight: 600 }}>{t('games.startBtn')}</span>
                     </>
                   ) : isTestUnlocked ? (
                     /* ── Test-unlocked content ─── */
@@ -629,14 +631,14 @@ export default function GamesPage() {
               🔒
             </div>
             <h2 style={{ color: '#fff', fontSize: 19, fontWeight: 800, marginBottom: 10 }}>
-              Bugungi chegara tugadi
+              {t('games.limitModalTitle')}
             </h2>
             <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>
-              Sen bugun {dailyStatus.dailyLimit} ta yangi level{dailyStatus.dailyLimit > 1 ? 'larni' : 'ni'} ochding. Ertaga soat 00:00 (Toshkent vaqti) da yangi level{dailyStatus.dailyLimit > 1 ? 'lar' : ''} ochiladi.
+              {t(dailyStatus.dailyLimit > 1 ? 'games.limitModalBodyPlural' : 'games.limitModalBodySingular', { limit: dailyStatus.dailyLimit })}
             </p>
             {countdown && (
               <p style={{ color: 'rgba(249,115,22,0.8)', fontSize: 13, fontWeight: 700, marginBottom: 20 }}>
-                Yangi levelgacha: {countdown}
+                {t('games.countdownLabel', { countdown })}
               </p>
             )}
             <div style={{ display: 'flex', gap: 10, flexDirection: dailyStatus.isPremium ? 'column' : 'row' }}>
@@ -648,7 +650,7 @@ export default function GamesPage() {
                   border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
                 }}
               >
-                Yopish
+                {t('games.closeBtn')}
               </button>
               {!dailyStatus.isPremium && (
                 <button
@@ -659,7 +661,7 @@ export default function GamesPage() {
                     border: 'none', cursor: 'pointer',
                   }}
                 >
-                  👑 Premiumga o&apos;tish
+                  {t('games.upgradeBtn')}
                 </button>
               )}
             </div>

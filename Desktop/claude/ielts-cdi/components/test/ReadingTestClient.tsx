@@ -11,6 +11,7 @@ import { useTest } from '@/lib/hooks/useTest'
 import { getBandColor, getBandLabel } from '@/lib/utils/bandScore'
 import { formatTime } from '@/lib/utils/formatters'
 import { buildInjectScript } from '@/lib/utils/injectScript'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 interface Passage {
   id: string
@@ -38,6 +39,7 @@ interface ReadingTestClientProps {
 
 
 export function ReadingTestClient({ test, passages, questions, session }: ReadingTestClientProps) {
+  const { t } = useLanguage()
   const [activePassage, setActivePassage] = useState(0)
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
@@ -196,7 +198,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           }}>
             <div className="text-center">
               <div className="text-4xl mb-3 animate-pulse">📄</div>
-              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Yuklanmoqda…</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>{t('common.loading')}</p>
             </div>
           </div>
         )}
@@ -221,7 +223,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             }}
           >
-            ← Testdan chiqish
+            ← {t('testTaking.exit')}
           </button>
         )}
       </>
@@ -244,7 +246,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         >
           <div className="flex items-center gap-3 min-w-0">
             <Link href={exitHref} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
-              <ArrowLeft size={14} /> <span>Exit</span>
+              <ArrowLeft size={14} /> <span>{t('testTaking.exit')}</span>
             </Link>
             <h1 className="font-bold text-sm sm:text-base truncate" style={{ color: 'var(--text-primary)' }}>
               {test.title}
@@ -252,7 +254,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           </div>
           <Link href="/results" className="btn-primary text-sm flex items-center gap-1.5 shrink-0">
             <BarChart2 size={14} />
-            <span className="hidden sm:inline">My Results</span>
+            <span className="hidden sm:inline">{t('results.title')}</span>
           </Link>
         </div>
 
@@ -268,7 +270,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <Trophy size={52} className="mx-auto mb-4" style={{ color }} />
               <div className="text-7xl font-black mb-1" style={{ color }}>{result.bandScore}</div>
               <div className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>
-                Band Score — {label}
+                {t('testTaking.bandScoreLabel', { label })}
               </div>
             </motion.div>
 
@@ -276,21 +278,21 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <CheckCircle size={14} style={{ color: 'var(--success)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Correct</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('testTaking.correct')}</span>
                 </div>
                 <div className="text-xl font-bold" style={{ color: 'var(--success)' }}>{result.rawScore}</div>
               </div>
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
                 <div className="flex items-center justify-center gap-1 mb-1">
                   <XCircle size={14} style={{ color: 'var(--error)' }} />
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Wrong</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('testTaking.wrong')}</span>
                 </div>
                 <div className="text-xl font-bold" style={{ color: 'var(--error)' }}>
                   {questions.length - result.rawScore}
                 </div>
               </div>
               <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
-                <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>Time</div>
+                <div className="text-xs mb-1" style={{ color: 'var(--text-muted)' }}>{t('testTaking.time')}</div>
                 <div className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {formatTime(result.timeTaken)}
                 </div>
@@ -312,10 +314,10 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
 
             <div className="flex gap-3">
               <Link href={exitHref} className="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
-                <ArrowLeft size={14} /> All Tests
+                <ArrowLeft size={14} /> {t('testTaking.allTests')}
               </Link>
               <Link href="/results" className="btn-primary flex-1 text-sm flex items-center justify-center gap-1.5">
-                <BarChart2 size={14} /> My Results
+                <BarChart2 size={14} /> {t('results.title')}
               </Link>
             </div>
           </motion.div>
@@ -337,25 +339,25 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         <div className="flex items-center gap-3 min-w-0">
           <Link href={exitHref} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
             <ArrowLeft size={14} />
-            <span className="hidden sm:inline">Exit</span>
+            <span className="hidden sm:inline">{t('testTaking.exit')}</span>
           </Link>
           <h1 className="font-bold text-sm sm:text-base truncate" style={{ color: 'var(--text-primary)' }}>
             {test.title}
           </h1>
           {saving && (
             <span className="text-xs flex items-center gap-1 shrink-0" style={{ color: 'var(--text-muted)' }}>
-              <Save size={12} className="animate-pulse" /> Saving...
+              <Save size={12} className="animate-pulse" /> {t('testTaking.saving')}
             </span>
           )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-xs hidden sm:block" style={{ color: 'var(--text-muted)' }}>
-            {answeredCount}/{questions.length} answered
+            {t('testTaking.answeredCount', { answered: answeredCount, total: questions.length })}
           </span>
           <TestTimer timeRemaining={timeRemaining} />
           <button onClick={() => setConfirmSubmit(true)} disabled={submitting} className="btn-primary text-sm">
             <Send size={14} />
-            <span className="hidden sm:inline">Submit</span>
+            <span className="hidden sm:inline">{t('testTaking.submit')}</span>
           </button>
         </div>
       </div>
@@ -372,7 +374,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <div className="text-center p-8">
                   <div className="text-3xl mb-3 animate-pulse">📄</div>
-                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda…</p>
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</p>
                 </div>
               </div>
             )
@@ -388,7 +390,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
                       color: activePassage === i ? 'var(--accent)' : 'var(--text-muted)',
                       borderBottom: activePassage === i ? '2px solid var(--accent)' : '2px solid transparent',
                     }}>
-                    Passage {p.passage_number}
+                    {t('testTaking.passageLabel', { n: p.passage_number })}
                   </button>
                 ))}
               </div>
@@ -410,10 +412,10 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <div className="text-center p-8">
                 <div className="text-4xl mb-3">📄</div>
                 <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
-                  Test content hali yuklanmagan
+                  {t('testTaking.contentNotUploaded')}
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                  Admin paneldan CDI fayl yuklang
+                  {t('testTaking.uploadHint')}
                 </p>
               </div>
             </div>
@@ -440,14 +442,14 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             className="relative card p-6 max-w-sm w-full text-center">
             <AlertTriangle size={40} className="mx-auto mb-4" style={{ color: 'var(--warning)' }} />
-            <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text-primary)' }}>Submit test?</h3>
+            <h3 className="font-bold text-lg mb-2" style={{ color: 'var(--text-primary)' }}>{t('testTaking.submitTitle')}</h3>
             <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-              You have answered {answeredCount} of {questions.length} questions. This cannot be undone.
+              {t('testTaking.submitBody', { answered: answeredCount, total: questions.length })}
             </p>
             <div className="flex gap-3">
-              <button className="btn-outline flex-1" onClick={() => setConfirmSubmit(false)}>Cancel</button>
+              <button className="btn-outline flex-1" onClick={() => setConfirmSubmit(false)}>{t('test.cancel')}</button>
               <button className="btn-primary flex-1" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit'}
+                {submitting ? t('testTaking.submitting') : t('testTaking.submit')}
               </button>
             </div>
           </motion.div>

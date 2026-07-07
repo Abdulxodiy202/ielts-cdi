@@ -5,11 +5,13 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import MusicPlayer from '@/components/MusicPlayer'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function ArticlePage() {
   const params = useParams()
   const id = params?.id as string
   const router = useRouter()
+  const { t } = useLanguage()
   const [article, setArticle] = useState<any>(null)
   const [isPremium, setIsPremium] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -38,20 +40,20 @@ export default function ArticlePage() {
     load()
   }, [id, router])
 
-  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>Yuklanmoqda...</div>
-  if (!article) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>Topilmadi</div>
+  if (loading) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>{t('common.loading')}</div>
+  if (!article) return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'white'}}>{t('articles.notFound')}</div>
 
   if (article.is_premium && !isPremium) {
     return (
       <div style={{minHeight:'100vh',background:'#0f0f1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 20px',textAlign:'center'}}>
         <div style={{fontSize:'80px',marginBottom:'24px'}}>🔒</div>
-        <h2 style={{fontSize:'28px',fontWeight:'700',color:'white',marginBottom:'12px'}}>Bu maqola Premium uchun</h2>
-        <p style={{color:'#9ca3af',marginBottom:'32px',maxWidth:'400px'}}>Barcha premium maqolalarni o&apos;qish uchun Premium tarifga o&apos;ting</p>
+        <h2 style={{fontSize:'28px',fontWeight:'700',color:'white',marginBottom:'12px'}}>{t('articles.lockedTitle')}</h2>
+        <p style={{color:'#9ca3af',marginBottom:'32px',maxWidth:'400px'}}>{t('articles.lockedDesc')}</p>
         <button onClick={() => setShowModal(true)} style={{background:'linear-gradient(135deg,#f59e0b,#d97706)',color:'white',border:'none',padding:'16px 40px',borderRadius:'12px',fontSize:'18px',fontWeight:'700',cursor:'pointer',marginBottom:'16px'}}>
-          👑 Premiumga o&apos;tish — 50,000 so&apos;m/oy
+          {t('articles.upgradeBtn')}
         </button>
         <button onClick={() => router.push('/articles')} style={{background:'none',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'14px'}}>
-          ← Maqolalarga qaytish
+          {t('articles.backToList')}
         </button>
 
         <PaymentModal

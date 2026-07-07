@@ -9,10 +9,12 @@ import { Crown, CheckCircle, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 export default function PremiumPage() {
   const router = useRouter()
   const supabase = createClient()
+  const { t } = useLanguage()
   const [modalOpen, setModalOpen] = useState(false)
   const [success, setSuccess] = useState(false)
   const [initialName, setInitialName] = useState('')
@@ -47,7 +49,7 @@ export default function PremiumPage() {
           className="inline-flex items-center gap-2 text-sm mb-6"
           style={{ color: 'var(--text-muted)' }}
         >
-          <ArrowLeft size={14} /> Back to Dashboard
+          <ArrowLeft size={14} /> {t('premiumPage.backToDashboard')}
         </Link>
 
         <motion.div
@@ -73,13 +75,13 @@ export default function PremiumPage() {
                 className="text-2xl font-bold mb-2"
                 style={{ color: 'var(--text-primary)' }}
               >
-                So&apos;rovingiz qabul qilindi! 🎉
+                {t('premiumPage.requestReceivedTitle')}
               </h2>
               <p className="mb-6" style={{ color: 'var(--text-muted)' }}>
-                To&apos;lovingiz tekshirilgach, 24 soat ichida premium faollashtiriladi.
+                {t('premiumPage.requestReceivedDesc')}
               </p>
               <Link href="/dashboard" className="btn-primary w-full flex justify-center">
-                Dashboardga qaytish
+                {t('premiumPage.backToDashboardBtn')}
               </Link>
             </div>
           ) : (
@@ -96,16 +98,16 @@ export default function PremiumPage() {
                   50,000 UZS
                 </div>
                 <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  oyiga · istalgan vaqt bekor qilish
+                  {t('premiumPage.perMonth')}
                 </p>
               </div>
 
               {[
-                '5 ta Premium Reading Testi (5–9)',
-                '5 ta Premium Listening Testi (5–9)',
-                "Mock Test Bron qilish (20,000 UZS/sessiya)",
-                "To'liq tahlil va band kuzatuvi",
-                'Ustuvor qo\'llab-quvvatlash',
+                t('premiumPage.feature1'),
+                t('premiumPage.feature2'),
+                t('premiumPage.feature3'),
+                t('premiumPage.feature4'),
+                t('premiumPage.feature5'),
               ].map((f) => (
                 <div key={f} className="flex items-start gap-3 mb-3">
                   <CheckCircle
@@ -124,11 +126,11 @@ export default function PremiumPage() {
                 className="btn-primary w-full text-base mt-6"
               >
                 <Crown size={18} />
-                Upgrade Now
+                {t('premiumPage.upgradeNowBtn')}
               </button>
 
               <p className="text-center text-xs mt-4" style={{ color: 'var(--text-muted)' }}>
-                To&apos;lovdan keyin 24 soat ichida faollashtiriladi
+                {t('premiumPage.activatedNote')}
               </p>
             </>
           )}

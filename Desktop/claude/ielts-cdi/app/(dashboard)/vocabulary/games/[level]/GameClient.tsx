@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Question {
@@ -94,15 +95,6 @@ function computeStars(score: number, total: number): number {
   return 0
 }
 
-const STAR_MESSAGES: Record<number, string> = {
-  5: "Ajoyib! Mukammal natija! 🎉",
-  4: "Zo'r natija! Yana bir oz harakat!",
-  3: "Yaxshi! Yana urinib ko'ring!",
-  2: "Yomon emas, lekin yaxshiroq bo'lishi mumkin",
-  1: "O'tdingiz, lekin qayta urinib ko'ring",
-  0: "O'tdingiz. Yulduzlar uchun qayta urinib ko'ring!",
-}
-
 /* ── Confetti ─────────────────────────────────────────────────────── */
 function Confetti() {
   const pieces = useMemo(() => Array.from({ length: 56 }, (_, i) => ({
@@ -159,6 +151,7 @@ function CountdownRing({ correct }: { correct: boolean }) {
 /* ── Main component ───────────────────────────────────────────────── */
 export default function GameClient({ levelNumber, title, questions, initialProgress }: Props) {
   const router = useRouter()
+  const { t } = useLanguage()
   const total  = questions.length
 
   /* Shuffled questions (client-only) */
@@ -245,7 +238,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
         }}>
           <div style={{ fontSize: 54 }}>🚧</div>
           <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, margin: 0, textAlign: 'center', padding: '0 24px' }}>
-            Bu daraja uchun savollar hali qo'shilmagan
+            {t('games.noQuestionsYet')}
           </p>
           <button onClick={() => router.push('/vocabulary/games')}
             style={{
@@ -253,7 +246,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
               background: 'linear-gradient(135deg,#6366f1,#4f46e5)',
               color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: 14,
             }}>
-            ← Yo'lakka qaytish
+            {t('games.backToPath')}
           </button>
         </div>
       </>
@@ -304,12 +297,12 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
 
                 {/* ── Message ── */}
                 <h2 style={{ margin: '0 0 10px', fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.3 }}>
-                  {STAR_MESSAGES[stars]}
+                  {t(`games.star${stars}`)}
                 </h2>
 
                 {/* ── Score text ── */}
                 <p style={{ margin: '0 0 20px', color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>
-                  Siz {total} tadan {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
+                  {t('games.scoreText', { score: finalScore, total })}
                 </p>
 
                 {/* ── Score badge ── */}
@@ -323,16 +316,16 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                   {levelNumber < 100 && (
                     <button onClick={() => router.push(`/vocabulary/games/${levelNumber + 1}`)}
                       style={{ padding: '14px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#6366f1,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                      Keyingi level →
+                      {t('games.nextLevel')}
                     </button>
                   )}
                   <button onClick={retry}
                     style={{ padding: '13px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-                    🔄 Qayta urinish
+                    {t('games.retryBtn')}
                   </button>
                   <button onClick={() => router.push('/vocabulary/games')}
                     style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                    ← Yo&apos;lakka qaytish
+                    {t('games.backToPath')}
                   </button>
                 </div>
               </>
@@ -341,13 +334,13 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                 {/* ── Fail ── */}
                 <div style={{ fontSize: 72, lineHeight: 1, marginBottom: 16 }}>😔</div>
                 <h2 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 900, color: '#f87171' }}>
-                  Ko&apos;proq harakat kerak!
+                  {t('games.needMoreEffort')}
                 </h2>
                 <p style={{ margin: '0 0 8px', color: 'rgba(255,255,255,0.45)', fontSize: 14 }}>
-                  Siz {total} tadan faqat {finalScore} ta savolga to&apos;g&apos;ri javob berdingiz
+                  {t('games.failScoreText', { score: finalScore, total })}
                 </p>
                 <p style={{ margin: '0 0 24px', color: 'rgba(239,68,68,0.65)', fontSize: 13 }}>
-                  Keyingi levelga o&apos;tish uchun kamida {passThreshold} ta to&apos;g&apos;ri javob kerak
+                  {t('games.thresholdText', { threshold: passThreshold })}
                 </p>
                 <div style={{ display: 'inline-flex', alignItems: 'baseline', gap: 4, marginBottom: 28 }}>
                   <span style={{ fontSize: 44, fontWeight: 900, color: '#f87171' }}>{finalScore}</span>
@@ -356,11 +349,11 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <button onClick={retry}
                     style={{ padding: '14px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
-                    🔄 Qayta urinish
+                    {t('games.retryBtn')}
                   </button>
                   <button onClick={() => router.push('/vocabulary/games')}
                     style={{ padding: '12px 24px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'transparent', color: 'rgba(255,255,255,0.35)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                    ← Yo&apos;lakka qaytish
+                    {t('games.backToPath')}
                   </button>
                 </div>
               </>
@@ -397,10 +390,10 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
         }}>
           <button onClick={() => router.push('/vocabulary/games')}
             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: 0 }}>
-            ← Yo'lak
+            {t('games.backToPathShort')}
           </button>
           <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, letterSpacing: '.2px' }}>
-            {levelNumber}-daraja · {title}
+            {t('games.levelLabel', { n: levelNumber, title })}
           </span>
           <span style={{ color: '#4ade80', fontWeight: 700, fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>
             {idx + 1}/{total}
@@ -477,7 +470,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
                       color: '#fcd34d', fontSize: 12, fontWeight: 600,
                       cursor: 'pointer', outline: 'none',
                     }}>
-                    💡 Ko'rsatma
+                    {t('games.hintBtn')}
                   </button>
                 )}
               </div>
@@ -580,10 +573,10 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: isCorrectSel ? '#4ade80' : '#f87171' }}>
-                  {isCorrectSel ? 'To\'g\'ri!' : `To'g'ri javob: ${q.correct_answer}`}
+                  {isCorrectSel ? t('games.correctFeedback') : t('games.wrongFeedback', { answer: q.correct_answer })}
                 </div>
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.28)', marginTop: 2 }}>
-                  Keyingi savol yuklanmoqda...
+                  {t('games.loadingNext')}
                 </div>
               </div>
 
@@ -617,7 +610,7 @@ export default function GameClient({ levelNumber, title, questions, initialProgr
           {/* Keyboard hint */}
           {!answered && (
             <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, textAlign: 'center' }}>
-              Klaviatura: <kbd style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px' }}>A</kbd>{' '}
+              {t('games.keyboardHint')} <kbd style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px' }}>A</kbd>{' '}
               <kbd style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px' }}>B</kbd>{' '}
               <kbd style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px' }}>C</kbd>{' '}
               <kbd style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 4, padding: '1px 5px' }}>D</kbd>
