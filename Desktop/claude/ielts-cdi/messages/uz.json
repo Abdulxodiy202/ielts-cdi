@@ -357,6 +357,8 @@
     "copySql": "SQL nusxalash",
     "collocations": "Kolokatsiyalar",
     "wordCount": "{count} ta so'z",
+    "savedCount": "{count} saqlangan",
+    "personal": "Shaxsiy",
     "delete": "O'chirish",
     "cancel": "Bekor qilish",
     "readingTestsSubtitle": "Har bir test uchun so'z ro'yxatlari tez kunda. So'zlar matnlardan avtomatik ajratib olinadi.",

@@ -357,6 +357,8 @@
     "copySql": "Copy SQL",
     "collocations": "Collocations",
     "wordCount": "{count} words",
+    "savedCount": "{count} saved",
+    "personal": "Personal",
     "delete": "Delete",
     "cancel": "Cancel",
     "readingTestsSubtitle": "Vocabulary word lists per test coming soon. Words will be auto-extracted from test passages.",

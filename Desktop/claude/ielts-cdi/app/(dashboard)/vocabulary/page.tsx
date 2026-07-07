@@ -9,6 +9,7 @@ export default function VocabularyPage() {
   const [lwCount, setLwCount] = useState<number | null>(null)
   const [wcCount, setWcCount] = useState<number | null>(null)
   const [rvCount, setRvCount] = useState<number | null>(null)
+  const [libCount, setLibCount] = useState<number | 'error' | null>(null)
 
   useEffect(() => {
     fetch('/api/vocabulary/linking-words')
@@ -23,6 +24,10 @@ export default function VocabularyPage() {
       .then(r => r.ok ? r.json() : {})
       .then((d: { count?: number }) => setRvCount(d.count ?? 0))
       .catch(() => {})
+    fetch('/api/vocab/words')
+      .then(r => { if (!r.ok) throw new Error('failed'); return r.json() })
+      .then((d: unknown) => setLibCount(Array.isArray(d) ? d.length : 'error'))
+      .catch(() => setLibCount('error'))
   }, [])
 
   const CATEGORIES = [
@@ -51,7 +56,9 @@ export default function VocabularyPage() {
       emoji: '📖',
       titleKey: 'vocabulary.library',
       descKey:  'vocabulary.libraryDesc',
-      count:    null,
+      count:    libCount === 'error' ? t('vocabulary.personal')
+              : libCount !== null    ? t('vocabulary.savedCount', { count: libCount })
+              : '...',
       color: '#10b981',
       bg:    'rgba(16,185,129,0.08)',
       border:'rgba(16,185,129,0.25)',
