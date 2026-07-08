@@ -45,6 +45,13 @@ function shuffleNoAdjacentDupes(words: string[]): string[] {
   return a
 }
 
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}m ${secs}s`
+}
+
 /* ── Typing engine (reducer) ──────────────────────────────────────── */
 interface TypingState {
   words: string[]
@@ -363,23 +370,23 @@ export default function TypingPage() {
      topLineIndex changes (e.g. on every scroll, and on restart snapping
      back to 0), so a getBoundingClientRect() read taken shortly after is
      racing that transition — it can land mid-animation and capture a
-     position partway between the old and new scroll offset. Nothing else
-     re-triggers this effect once currentIndex/topLineIndex settle, so a
-     mid-transition read would stick permanently instead of resolving to
-     the final position. Computing Y from state sidesteps the race
-     entirely. X is still DOM-measured since translateY never affects the
-     horizontal axis, so it's unaffected by the transition's progress. ── */
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      if (!cursorAnchorRef.current || !linesWrapRef.current) return
-      const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
-      const wrapRect = linesWrapRef.current.getBoundingClientRect()
-      setCursorPos({
-        x: anchorRect.left - wrapRect.left,
-        y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
-      })
+     position partway between the old and new scroll offset. Computing Y
+     from state sidesteps the race entirely. X is still DOM-measured since
+     translateY never affects the horizontal axis, so it's unaffected by
+     the transition's progress — which also means it no longer needs to
+     wait a frame. This runs as a layout effect (not a passive effect
+     deferred behind a requestAnimationFrame) so the very first paint of a
+     fresh test already shows the corrected, offset position instead of
+     briefly flashing the uncentered {0,0} reset value until the first
+     keystroke happens to re-trigger the old rAF-based measurement. ── */
+  useLayoutEffect(() => {
+    if (!cursorAnchorRef.current || !linesWrapRef.current) return
+    const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
+    const wrapRect = linesWrapRef.current.getBoundingClientRect()
+    setCursorPos({
+      x: anchorRect.left - wrapRect.left,
+      y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
     })
-    return () => cancelAnimationFrame(raf)
   }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
@@ -412,6 +419,7 @@ export default function TypingPage() {
   const wpm = elapsedMinutes > 0 ? Math.round((correctKeystrokes / 5) / elapsedMinutes) : 0
   const totalKeystrokes = correctKeystrokes + incorrectKeystrokes + extraKeystrokes
   const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 0
+  const elapsedSeconds = startedAt && endedAt ? Math.round((endedAt - startedAt) / 1000) : 0
 
   /* ── Live counter (top-left) ──────────────────────────────────────── */
   const liveCounter = (() => {
@@ -658,7 +666,7 @@ export default function TypingPage() {
 
       {status === 'result' && (
         <div className="w-full max-w-xl flex flex-col items-center gap-8">
-          <div className="flex items-center gap-16">
+          <div className="flex items-center justify-center flex-wrap gap-10">
             <div className="text-center">
               <div className="text-6xl font-black" style={{ color: '#a5b4fc' }}>{wpm}</div>
               <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>WPM</div>
@@ -666,6 +674,10 @@ export default function TypingPage() {
             <div className="text-center">
               <div className="text-6xl font-black" style={{ color: '#6ee7b7' }}>{accuracy}%</div>
               <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{t('typing.accuracy')}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-6xl font-black" style={{ color: '#fbbf24' }}>{formatTime(elapsedSeconds)}</div>
+              <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{t('typing.time')}</div>
             </div>
           </div>
 

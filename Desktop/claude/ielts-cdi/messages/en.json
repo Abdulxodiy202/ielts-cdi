@@ -543,6 +543,7 @@
     "restartHint": "restart",
     "configHint": "config",
     "accuracy": "Accuracy",
+    "time": "Time",
     "characters": "characters",
     "correct": "correct",
     "incorrect": "incorrect",
