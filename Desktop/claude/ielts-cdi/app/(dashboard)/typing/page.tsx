@@ -296,12 +296,17 @@ export default function TypingPage() {
   }, [typingState.currentIndex, scrollLines, LINE_HEIGHT])
 
   /* ── Track the cursor's target position so it can animate smoothly via a
-     CSS transform transition, instead of jumping as an inline element ── */
+     CSS transform transition, instead of jumping as an inline element.
+     Measuring inside requestAnimationFrame ensures the anchor's post-scroll
+     position (the linesWrap transform) has been committed before we read it. ── */
   useEffect(() => {
-    if (!cursorAnchorRef.current || !linesWrapRef.current) return
-    const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
-    const wrapRect = linesWrapRef.current.getBoundingClientRect()
-    setCursorPos({ x: anchorRect.left - wrapRect.left, y: anchorRect.top - wrapRect.top })
+    const raf = requestAnimationFrame(() => {
+      if (!cursorAnchorRef.current || !linesWrapRef.current) return
+      const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
+      const wrapRect = linesWrapRef.current.getBoundingClientRect()
+      setCursorPos({ x: anchorRect.left - wrapRect.left, y: anchorRect.top - wrapRect.top })
+    })
+    return () => cancelAnimationFrame(raf)
   }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], scrollLines])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
@@ -477,7 +482,10 @@ export default function TypingPage() {
       )}
 
       {status === 'typing' && (
-        <div className="w-full max-w-4xl flex flex-col items-center gap-6">
+        <div
+          className="w-full flex flex-col items-center gap-6"
+          style={{ maxWidth: 900, margin: '0 auto', padding: '0 40px', boxSizing: 'border-box' }}
+        >
           {essayTitle && (
             <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.35)' }}>{essayTitle}</p>
           )}
@@ -506,7 +514,19 @@ export default function TypingPage() {
                 // rendered as the visible cursor) so the real cursor can be
                 // absolutely positioned and animate smoothly between spots
                 // instead of jumping as an inline element would.
-                const anchor = <span key="anchor" ref={cursorAnchorRef} style={{ display: 'inline-block', width: 0 }} />
+                // vertical-align: text-top matters here — a zero-height
+                // inline-block defaults to baseline alignment, which sits
+                // near the BOTTOM of the glyphs, not the top. Measuring from
+                // baseline and extending the cursor downward by font-size
+                // put almost the whole cursor bar below the visible letters
+                // (and often clipped by the container's overflow:hidden).
+                const anchor = (
+                  <span
+                    key="anchor"
+                    ref={cursorAnchorRef}
+                    style={{ display: 'inline-block', width: 0, verticalAlign: 'text-top' }}
+                  />
+                )
                 const chars = []
                 for (let j = 0; j < len; j++) {
                   if (isCurrent && j === typed.length) chars.push(anchor)
