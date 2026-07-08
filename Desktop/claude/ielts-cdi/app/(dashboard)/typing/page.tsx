@@ -53,6 +53,14 @@ interface TypingState {
   started: boolean
   finished: boolean
   endless: boolean // time mode: word buffer can grow, never "runs out"
+  // Keystroke-level tallies: incremented once per keystroke as it happens
+  // and never decremented by backspace, so accuracy reflects every mistake
+  // made during the test — including ones the user later fixed — instead
+  // of just diffing the final on-screen text against the target.
+  correctKeystrokes: number
+  incorrectKeystrokes: number
+  extraKeystrokes: number
+  missedChars: number
 }
 
 type TypingAction =
@@ -73,6 +81,10 @@ function typingReducer(state: TypingState, action: TypingAction): TypingState {
         started: false,
         finished: false,
         endless: action.endless,
+        correctKeystrokes: 0,
+        incorrectKeystrokes: 0,
+        extraKeystrokes: 0,
+        missedChars: 0,
       }
     case 'EXTEND':
       return {
@@ -83,10 +95,26 @@ function typingReducer(state: TypingState, action: TypingAction): TypingState {
     case 'CHAR': {
       if (state.finished) return state
       const inputs = state.inputs.slice()
+      const target = state.words[state.currentIndex] ?? ''
+      // Position this keystroke lands at, BEFORE appending it — this is what
+      // determines whether it's correct/incorrect/extra, and that judgment
+      // is locked in permanently (backspace only edits `inputs`, never these
+      // tallies), so a later fix doesn't erase the original mistake.
+      const posInWord = (state.inputs[state.currentIndex] ?? '').length
       inputs[state.currentIndex] = (inputs[state.currentIndex] ?? '') + action.ch
       const lastWord = !state.endless && state.currentIndex === state.words.length - 1
       const finished = lastWord && inputs[state.currentIndex].length >= state.words[state.currentIndex].length
-      return { ...state, inputs, started: true, finished }
+      const isExtra = posInWord >= target.length
+      const isCorrect = !isExtra && action.ch === target[posInWord]
+      return {
+        ...state,
+        inputs,
+        started: true,
+        finished,
+        correctKeystrokes: state.correctKeystrokes + (isCorrect ? 1 : 0),
+        incorrectKeystrokes: state.incorrectKeystrokes + (!isExtra && !isCorrect ? 1 : 0),
+        extraKeystrokes: state.extraKeystrokes + (isExtra ? 1 : 0),
+      }
     }
     case 'BACKSPACE': {
       if (state.finished) return state
@@ -102,48 +130,25 @@ function typingReducer(state: TypingState, action: TypingAction): TypingState {
     }
     case 'SPACE': {
       if (state.finished || (state.inputs[state.currentIndex] ?? '').length === 0) return state
+      const target = state.words[state.currentIndex] ?? ''
+      const typedLen = (state.inputs[state.currentIndex] ?? '').length
+      const remaining = target.length - typedLen
+      const missedChars = state.missedChars + (remaining > 0 ? remaining : 0)
       const atLastWord = state.currentIndex >= state.words.length - 1
       // In endless (time) mode there is no "last word" to freeze at — always
       // advance and trust the buffer-extend effect to keep words ahead of the
       // cursor. Freezing here (as before) could permanently strand the user
       // on the final word if the extend effect ever ran a beat late.
       if (atLastWord && !state.endless) {
-        return { ...state, started: true, finished: true }
+        return { ...state, started: true, finished: true, missedChars }
       }
-      return { ...state, currentIndex: state.currentIndex + 1, started: true }
+      return { ...state, currentIndex: state.currentIndex + 1, started: true, missedChars }
     }
     case 'FORCE_FINISH':
       return { ...state, finished: true }
     default:
       return state
   }
-}
-
-interface Stats {
-  correct: number
-  incorrect: number
-  extra: number
-  missed: number
-}
-
-function computeStats(words: string[], inputs: string[], upToIndex: number): Stats {
-  const stats: Stats = { correct: 0, incorrect: 0, extra: 0, missed: 0 }
-  for (let i = 0; i <= upToIndex && i < words.length; i++) {
-    const target = words[i] ?? ''
-    const typed = inputs[i] ?? ''
-    const len = Math.max(target.length, typed.length)
-    for (let j = 0; j < len; j++) {
-      if (j < target.length && j < typed.length) {
-        if (typed[j] === target[j]) stats.correct++
-        else stats.incorrect++
-      } else if (j >= target.length) {
-        stats.extra++
-      } else {
-        stats.missed++
-      }
-    }
-  }
-  return stats
 }
 
 /* ── Component ────────────────────────────────────────────────────── */
@@ -174,6 +179,7 @@ export default function TypingPage() {
 
   const [typingState, dispatch] = useReducer(typingReducer, {
     words: [], inputs: [], currentIndex: 0, started: false, finished: false, endless: false,
+    correctKeystrokes: 0, incorrectKeystrokes: 0, extraKeystrokes: 0, missedChars: 0,
   })
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
@@ -205,6 +211,12 @@ export default function TypingPage() {
   }, [])
   const FONT_SIZE = isMobile ? 28 : 40
   const LINE_HEIGHT = Math.round(FONT_SIZE * 1.5)
+  // Slightly shorter than the glyphs and vertically centered within the row
+  // (LINE_HEIGHT), not top-aligned to it — the row is taller than the font
+  // itself, so anchoring the cursor's top to the row's top left it sitting
+  // above the letters instead of level with them.
+  const CURSOR_HEIGHT = FONT_SIZE * 0.9
+  const CURSOR_Y_OFFSET = (LINE_HEIGHT - CURSOR_HEIGHT) / 2
 
   /* ── Fetch words/essay for the selected config ─────────────────── */
   const loadTest = useCallback(async () => {
@@ -362,10 +374,13 @@ export default function TypingPage() {
       if (!cursorAnchorRef.current || !linesWrapRef.current) return
       const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
       const wrapRect = linesWrapRef.current.getBoundingClientRect()
-      setCursorPos({ x: anchorRect.left - wrapRect.left, y: (currentLineIndex - topLineIndex) * LINE_HEIGHT })
+      setCursorPos({
+        x: anchorRect.left - wrapRect.left,
+        y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
+      })
     })
     return () => cancelAnimationFrame(raf)
-  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT])
+  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -389,15 +404,14 @@ export default function TypingPage() {
     if (status === 'typing' || status === 'result') inputRef.current?.focus()
   }, [status])
 
-  /* ── Stats for the result screen ──────────────────────────────────── */
-  const stats = useMemo(
-    () => computeStats(typingState.words, typingState.inputs, typingState.currentIndex),
-    [typingState.words, typingState.inputs, typingState.currentIndex],
-  )
+  /* ── Stats for the result screen — every keystroke counts, including ones
+     later fixed with backspace, so accuracy reflects mistakes actually made
+     rather than just diffing the final text against the target. ── */
+  const { correctKeystrokes, incorrectKeystrokes, extraKeystrokes, missedChars } = typingState
   const elapsedMinutes = startedAt && endedAt ? Math.max((endedAt - startedAt) / 60000, 1 / 600) : 0
-  const wpm = elapsedMinutes > 0 ? Math.round((stats.correct / 5) / elapsedMinutes) : 0
-  const totalTyped = stats.correct + stats.incorrect + stats.extra
-  const accuracy = totalTyped > 0 ? Math.round((stats.correct / totalTyped) * 100) : 0
+  const wpm = elapsedMinutes > 0 ? Math.round((correctKeystrokes / 5) / elapsedMinutes) : 0
+  const totalKeystrokes = correctKeystrokes + incorrectKeystrokes + extraKeystrokes
+  const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 0
 
   /* ── Live counter (top-left) ──────────────────────────────────────── */
   const liveCounter = (() => {
@@ -626,7 +640,7 @@ export default function TypingPage() {
             {/* Smoothly-animated cursor, positioned via the measured anchor above */}
             <div
               style={{
-                position: 'absolute', top: 0, left: 0, width: 3, height: FONT_SIZE,
+                position: 'absolute', top: 0, left: 0, width: 3, height: CURSOR_HEIGHT,
                 background: '#e2b714', pointerEvents: 'none',
                 transform: `translate(${cursorPos.x}px, ${cursorPos.y}px)`,
                 transition: 'transform 0.1s ease-out',
@@ -658,7 +672,7 @@ export default function TypingPage() {
           <div className="text-center">
             <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('typing.characters')}</div>
             <div className="text-xl font-mono font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>
-              {stats.correct} / {stats.incorrect} / {stats.extra} / {stats.missed}
+              {correctKeystrokes} / {incorrectKeystrokes} / {extraKeystrokes} / {missedChars}
             </div>
             <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
               {t('typing.correct')} / {t('typing.incorrect')} / {t('typing.extra')} / {t('typing.missed')}
