@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useReducer, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -181,23 +181,30 @@ export default function TypingPage() {
   const [nowTick, setNowTick] = useState(Date.now())
 
   const inputRef = useRef<HTMLInputElement>(null)
-  const currentWordRef = useRef<HTMLSpanElement>(null)
+  const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const linesWrapRef = useRef<HTMLDivElement>(null)
   const cursorAnchorRef = useRef<HTMLSpanElement>(null)
-  const [scrollLines, setScrollLines] = useState(0)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
+
+  /* ── Visual-line grouping (independent of word index): which line each
+     word actually wrapped onto, computed by measuring the DOM. Scrolling is
+     driven by "which line is the cursor's line", not by re-deriving a line
+     number from a possibly-mid-transition getBoundingClientRect() read. ── */
+  const [lines, setLines] = useState<number[][]>([])
+  const [topLineIndex, setTopLineIndex] = useState(0)
+  const VISIBLE_LINES = 3
 
   /* ── Responsive type size, kept in sync between CSS and the JS scroll math ── */
   const [isMobile, setIsMobile] = useState(false)
+  const [resizeTick, setResizeTick] = useState(0)
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth <= 768)
+    const check = () => { setIsMobile(window.innerWidth <= 768); setResizeTick(t => t + 1) }
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
   const FONT_SIZE = isMobile ? 28 : 40
   const LINE_HEIGHT = Math.round(FONT_SIZE * 1.5)
-  const VISIBLE_LINES = 4
 
   /* ── Fetch words/essay for the selected config ─────────────────── */
   const loadTest = useCallback(async () => {
@@ -239,7 +246,9 @@ export default function TypingPage() {
       }
       setStartedAt(null)
       setEndedAt(null)
-      setScrollLines(0)
+      setTopLineIndex(0)
+      setLines([])
+      wordRefs.current = []
       setStatus('typing')
     } finally {
       setLoadingWords(false)
@@ -283,17 +292,48 @@ export default function TypingPage() {
     }
   }, [typingState.finished, endedAt])
 
-  /* ── Auto-scroll the word lines: current line is pinned to the top, always
-     leaving VISIBLE_LINES-1 (3) untyped lines visible ahead ── */
-  useEffect(() => {
-    if (!currentWordRef.current || !linesWrapRef.current) return
-    const wrapTop = linesWrapRef.current.getBoundingClientRect().top
-    const wordTop = currentWordRef.current.getBoundingClientRect().top
-    const relativeLine = Math.round((wordTop - wrapTop) / LINE_HEIGHT) + scrollLines
-    if (relativeLine > scrollLines) {
-      setScrollLines(relativeLine)
+  /* ── Group words into visual lines by measuring where the browser actually
+     wrapped them (flex-wrap handles the wrapping; we just read it back).
+     Recomputed whenever the word list grows (EXTEND) or the layout could
+     reflow (font-size/viewport change) — never during scrolling itself, so
+     it can't be thrown off by a mid-transition transform read. ── */
+  useLayoutEffect(() => {
+    const refs = wordRefs.current
+    const newLines: number[][] = []
+    let currentLine: number[] = []
+    let lastTop: number | null = null
+    for (let i = 0; i < typingState.words.length; i++) {
+      const el = refs[i]
+      if (!el) continue
+      const top = el.getBoundingClientRect().top
+      if (lastTop === null || Math.abs(top - lastTop) < 1) {
+        currentLine.push(i)
+      } else {
+        if (currentLine.length > 0) newLines.push(currentLine)
+        currentLine = [i]
+      }
+      lastTop = top
     }
-  }, [typingState.currentIndex, scrollLines, LINE_HEIGHT])
+    if (currentLine.length > 0) newLines.push(currentLine)
+    setLines(newLines)
+  }, [typingState.words.length, FONT_SIZE, resizeTick])
+
+  /* ── Which visual line the cursor is currently on ── */
+  const currentLineIndex = useMemo(() => {
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(typingState.currentIndex)) return i
+    }
+    return lines.length > 0 ? lines.length - 1 : 0
+  }, [lines, typingState.currentIndex])
+
+  /* ── Scroll exactly one line at a time: the top visible line only ever
+     advances to the cursor's line, never further, and never in one jump
+     across two lines under normal (sequential) typing. ── */
+  useEffect(() => {
+    if (currentLineIndex > topLineIndex) {
+      setTopLineIndex(currentLineIndex)
+    }
+  }, [currentLineIndex, topLineIndex])
 
   /* ── Track the cursor's target position so it can animate smoothly via a
      CSS transform transition, instead of jumping as an inline element.
@@ -307,7 +347,7 @@ export default function TypingPage() {
       setCursorPos({ x: anchorRect.left - wrapRect.left, y: anchorRect.top - wrapRect.top })
     })
     return () => cancelAnimationFrame(raf)
-  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], scrollLines])
+  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -484,7 +524,7 @@ export default function TypingPage() {
       {status === 'typing' && (
         <div
           className="w-full flex flex-col items-center gap-6"
-          style={{ maxWidth: 900, margin: '0 auto', padding: '0 40px', boxSizing: 'border-box' }}
+          style={{ maxWidth: 1100, margin: '0 auto', padding: '0 60px', boxSizing: 'border-box' }}
         >
           {essayTitle && (
             <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.35)' }}>{essayTitle}</p>
@@ -502,7 +542,7 @@ export default function TypingPage() {
               style={{
                 fontSize: FONT_SIZE, lineHeight: 1.5, letterSpacing: '0.02em',
                 rowGap: '0.3em',
-                transform: `translateY(-${scrollLines * LINE_HEIGHT}px)`,
+                transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
               }}
             >
               {typingState.words.map((word, i) => {
@@ -557,7 +597,7 @@ export default function TypingPage() {
                 return (
                   <span
                     key={i}
-                    ref={isCurrent ? currentWordRef : undefined}
+                    ref={el => { wordRefs.current[i] = el }}
                     style={{ opacity: isDone || isCurrent ? 1 : 0.4, marginRight: '0.5em' }}
                   >
                     {chars}
