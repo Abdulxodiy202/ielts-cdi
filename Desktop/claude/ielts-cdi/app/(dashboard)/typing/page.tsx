@@ -258,7 +258,7 @@ export default function TypingPage() {
   /* ── Extend the word buffer for time mode as the user approaches the end ── */
   useEffect(() => {
     if (!typingState.endless) return
-    if (typingState.words.length - typingState.currentIndex <= 20 && wordPoolRef.current.length > 0) {
+    if (typingState.words.length - typingState.currentIndex <= 40 && wordPoolRef.current.length > 0) {
       const pool = wordPoolRef.current
       const batch: string[] = []
       while (batch.length < 100) batch.push(...shuffleNoAdjacentDupes(pool))
@@ -326,12 +326,14 @@ export default function TypingPage() {
     return lines.length > 0 ? lines.length - 1 : 0
   }, [lines, typingState.currentIndex])
 
-  /* ── Scroll exactly one line at a time: the top visible line only ever
-     advances to the cursor's line, never further, and never in one jump
-     across two lines under normal (sequential) typing. ── */
+  /* ── Keep the cursor's line pinned to the middle of the 3-line window once
+     the user has moved past the very first line, so the visible window is
+     always 1 finished line above + cursor's line + 1 upcoming line below. ── */
   useEffect(() => {
-    if (currentLineIndex > topLineIndex) {
-      setTopLineIndex(currentLineIndex)
+    if (currentLineIndex === 0) return
+    const desiredTopLine = currentLineIndex - 1
+    if (desiredTopLine > topLineIndex) {
+      setTopLineIndex(desiredTopLine)
     }
   }, [currentLineIndex, topLineIndex])
 
@@ -524,7 +526,7 @@ export default function TypingPage() {
       {status === 'typing' && (
         <div
           className="w-full flex flex-col items-center gap-6"
-          style={{ maxWidth: 1100, margin: '0 auto', padding: '0 60px', boxSizing: 'border-box' }}
+          style={{ maxWidth: 1600, margin: '0 auto', padding: '0 40px', boxSizing: 'border-box' }}
         >
           {essayTitle && (
             <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.35)' }}>{essayTitle}</p>
@@ -540,8 +542,7 @@ export default function TypingPage() {
             <div
               className="flex flex-wrap content-start transition-transform duration-200"
               style={{
-                fontSize: FONT_SIZE, lineHeight: 1.5, letterSpacing: '0.02em',
-                rowGap: '0.3em',
+                fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, letterSpacing: '0.02em',
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
               }}
             >
