@@ -248,6 +248,7 @@ export default function TypingPage() {
       setEndedAt(null)
       setTopLineIndex(0)
       setLines([])
+      setCursorPos({ x: 0, y: 0 })
       wordRefs.current = []
       setStatus('typing')
     } finally {
@@ -344,17 +345,27 @@ export default function TypingPage() {
 
   /* ── Track the cursor's target position so it can animate smoothly via a
      CSS transform transition, instead of jumping as an inline element.
-     Measuring inside requestAnimationFrame ensures the anchor's post-scroll
-     position (the linesWrap transform) has been committed before we read it. ── */
+     Y is computed analytically from (currentLineIndex - topLineIndex) *
+     LINE_HEIGHT rather than measured off the anchor's live DOM position.
+     The lines container animates via its own CSS transition whenever
+     topLineIndex changes (e.g. on every scroll, and on restart snapping
+     back to 0), so a getBoundingClientRect() read taken shortly after is
+     racing that transition — it can land mid-animation and capture a
+     position partway between the old and new scroll offset. Nothing else
+     re-triggers this effect once currentIndex/topLineIndex settle, so a
+     mid-transition read would stick permanently instead of resolving to
+     the final position. Computing Y from state sidesteps the race
+     entirely. X is still DOM-measured since translateY never affects the
+     horizontal axis, so it's unaffected by the transition's progress. ── */
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
       if (!cursorAnchorRef.current || !linesWrapRef.current) return
       const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
       const wrapRect = linesWrapRef.current.getBoundingClientRect()
-      setCursorPos({ x: anchorRect.left - wrapRect.left, y: anchorRect.top - wrapRect.top })
+      setCursorPos({ x: anchorRect.left - wrapRect.left, y: (currentLineIndex - topLineIndex) * LINE_HEIGHT })
     })
     return () => cancelAnimationFrame(raf)
-  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex])
+  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
