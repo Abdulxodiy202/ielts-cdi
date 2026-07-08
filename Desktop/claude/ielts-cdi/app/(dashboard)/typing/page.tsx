@@ -258,7 +258,7 @@ export default function TypingPage() {
   /* ── Extend the word buffer for time mode as the user approaches the end ── */
   useEffect(() => {
     if (!typingState.endless) return
-    if (typingState.words.length - typingState.currentIndex <= 40 && wordPoolRef.current.length > 0) {
+    if (typingState.words.length - typingState.currentIndex <= 50 && wordPoolRef.current.length > 0) {
       const pool = wordPoolRef.current
       const batch: string[] = []
       while (batch.length < 100) batch.push(...shuffleNoAdjacentDupes(pool))
@@ -294,9 +294,14 @@ export default function TypingPage() {
 
   /* ── Group words into visual lines by measuring where the browser actually
      wrapped them (flex-wrap handles the wrapping; we just read it back).
-     Recomputed whenever the word list grows (EXTEND) or the layout could
-     reflow (font-size/viewport change) — never during scrolling itself, so
-     it can't be thrown off by a mid-transition transform read. ── */
+     Recomputed whenever the word list grows (EXTEND), the layout could
+     reflow (font-size/viewport change), OR the user overtypes a word with
+     extra characters — that grows the word's rendered width and reflows
+     every later word onto different lines, so `inputs` must be a dependency
+     too or the cached line map silently desyncs from the real DOM the
+     moment a typo happens (which is most tests). Never re-measures during
+     the scroll itself, so it can't be thrown off by a mid-transition
+     transform read. ── */
   useLayoutEffect(() => {
     const refs = wordRefs.current
     const newLines: number[][] = []
@@ -316,7 +321,7 @@ export default function TypingPage() {
     }
     if (currentLine.length > 0) newLines.push(currentLine)
     setLines(newLines)
-  }, [typingState.words.length, FONT_SIZE, resizeTick])
+  }, [typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick])
 
   /* ── Which visual line the cursor is currently on ── */
   const currentLineIndex = useMemo(() => {
