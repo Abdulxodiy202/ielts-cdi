@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 /** GET /api/admin/mock-writing?scheduleId=xxx
  *  Returns all writing answers submitted for a specific schedule.
@@ -12,7 +12,7 @@ const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdmin(user.email)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 

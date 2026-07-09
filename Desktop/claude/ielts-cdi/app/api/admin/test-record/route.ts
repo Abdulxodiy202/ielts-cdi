@@ -4,13 +4,13 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 // Lightweight DB-only update after a client-side Supabase Storage upload.
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdmin(user.email)) {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 

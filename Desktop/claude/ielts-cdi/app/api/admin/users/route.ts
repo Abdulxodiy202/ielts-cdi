@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 interface PaymentItem {
   id: string
@@ -17,7 +17,7 @@ interface PaymentItem {
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !isAdmin(user.email)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

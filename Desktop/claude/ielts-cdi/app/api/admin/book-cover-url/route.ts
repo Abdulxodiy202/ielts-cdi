@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 const CONTENT_TYPES: Record<string, string> = {
   jpg:  'image/jpeg',
@@ -16,7 +16,7 @@ const CONTENT_TYPES: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user || !isAdmin(user.email)) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const { bookId, fileName } = await request.json() as { bookId: string; fileName: string }
   if (!bookId || !fileName) return Response.json({ error: 'bookId va fileName kerak' }, { status: 400 })
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user || !isAdmin(user.email)) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const { bookId } = await request.json() as { bookId: string }
   if (!bookId) return Response.json({ error: 'bookId kerak' }, { status: 400 })

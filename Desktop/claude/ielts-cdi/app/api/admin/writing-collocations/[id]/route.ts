@@ -3,12 +3,12 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAILS = ['abdulxdiymamajonov@gmail.com', 'otabekmuminov0427@gmail.com']
+import { isAdmin as isAdminEmail } from '@/lib/admin-config'
 
 async function isAdmin(): Promise<boolean> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  return !!(user?.email && ADMIN_EMAILS.includes(user.email))
+  return isAdminEmail(user?.email)
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {

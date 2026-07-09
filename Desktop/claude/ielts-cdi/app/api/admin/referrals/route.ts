@@ -3,12 +3,12 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user || user.email !== ADMIN_EMAIL) return Response.json({ error: 'Forbidden' }, { status: 403 })
+  if (!user || !isAdmin(user.email)) return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
 

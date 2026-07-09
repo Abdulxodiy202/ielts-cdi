@@ -6,8 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
-
-const TEST_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 /* ── Types ────────────────────────────────────────────────────────── */
 interface Level {
@@ -222,7 +221,7 @@ export default function GamesPage() {
       setTimeout(() => currentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200)
   }, [loading])
 
-  const isTestUser = userEmail === TEST_EMAIL
+  const isTestUser = isAdmin(userEmail)
 
   const lvlMap     = useMemo(() => new Map(levels.map(l => [l.level_number, l])), [levels])
   const doneN      = levels.filter(l => l.status === 'completed').length

@@ -3,14 +3,15 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isActivePremium } from '@/lib/utils/premium'
-import { GAME_ADMIN_EMAIL, getDailyLimit, getTashkentDate, getNextTashkentMidnightISO } from '@/lib/utils/gameUnlock'
+import { getDailyLimit, getTashkentDate, getNextTashkentMidnightISO } from '@/lib/utils/gameUnlock'
+import { isAdmin as checkIsAdmin } from '@/lib/admin-config'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const isAdmin = user.email === GAME_ADMIN_EMAIL
+  const isAdmin = checkIsAdmin(user.email)
   const admin = createAdminClient()
 
   const [profileRes, unlocksRes] = await Promise.all([

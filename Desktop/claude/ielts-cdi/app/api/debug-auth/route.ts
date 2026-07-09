@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { isAdmin } from '@/lib/admin-config'
 
 export async function GET() {
   const hasUrl  = !!process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -29,6 +30,6 @@ export async function GET() {
     },
     user,
     authError,
-    isAdmin: user?.email === 'abdulxdiymamajonov@gmail.com',
+    isAdmin: isAdmin(user?.email),
   })
 }

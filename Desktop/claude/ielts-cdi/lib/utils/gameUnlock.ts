@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isAdmin } from '@/lib/admin-config'
 
-export const GAME_ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
 const TASHKENT_TZ = 'Asia/Tashkent'
 
 /** Today's date (YYYY-MM-DD) in Asia/Tashkent (fixed UTC+5, no DST). */
@@ -54,7 +54,7 @@ export async function canUnlockLevel(
 ): Promise<UnlockCheck> {
   const dailyLimit = getDailyLimit(isPremium)
 
-  if (userEmail === GAME_ADMIN_EMAIL) {
+  if (isAdmin(userEmail)) {
     return { canUnlock: true, reason: 'admin_bypass', unlockedToday: 0, dailyLimit: 999 }
   }
 
@@ -107,7 +107,7 @@ export async function recordLevelUnlock(
   userId: string,
   userEmail: string | null | undefined,
 ): Promise<void> {
-  if (userEmail === GAME_ADMIN_EMAIL) return
+  if (isAdmin(userEmail)) return
 
   const today = getTashkentDate()
   const { data: existing } = await admin

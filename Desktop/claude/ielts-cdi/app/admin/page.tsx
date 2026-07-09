@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { AdminClient } from './AdminClient'
 import type { MockSchedule } from '@/components/admin/MockScheduleEditor'
 
-const ADMIN_EMAIL = 'abdulxdiymamajonov@gmail.com'
+import { isAdmin } from '@/lib/admin-config'
 
 interface Test {
   id: string
@@ -49,7 +49,7 @@ export default function AdminPage() {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) { router.replace('/login'); return }
-      if (user.email !== ADMIN_EMAIL) { router.replace('/dashboard'); return }
+      if (!isAdmin(user.email)) { router.replace('/dashboard'); return }
 
       // Fetch all admin data in parallel from API routes
       const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes, promoRes] = await Promise.all([
