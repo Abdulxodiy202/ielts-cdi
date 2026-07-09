@@ -41,20 +41,21 @@ export type MatchLevel = 'exact' | 'partial' | 'none'
 export function compareWords(user: string, orig: string): MatchLevel {
   if (user === orig) return 'exact'
 
-  // Partial match requires both words to be at least 4 chars
-  if (user.length < 4 || orig.length < 4) return 'none'
-
-  const dist = levenshtein(user, orig)
   const maxLen = Math.max(user.length, orig.length)
+  const dist = levenshtein(user, orig)
 
-  // Rules for partial match:
-  // - 4-5 char words: allow 1 char difference
-  // - 6+ char words: allow 2 char difference
-  // AND the difference must be less than 30% of word length
-  let allowedDistance = 1
-  if (maxLen >= 6) allowedDistance = 2
+  // Skip very short words (1-2 chars) — too easy to match wrong
+  if (maxLen < 3) return 'none'
 
-  if (dist <= allowedDistance && dist / maxLen < 0.3) {
+  // Determine allowed distance based on word length
+  let allowedDistance: number
+  if (maxLen === 3) allowedDistance = 1        // 3 chars: 1 diff (e.g. "bbs" -> "bbc")
+  else if (maxLen <= 5) allowedDistance = 1    // 4-5 chars: 1 diff
+  else if (maxLen <= 8) allowedDistance = 2    // 6-8 chars: 2 diff
+  else allowedDistance = 3                     // 9+ chars: 3 diff
+
+  // Also require diff to be < 40% of word length
+  if (dist <= allowedDistance && dist / maxLen < 0.4) {
     return 'partial'
   }
   return 'none'
@@ -78,6 +79,12 @@ export interface AlignmentStats {
 export interface AlignmentResult {
   alignment: AlignItem[]
   accuracy: number
+  /** Accuracy of only the words the user actually typed, i.e. score /
+      userWords.length instead of score / origWords.length. Useful for
+      distinguishing "typed little, but what they typed was right" from
+      "typed a lot, and got most of it wrong" when `accuracy` alone (which
+      is always relative to the FULL transcript) is very low. */
+  attemptAccuracy: number
   stats: AlignmentStats
 }
 
@@ -147,25 +154,47 @@ export function computeAlignment(userText: string, origText: string): AlignmentR
   // Exact = 1.0 weight, partial = 0.6 weight
   const score = exactCount + partialCount * 0.6
   const accuracy = origWords.length > 0 ? Math.round((score / origWords.length) * 100) : 0
+  // Accuracy of only what the user actually typed (not the full transcript) —
+  // lets the result screen distinguish "typed little but correct" from
+  // "typed a lot but wrong" when `accuracy` alone is very low.
+  const attemptAccuracy = userWords.length > 0 ? Math.round((score / userWords.length) * 100) : 0
 
-  // eslint-disable-next-line no-console
-  console.log('=== SCRIPT CHECK DEBUG ===')
-  // eslint-disable-next-line no-console
-  console.log('User words:', userWords.length, userWords.slice(0, 20))
-  // eslint-disable-next-line no-console
-  console.log('Orig words:', origWords.length, origWords.slice(0, 20))
-  // eslint-disable-next-line no-console
-  console.log('Exact:', exactCount, 'Partial:', partialCount, 'Missing:', missingCount, 'Extra:', extraCount)
-  // eslint-disable-next-line no-console
-  console.log('Score:', score, '/ Denominator:', origWords.length)
-  // eslint-disable-next-line no-console
-  console.log('Accuracy:', accuracy, '% -> Stars:', getStars(accuracy))
-  // eslint-disable-next-line no-console
+  /* eslint-disable no-console */
+  console.log('=== SCRIPT DEBUG ===')
+  console.log('User input word count:', userWords.length)
+  console.log('User words:', userWords)
+  console.log('Original word count:', origWords.length)
+  console.log('Original first 20:', origWords.slice(0, 20))
+  console.log('Original last 20:', origWords.slice(-20))
+  console.log('---')
+  console.log('Alignment stats:')
+  console.log('  Exact matches:', exactCount)
+  console.log('  Partial matches:', partialCount)
+  console.log('  Missing (in orig, not in user):', missingCount)
+  console.log('  Extra (in user, not in orig):', extraCount)
+  console.log('---')
+  console.log('Exact matched words (in order):')
+  alignment.filter(a => a.status === 'exact').forEach(a => console.log('  -', a.orig))
+  console.log('Partial matches:')
+  alignment.filter(a => a.status === 'partial').forEach(a => console.log('  -', a.user, '->', a.orig))
+  console.log('Extra words:')
+  alignment.filter(a => a.status === 'extra').forEach(a => console.log('  -', a.user))
+  console.log('---')
+  console.log('Score calculation:')
+  console.log('  Exact x 1.0 =', exactCount)
+  console.log('  Partial x 0.6 =', partialCount * 0.6)
+  console.log('  Total score:', score)
+  console.log('  Denominator (orig words):', origWords.length)
+  console.log('  Accuracy:', accuracy, '%')
+  console.log('  Attempt accuracy (score / user words typed):', attemptAccuracy, '%')
+  console.log('  Stars:', getStars(accuracy))
   console.log('=== END DEBUG ===')
+  /* eslint-enable no-console */
 
   return {
     alignment,
     accuracy,
+    attemptAccuracy,
     stats: {
       totalOrig: origWords.length,
       totalUser: userWords.length,

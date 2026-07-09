@@ -333,6 +333,11 @@ function ResultScreen({
           ))}
         </div>
         <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{t(STAR_MESSAGE_KEYS[stars])}</p>
+        {result.accuracy < 30 && result.attemptAccuracy > 70 && (
+          <p className="text-xs mt-2 max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
+            {t('script.result.incompleteButAccurate', { attemptAccuracy: result.attemptAccuracy })}
+          </p>
+        )}
       </div>
 
       {/* Stats box */}

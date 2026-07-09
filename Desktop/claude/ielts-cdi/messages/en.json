@@ -121,7 +121,8 @@
       "stars2": "Not bad!",
       "stars3": "Good job!",
       "stars4": "Great result!",
-      "stars5": "Excellent! Nearly perfect! 🎉"
+      "stars5": "Excellent! Nearly perfect! 🎉",
+      "incompleteButAccurate": "What you typed was {attemptAccuracy}% accurate — you just typed a small part of the script. Try listening to the whole audio and writing it all down."
     }
   },
   "mock": {

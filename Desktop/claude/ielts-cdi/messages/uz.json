@@ -121,7 +121,8 @@
       "stars2": "Yomon emas!",
       "stars3": "Yaxshi!",
       "stars4": "Zo'r natija!",
-      "stars5": "Ajoyib! Deyarli mukammal! 🎉"
+      "stars5": "Ajoyib! Deyarli mukammal! 🎉",
+      "incompleteButAccurate": "Yozganingiz {attemptAccuracy}% to'g'ri edi — lekin skriptning kichik qismini yozdingiz. Butun audioni tinglab, hammasini yozib ko'ring."
     }
   },
   "mock": {
