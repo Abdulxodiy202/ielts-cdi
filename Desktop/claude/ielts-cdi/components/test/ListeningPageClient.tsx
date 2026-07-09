@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X,
   ChevronLeft, ChevronRight, Headphones, Zap,
-  MessageSquare, Mic, GraduationCap, BookOpen,
+  MessageSquare, Mic, GraduationCap, BookOpen, PenLine,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -240,7 +240,7 @@ export function ListeningPageClient({
     <>
       {/* Mode selector */}
       {mode === 'select' && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Full Test card */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
@@ -317,6 +317,47 @@ export function ListeningPageClient({
               {t('test.choosePart')} <ChevronRight size={15} />
             </div>
           </motion.button>
+
+          {/* Script Practice card */}
+          <Link href="/listening/script" className="block">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.14 }}
+              className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] h-full"
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 relative"
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))' }}
+              >
+                <Headphones size={26} style={{ color: '#10b981' }} />
+                <PenLine size={14} style={{ color: '#06b6d4', position: 'absolute', bottom: 6, right: 6 }} />
+              </div>
+              <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+                🎧✍️ {t('script.title')}
+              </h2>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+                {t('script.cardDesc')}
+              </p>
+              <div className="flex flex-wrap gap-2 mb-5">
+                {[t('script.badgeBbc'), t('script.badgeMinutes'), t('script.badgeSmart')].map((tag) => (
+                  <span
+                    key={tag}
+                    className="text-xs px-2 py-1 rounded-lg"
+                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              <div
+                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))', color: '#10b981' }}
+              >
+                {t('test.start')} <ChevronRight size={15} />
+              </div>
+            </motion.div>
+          </Link>
 
         </div>
       )}

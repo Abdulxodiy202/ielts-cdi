@@ -10,7 +10,7 @@ import {
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
   Loader2, Upload, FileText, X, Music, Play, Keyboard,
 } from 'lucide-react'
-import { formatDate, formatPrice } from '@/lib/utils/formatters'
+import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
 import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
@@ -3928,10 +3928,543 @@ function TypingEssaysTab() {
   )
 }
 
+/* ── Scripts (Script Practice) tab ────────────────────────────────── */
+interface AdminScript {
+  id: number
+  title: string
+  description: string | null
+  thumbnail_url: string | null
+  audio_url: string
+  transcript: string
+  duration_seconds: number | null
+  order_index: number
+  is_premium: boolean
+  is_active: boolean
+  created_at: string
+}
+
+const SCRIPT_BLANK: Omit<AdminScript, 'id' | 'created_at'> = {
+  title: '', description: '', thumbnail_url: null, audio_url: '',
+  transcript: '', duration_seconds: null, order_index: 1,
+  is_premium: false, is_active: true,
+}
+
+function ScriptsTab() {
+  const [scripts,        setScripts]        = useState<AdminScript[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState<number | null>(null)
+  const [formError,      setFormError]      = useState('')
+  const [modal,          setModal]          = useState<{ mode: 'add' | 'edit'; data: typeof SCRIPT_BLANK & { id?: number } } | null>(null)
+  const [audioFile,      setAudioFile]      = useState<File | null>(null)
+  const [thumbFile,      setThumbFile]      = useState<File | null>(null)
+  const [audioProgress,  setAudioProgress]  = useState(0)
+  const [thumbProgress,  setThumbProgress]  = useState(0)
+  const [transcriptMode, setTranscriptMode] = useState<'manual' | 'file'>('manual')
+  const [transcriptFileMsg, setTranscriptFileMsg] = useState<string | null>(null)
+  const [deleteTarget,   setDeleteTarget]   = useState<AdminScript | null>(null)
+  const audioXhrRef = useRef<XMLHttpRequest | null>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
+  const thumbInputRef  = useRef<HTMLInputElement>(null)
+
+  async function load() {
+    setLoading(true)
+    const res = await fetch('/api/admin/script')
+    if (res.ok) { const d = await res.json(); setScripts(Array.isArray(d) ? d : []) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function resetFiles() {
+    setAudioFile(null); setThumbFile(null); setAudioProgress(0); setThumbProgress(0)
+    setTranscriptMode('manual'); setTranscriptFileMsg(null)
+    if (audioInputRef.current) audioInputRef.current.value = ''
+    if (thumbInputRef.current) thumbInputRef.current.value = ''
+  }
+  function openAdd() {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'add', data: { ...SCRIPT_BLANK, order_index: scripts.length + 1 } })
+  }
+  function openEdit(s: AdminScript) {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'edit', data: {
+      id: s.id, title: s.title, description: s.description ?? '',
+      thumbnail_url: s.thumbnail_url, audio_url: s.audio_url, transcript: s.transcript,
+      duration_seconds: s.duration_seconds, order_index: s.order_index,
+      is_premium: s.is_premium, is_active: s.is_active,
+    }})
+  }
+  function closeModal() {
+    if (audioXhrRef.current) { audioXhrRef.current.abort(); audioXhrRef.current = null }
+    setModal(null); setFormError(''); resetFiles()
+  }
+
+  async function uploadToStorage(file: File, type: 'audio' | 'thumbnail', onProgress: (p: number) => void): Promise<string> {
+    const urlRes = await fetch('/api/admin/script/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, fileName: file.name }),
+    })
+    if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+    const { signedUrl, publicUrl } = await urlRes.json()
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      if (type === 'audio') audioXhrRef.current = xhr
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`))
+      xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+      xhr.open('PUT', signedUrl)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.send(file)
+    })
+    return publicUrl
+  }
+
+  /** Reads local audio metadata (no upload needed) to auto-detect duration. */
+  function detectAudioDuration(file: File): Promise<number | null> {
+    return new Promise(resolve => {
+      const audio = document.createElement('audio')
+      const url = URL.createObjectURL(file)
+      audio.preload = 'metadata'
+      audio.onloadedmetadata = () => {
+        URL.revokeObjectURL(url)
+        resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration) : null)
+      }
+      audio.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+      audio.src = url
+    })
+  }
+
+  async function handleAudioFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAudioFile(file)
+    const duration = await detectAudioDuration(file)
+    setModal(m => m ? { ...m, data: { ...m.data, duration_seconds: duration } } : m)
+  }
+
+  /** Parses a locally-selected transcript file (TXT/DOCX/PDF/RTF/HTML) into
+      plain text. Ported from the previous Dictation admin form, where this
+      exact PDF-extraction approach (pdfjs-dist, not a plain-text read) was
+      what fixed a real "binary garbage" bug. */
+  async function handleTranscriptFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !modal) return
+    if (file.size > 5 * 1024 * 1024) { setTranscriptFileMsg("Fayl juda katta (max 5 MB)"); return }
+    setTranscriptFileMsg(null)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    try {
+      let text = ''
+      if (ext === 'pdf') {
+        // @ts-expect-error pdfjs-dist ships no type declarations for this subpath
+        const pdfjsLib: any = await import('pdfjs-dist/build/pdf.mjs')
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        let fullText = ''
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          const pageText = content.items.map((item: any) => item.str).join(' ')
+          fullText += pageText + '\n'
+        }
+        text = fullText.replace(/\s+/g, ' ').trim()
+      } else if (ext === 'docx') {
+        const mammoth = (await import('mammoth')).default
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer })
+        text = result.value
+      } else if (ext === 'doc') {
+        try {
+          const mammoth = (await import('mammoth')).default
+          const arrayBuffer = await file.arrayBuffer()
+          const result = await mammoth.extractRawText({ arrayBuffer })
+          text = result.value
+        } catch { text = await file.text() }
+      } else if (ext === 'html' || ext === 'htm') {
+        const raw = await file.text()
+        text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      } else {
+        text = await file.text()
+        const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F�]/g) || []).length
+        if (nonPrintable > text.length * 0.05) {
+          setTranscriptFileMsg("Bu fayl matn emas. Boshqa fayl sinab ko'ring yoki qo'lda yozing.")
+          return
+        }
+      }
+      if (!text.trim()) { setTranscriptFileMsg("Fayldan matn olinmadi. Boshqa fayl tanlang yoki qo'lda yozing."); return }
+      setModal(m => m ? { ...m, data: { ...m.data, transcript: text.trim() } } : m)
+      const wc = text.trim().split(/\s+/).filter(Boolean).length
+      setTranscriptFileMsg(`Fayl yuklandi (${wc} so'z)`)
+    } catch (err) {
+      console.error('File parse error:', err)
+      setTranscriptFileMsg("Faylni o'qib bo'lmadi. Boshqa fayl sinab ko'ring.")
+    }
+  }
+
+  async function handleSave() {
+    if (!modal) return
+    const title = modal.data.title.trim()
+    const transcript = modal.data.transcript.trim()
+    const wordCount = transcript.split(/\s+/).filter(Boolean).length
+    if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+    if (wordCount < 50) { setFormError("Transkript kamida 50 so'zdan iborat bo'lishi kerak"); return }
+    if (!audioFile && !modal.data.audio_url) { setFormError('Audio fayl yuklanishi shart'); return }
+    if (audioFile && audioFile.size > 100 * 1024 * 1024) { setFormError('Audio hajmi 100MB dan oshmasligi kerak'); return }
+    if (thumbFile && thumbFile.size > 5 * 1024 * 1024) { setFormError('Rasm hajmi 5MB dan oshmasligi kerak'); return }
+
+    setSaving(true); setFormError('')
+    let audioUrl = modal.data.audio_url
+    let thumbUrl = modal.data.thumbnail_url
+
+    try {
+      if (audioFile) {
+        setAudioProgress(0)
+        audioUrl = await uploadToStorage(audioFile, 'audio', p => setAudioProgress(p))
+      }
+      if (thumbFile) {
+        setThumbProgress(0)
+        thumbUrl = await uploadToStorage(thumbFile, 'thumbnail', p => setThumbProgress(p))
+      }
+
+      const body = {
+        title,
+        description: modal.data.description?.trim() || null,
+        thumbnail_url: thumbUrl || null,
+        audio_url: audioUrl.trim(),
+        transcript,
+        duration_seconds: modal.data.duration_seconds,
+        order_index: modal.data.order_index,
+        is_premium: modal.data.is_premium,
+        is_active: modal.data.is_active,
+      }
+      const res = modal.mode === 'add'
+        ? await fetch('/api/admin/script',                  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(`/api/admin/script/${modal.data.id}`, { method: 'PUT',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+      if (modal.mode === 'add') setScripts(prev => [...prev, json].sort((a, b) => a.order_index - b.order_index))
+      else setScripts(prev => prev.map(s => s.id === modal.data.id ? json : s))
+      closeModal()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Xatolik')
+    }
+    setSaving(false)
+  }
+
+  async function handleToggleActive(s: AdminScript) {
+    const res = await fetch(`/api/admin/script/${s.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !s.is_active }),
+    })
+    if (res.ok) setScripts(prev => prev.map(x => x.id === s.id ? { ...x, is_active: !s.is_active } : x))
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(deleteTarget.id)
+    const res = await fetch(`/api/admin/script/${deleteTarget.id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setScripts(prev => prev.filter(s => s.id !== deleteTarget.id))
+    setDeleting(null)
+    setDeleteTarget(null)
+  }
+
+  const wordCount = modal?.data.transcript ? modal.data.transcript.trim().split(/\s+/).filter(Boolean).length : 0
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{scripts.length} ta script</span>
+        <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi script qo&apos;shish
+        </button>
+      </div>
+
+      {scripts.length === 0 ? (
+        <div className="card p-16 text-center">
+          <div className="text-4xl mb-3">🎧</div>
+          <p style={{ color: 'var(--text-muted)' }}>Hali script qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '48px 64px 1fr 70px 90px 70px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>#</span><span>Rasm</span><span>Sarlavha</span><span>Davomiylik</span><span>Turi</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {scripts.map(s => (
+              <div key={s.id} className="grid items-center px-4 py-3"
+                style={{ gridTemplateColumns: '48px 64px 1fr 70px 90px 70px 72px', gap: 8 }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{s.order_index}</span>
+                <div className="rounded-lg overflow-hidden shrink-0"
+                  style={{ width: 64, height: 36, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                  {s.thumbnail_url
+                    ? <img src={s.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <div className="w-full h-full flex items-center justify-center"><Headphones size={13} style={{ color: 'var(--text-muted)' }} /></div>}
+                </div>
+                <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {s.duration_seconds != null ? formatTime(s.duration_seconds) : '—'}
+                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                  style={s.is_premium
+                    ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
+                    : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  {s.is_premium ? '👑 Premium' : 'Bepul'}
+                </span>
+                <button onClick={() => handleToggleActive(s)}
+                  className="text-xs px-2 py-1 rounded-lg font-medium text-center"
+                  style={s.is_active
+                    ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                    : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {s.is_active ? 'Faol' : 'O\'chiq'}
+                </button>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button onClick={() => openEdit(s)} title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button onClick={() => setDeleteTarget(s)} disabled={deleting === s.id} title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    {deleting === s.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit modal ───────────────────────────────────────────── */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                {modal.mode === 'add' ? '🎧 Yangi script qo\'shish' : '✏️ Scriptni tahrirlash'}
+              </h3>
+              <button onClick={closeModal} disabled={saving} className="p-1 rounded-lg hover:opacity-70"
+                style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="World Wide Web..."
+                value={modal.data.title}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsif (ixtiyoriy)</label>
+              <textarea className="input-field text-sm w-full resize-none" rows={2}
+                value={modal.data.description ?? ''}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, description: e.target.value } } : m)} />
+            </div>
+
+            {/* Order index */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib raqami *</label>
+              <input type="number" min={1} className="input-field text-sm w-full"
+                value={modal.data.order_index}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, order_index: Number(e.target.value) } } : m)} />
+            </div>
+
+            {/* Thumbnail */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Rasm (ixtiyoriy — .jpg .png .webp, maks 5MB)
+              </label>
+              {(modal.data.thumbnail_url || thumbFile) && (
+                <div className="mb-2 relative rounded-xl overflow-hidden" style={{ maxWidth: 200, border: '1px solid var(--border)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbFile ? URL.createObjectURL(thumbFile) : modal.data.thumbnail_url!} alt="" style={{ width: '100%', display: 'block' }} />
+                  <button type="button"
+                    onClick={() => {
+                      setThumbFile(null)
+                      if (thumbInputRef.current) thumbInputRef.current.value = ''
+                      if (!thumbFile) setModal(m => m ? { ...m, data: { ...m.data, thumbnail_url: null } } : m)
+                    }}
+                    className="absolute top-1 right-1 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                    <X size={11} /> O&apos;chirish
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                style={{ border: `2px dashed ${thumbFile ? 'var(--accent)' : 'var(--border)'}`, background: thumbFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                onClick={() => !saving && thumbInputRef.current?.click()}>
+                <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {thumbFile ? thumbFile.name : (modal.data.thumbnail_url ? 'Rasmni almashtirish' : 'Rasm yuklash')}
+                </span>
+                <input ref={thumbInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/*" className="hidden" onChange={e => setThumbFile(e.target.files?.[0] ?? null)} />
+              </div>
+              {saving && thumbFile && (
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                  <div className="h-full rounded-full transition-all duration-300" style={{ width: `${thumbProgress}%`, background: '#10b981' }} />
+                </div>
+              )}
+            </div>
+
+            {/* Audio */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Audio fayl * (.mp3, .m4a, .wav, .ogg, maks 100MB)
+              </label>
+              {modal.data.audio_url && !audioFile ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                  <Headphones size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--success)' }}>
+                    Yuklangan audio mavjud{modal.data.duration_seconds != null ? ` — ${formatTime(modal.data.duration_seconds)}` : ''}
+                  </span>
+                  <button type="button" onClick={() => setModal(m => m ? { ...m, data: { ...m.data, audio_url: '' } } : m)}
+                    className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                  style={{ border: `2px dashed ${audioFile ? 'var(--accent)' : 'var(--border)'}`, background: audioFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                  onClick={() => !saving && audioInputRef.current?.click()}>
+                  {audioFile ? (
+                    <>
+                      <Headphones size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{audioFile.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {(audioFile.size / (1024 * 1024)).toFixed(1)} MB
+                          {modal.data.duration_seconds != null ? ` · ${formatTime(modal.data.duration_seconds)}` : ''}
+                        </p>
+                      </div>
+                      <button type="button"
+                        onClick={e => { e.stopPropagation(); setAudioFile(null); if (audioInputRef.current) audioInputRef.current.value = '' }}
+                        className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={14} /></button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1">
+                      <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP3, M4A, WAV yoki OGG tanlang</span>
+                    </div>
+                  )}
+                  <input ref={audioInputRef} type="file" accept=".mp3,.m4a,.wav,.ogg,audio/*" className="hidden" onChange={handleAudioFile} />
+                </div>
+              )}
+              {saving && audioFile && (
+                <div className="mt-2 space-y-1">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Audio yuklanmoqda... {audioProgress}%</span>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${audioProgress}%`, background: 'var(--accent)' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Transcript */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Transkript *</label>
+                <span className="text-xs" style={{ color: wordCount >= 50 ? '#10b981' : '#ef4444' }}>
+                  {wordCount} so&apos;z{wordCount < 50 ? ' (min 50)' : ''}
+                </span>
+              </div>
+              <div className="flex gap-4 mb-3">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                  <input type="radio" checked={transcriptMode === 'manual'}
+                    onChange={() => { setTranscriptMode('manual'); setTranscriptFileMsg(null) }} className="w-3 h-3" />
+                  <span style={{ color: 'var(--text-primary)' }}>Qo&apos;lda yozish</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                  <input type="radio" checked={transcriptMode === 'file'}
+                    onChange={() => { setTranscriptMode('file'); setTranscriptFileMsg(null) }} className="w-3 h-3" />
+                  <span style={{ color: 'var(--text-primary)' }}>Fayl yuklash</span>
+                </label>
+              </div>
+              {transcriptMode === 'file' && (
+                <div className="mb-3">
+                  <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                    <FileText size={14} style={{ color: 'var(--accent)' }} />
+                    {transcriptFileMsg
+                      ? <span style={{ color: '#10b981' }}>✓ {transcriptFileMsg}</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, PDF)</span>}
+                    <input type="file" accept=".txt,.docx,.doc,.pdf,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
+                  </label>
+                </div>
+              )}
+              <textarea
+                value={modal.data.transcript}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, transcript: e.target.value } } : m)}
+                rows={12} className="w-full px-3 py-2 rounded-lg text-sm border resize-y"
+                style={{ minHeight: 300, background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
+                placeholder="Audiodagi to'liq matn..." />
+            </div>
+
+            {/* Toggles */}
+            <div className="flex items-center gap-6 pt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_premium}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
+                Premium
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_active}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_active: e.target.checked } } : m)} />
+                Faol
+              </label>
+            </div>
+
+            {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSave} disabled={saving}
+                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" />
+                      {audioFile && audioProgress < 100 ? `Audio ${audioProgress}%...` : thumbFile && thumbProgress < 100 ? `Rasm ${thumbProgress}%...` : 'Saqlanmoqda...'}</>
+                  : <><Plus size={14} /> {modal.mode === 'add' ? 'Qo\'shish' : 'Saqlash'}</>}
+              </button>
+              <button onClick={closeModal} disabled={saving} className="btn-outline text-sm disabled:opacity-50">
+                {saving ? 'Bekor qilish' : 'Yopish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteTarget(null)} />
+          <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              Script &apos;{deleteTarget.title}&apos; o&apos;chirilsinmi?
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi (progress ham o&apos;chadi).</p>
+            <div className="flex gap-3">
+              <button onClick={handleDelete} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
   { id: 'listening',   label: 'Listening Tests',  Icon: Headphones },
+  { id: 'scripts',       label: 'Scripts',          Icon: FileText },
   { id: 'mock',       label: 'Mock Test',        Icon: Calendar },
   { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
   { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
@@ -4007,6 +4540,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'listening' && (
         <TestFileUploader type="listening" tests={listeningTests} accept=".mp3,.zip,.pdf" />
       )}
+      {activeTab === 'scripts' && <ScriptsTab />}
       {activeTab === 'mock' && (
         <MockScheduleEditor initialSchedules={initialSchedules} />
       )}

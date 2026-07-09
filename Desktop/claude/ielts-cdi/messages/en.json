@@ -92,6 +92,37 @@
     "freeBadge": "{count} free",
     "premiumBadge": "{count} premium"
   },
+  "script": {
+    "title": "Script Practice",
+    "cardDesc": "Listen to the audio, type what you hear",
+    "badgeBbc": "BBC-style audio",
+    "badgeMinutes": "6 min each",
+    "badgeSmart": "Smart grading",
+    "listSubtitle": "Listen to the audio, write down what you hear, and check your accuracy",
+    "noScripts": "No scripts have been added yet.",
+    "loadError": "Couldn't load. Please try again.",
+    "instructions": "Listen to the audio. Type what you hear into the box below. Click \"Check\" when you're done.",
+    "placeholder": "Type what you hear here...",
+    "wordsLabel": "Words",
+    "check": "Check",
+    "clear": "Clear",
+    "retry": "Try Again",
+    "nextScript": "Next Script",
+    "needsToPass": "You need at least 70% accuracy to unlock the next script",
+    "result": {
+      "total": "Total",
+      "exact": "Exact",
+      "partial": "Almost right",
+      "missing": "Missing",
+      "extra": "Extra",
+      "stars0": "Needs more practice. Try again.",
+      "stars1": "Could be better. Try again.",
+      "stars2": "Not bad!",
+      "stars3": "Good job!",
+      "stars4": "Great result!",
+      "stars5": "Excellent! Nearly perfect! 🎉"
+    }
+  },
   "mock": {
     "title": "Mock IELTS Test",
     "subtitle": "View upcoming sessions and book · 20,000 UZS",

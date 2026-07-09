@@ -92,6 +92,37 @@
     "freeBadge": "{count} ta bepul",
     "premiumBadge": "{count} ta premium"
   },
+  "script": {
+    "title": "Script Practice",
+    "cardDesc": "Audioni tinglang, matnni yozing",
+    "badgeBbc": "BBC-style audio",
+    "badgeMinutes": "6 min each",
+    "badgeSmart": "Smart grading",
+    "listSubtitle": "Audioni tinglang, eshitgan matnni yozing va aniqligingizni tekshiring",
+    "noScripts": "Hali script qo'shilmagan.",
+    "loadError": "Yuklab bo'lmadi. Qayta urinib ko'ring.",
+    "instructions": "Audioni tinglang. Eshitgan matnni pastdagi maydonga yozing. Tugatgach 'Tekshirish' tugmasini bosing.",
+    "placeholder": "Bu yerga eshitgan matningizni yozing...",
+    "wordsLabel": "So'zlar",
+    "check": "Tekshirish",
+    "clear": "Tozalash",
+    "retry": "Qayta urinish",
+    "nextScript": "Keyingi script",
+    "needsToPass": "Keyingi script ochilishi uchun kamida 70% aniqlik kerak",
+    "result": {
+      "total": "Jami",
+      "exact": "Aniq to'g'ri",
+      "partial": "Deyarli to'g'ri",
+      "missing": "Yetishmagan",
+      "extra": "Ortiqcha",
+      "stars0": "Ko'proq mashq kerak. Qayta urinib ko'ring.",
+      "stars1": "Yaxshiroq bo'lardi. Qayta urinib ko'ring.",
+      "stars2": "Yomon emas!",
+      "stars3": "Yaxshi!",
+      "stars4": "Zo'r natija!",
+      "stars5": "Ajoyib! Deyarli mukammal! 🎉"
+    }
+  },
   "mock": {
     "title": "Mock IELTS Test",
     "subtitle": "Kelgusi seanslarni ko'ring va bron qiling · 20,000 UZS",
