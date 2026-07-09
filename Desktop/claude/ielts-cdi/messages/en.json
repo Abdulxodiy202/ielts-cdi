@@ -104,6 +104,7 @@
     "instructions": "Listen to the audio. Type what you hear into the box below. Click \"Check\" when you're done.",
     "placeholder": "Type what you hear here...",
     "wordsLabel": "Words",
+    "minWordsHint": "Write at least {count} words",
     "check": "Check",
     "clear": "Clear",
     "retry": "Try Again",

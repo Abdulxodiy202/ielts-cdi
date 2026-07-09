@@ -104,6 +104,7 @@
     "instructions": "Audioni tinglang. Eshitgan matnni pastdagi maydonga yozing. Tugatgach 'Tekshirish' tugmasini bosing.",
     "placeholder": "Bu yerga eshitgan matningizni yozing...",
     "wordsLabel": "So'zlar",
+    "minWordsHint": "Kamida {count} ta so'z yozing",
     "check": "Tekshirish",
     "clear": "Tozalash",
     "retry": "Qayta urinish",

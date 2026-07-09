@@ -25,7 +25,7 @@ interface Script {
 
 type PageStatus = 'loading' | 'error' | 'exercise' | 'result'
 const SPEEDS = [0.75, 1, 1.25, 1.5] as const
-const MIN_WORDS = 20
+const MIN_WORDS = 3
 
 const STAR_MESSAGE_KEYS = [
   'script.result.stars0',
@@ -281,7 +281,7 @@ export default function ScriptExercisePage() {
             <button
               onClick={handleCheck}
               disabled={wordCount < MIN_WORDS}
-              className="btn-primary flex-1 disabled:opacity-50"
+              className={`btn-primary flex-1 ${wordCount < MIN_WORDS ? 'opacity-40 cursor-not-allowed' : ''}`}
             >
               {t('script.check')}
             </button>
@@ -289,6 +289,11 @@ export default function ScriptExercisePage() {
               {t('script.clear')}
             </button>
           </div>
+          {wordCount < MIN_WORDS && (
+            <p className="text-sm mt-2 text-center" style={{ color: 'var(--text-muted)' }}>
+              {t('script.minWordsHint', { count: MIN_WORDS })}
+            </p>
+          )}
         </>
       )}
 
