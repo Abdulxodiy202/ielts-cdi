@@ -90,8 +90,8 @@ export default function BooksPage() {
     <div className="min-h-screen p-6 md:p-8"
       style={{ background: 'var(--bg-primary)' }}>
       {/* shelf background strip */}
-      <div className="max-w-5xl mx-auto">
-        <div className="mb-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-6">
           <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
             {t('books.title')}
             {activeCategory && (
@@ -104,7 +104,7 @@ export default function BooksPage() {
         </div>
 
         {/* Filter bar */}
-        <div className="flex items-center gap-2 flex-wrap mb-8 overflow-x-auto pb-1">
+        <div className="flex items-center justify-center gap-2 flex-wrap mb-8 overflow-x-auto pb-1">
           {filterOptions.map(opt => {
             const active = activeCategory === opt.id
             const colors = opt.id ? BOOK_CATEGORY_COLORS[opt.id] : null
@@ -132,7 +132,7 @@ export default function BooksPage() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {books.map(book => {
               const locked = book.is_premium && !isPremium
               const gradient = bookColor(book.id, COVER_GRADIENTS)
