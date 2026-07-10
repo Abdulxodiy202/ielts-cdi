@@ -589,6 +589,11 @@
       "ielts_vocabulary": "IELTS Vocabulary",
       "task1": "Writing Task 1",
       "task2": "Writing Task 2"
+    },
+    "essaySelector": {
+      "chooseEssay": "Choose an essay",
+      "words": "words",
+      "back": "Back"
     }
   }
 }

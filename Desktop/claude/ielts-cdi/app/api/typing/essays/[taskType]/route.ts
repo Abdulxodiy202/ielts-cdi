@@ -17,15 +17,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ tas
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('typing_essays')
-    .select('title, content')
+    .select('id, title, content, word_count')
     .eq('task_type', taskType)
     .eq('is_active', true)
+    .order('id', { ascending: true })
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
   if (!data || data.length === 0) {
     return Response.json({ error: 'no_essays_available' }, { status: 404 })
   }
 
-  const pick = data[Math.floor(Math.random() * data.length)]
-  return Response.json(pick)
+  return Response.json({ essays: data })
 }

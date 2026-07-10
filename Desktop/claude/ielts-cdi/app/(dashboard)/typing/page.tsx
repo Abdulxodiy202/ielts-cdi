@@ -9,7 +9,14 @@ import { Keyboard, RotateCcw, Settings } from 'lucide-react'
 /* ── Config types ─────────────────────────────────────────────────── */
 type Mode = 'time' | 'words'
 type WordSetId = 'common_english' | 'ielts_vocabulary' | 'task1' | 'task2'
-type PageStatus = 'config' | 'typing' | 'result'
+type PageStatus = 'config' | 'essaySelector' | 'typing' | 'result'
+
+interface TypingEssayListItem {
+  id: number
+  title: string
+  content: string
+  word_count: number
+}
 
 const TIME_OPTIONS = [15, 30, 60, 120] as const
 const WORD_OPTIONS = [25, 50, 100, 200] as const
@@ -182,6 +189,8 @@ export default function TypingPage() {
   const [loadingWords, setLoadingWords] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [essayTitle, setEssayTitle] = useState<string | null>(null)
+  const [taskEssays, setTaskEssays] = useState<TypingEssayListItem[]>([])
+  const [selectedEssay, setSelectedEssay] = useState<TypingEssayListItem | null>(null)
   const wordPoolRef = useRef<string[]>([])
 
   const [typingState, dispatch] = useReducer(typingReducer, {
@@ -225,55 +234,93 @@ export default function TypingPage() {
   const CURSOR_HEIGHT = FONT_SIZE * 0.9
   const CURSOR_Y_OFFSET = (LINE_HEIGHT - CURSOR_HEIGHT) / 2
 
-  /* ── Fetch words/essay for the selected config ─────────────────── */
+  /* ── Shared reset of the typing-engine UI state, used whenever a fresh
+     set of words/an essay is about to be typed from scratch. ── */
+  const resetTypingUiState = useCallback(() => {
+    setStartedAt(null)
+    setEndedAt(null)
+    setTopLineIndex(0)
+    setLines([])
+    setCursorPos({ x: 0, y: 0 })
+    wordRefs.current = []
+    setStatus('typing')
+  }, [])
+
+  /* ── Fetch words for Common English / IELTS Vocabulary ───────────── */
   const loadTest = useCallback(async () => {
     setLoadingWords(true)
     setLoadError(null)
     setEssayTitle(null)
     try {
-      if (isEssaySet) {
-        const res = await fetch(`/api/typing/essays/${wordSet}`)
-        if (!res.ok) {
-          const e = await res.json().catch(() => ({}))
-          setLoadError(e.error === 'no_essays_available' ? 'noEssays' : 'genericError')
-          setLoadingWords(false)
-          return
-        }
-        const data: { title: string; content: string } = await res.json()
-        const essayWords = data.content.trim().split(/\s+/).filter(Boolean)
-        setEssayTitle(data.title)
-        wordPoolRef.current = []
-        dispatch({ type: 'RESET', words: essayWords, endless: false })
-      } else {
-        const res = await fetch(`/api/typing/words/${wordSet}`)
-        const data: { words?: string[] } = res.ok ? await res.json() : {}
-        const pool = data.words && data.words.length > 0 ? data.words : []
-        if (pool.length === 0) {
-          setLoadError('genericError')
-          setLoadingWords(false)
-          return
-        }
-        wordPoolRef.current = pool
-        if (mode === 'time') {
-          const initial = [...shuffleNoAdjacentDupes(pool), ...shuffleNoAdjacentDupes(pool)]
-          dispatch({ type: 'RESET', words: initial, endless: true })
-        } else {
-          const list: string[] = []
-          while (list.length < wordGoal) list.push(...shuffleNoAdjacentDupes(pool))
-          dispatch({ type: 'RESET', words: list.slice(0, wordGoal), endless: false })
-        }
+      const res = await fetch(`/api/typing/words/${wordSet}`)
+      const data: { words?: string[] } = res.ok ? await res.json() : {}
+      const pool = data.words && data.words.length > 0 ? data.words : []
+      if (pool.length === 0) {
+        setLoadError('genericError')
+        setLoadingWords(false)
+        return
       }
-      setStartedAt(null)
-      setEndedAt(null)
-      setTopLineIndex(0)
-      setLines([])
-      setCursorPos({ x: 0, y: 0 })
-      wordRefs.current = []
-      setStatus('typing')
+      wordPoolRef.current = pool
+      if (mode === 'time') {
+        const initial = [...shuffleNoAdjacentDupes(pool), ...shuffleNoAdjacentDupes(pool)]
+        dispatch({ type: 'RESET', words: initial, endless: true })
+      } else {
+        const list: string[] = []
+        while (list.length < wordGoal) list.push(...shuffleNoAdjacentDupes(pool))
+        dispatch({ type: 'RESET', words: list.slice(0, wordGoal), endless: false })
+      }
+      resetTypingUiState()
     } finally {
       setLoadingWords(false)
     }
-  }, [wordSet, mode, wordGoal, isEssaySet])
+  }, [wordSet, mode, wordGoal, resetTypingUiState])
+
+  /* ── Fetch the list of essays for Task 1 / Task 2, so the user can pick
+     one instead of having a random one assigned. ── */
+  const loadEssayList = useCallback(async () => {
+    setLoadingWords(true)
+    setLoadError(null)
+    setSelectedEssay(null)
+    try {
+      const res = await fetch(`/api/typing/essays/${wordSet}`)
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        setLoadError(e.error === 'no_essays_available' ? 'noEssays' : 'genericError')
+        return
+      }
+      const data: { essays: TypingEssayListItem[] } = await res.json()
+      setTaskEssays(data.essays)
+      setStatus('essaySelector')
+    } finally {
+      setLoadingWords(false)
+    }
+  }, [wordSet])
+
+  /** Loads one specific essay's content into the typing engine and starts
+      the test — used both for the initial pick and for retrying the same
+      essay (Tab / "Try Again" keep the current essay, not a new random one). */
+  const startEssay = useCallback((essay: TypingEssayListItem) => {
+    const essayWords = essay.content.trim().split(/\s+/).filter(Boolean)
+    setSelectedEssay(essay)
+    setEssayTitle(essay.title)
+    wordPoolRef.current = []
+    dispatch({ type: 'RESET', words: essayWords, endless: false })
+    resetTypingUiState()
+  }, [resetTypingUiState])
+
+  /** "Restart" (Tab / Try Again): reload the same essay for essay modes —
+      never a new random one — or reshuffle the same word pool otherwise. */
+  const restartCurrent = useCallback(() => {
+    if (isEssaySet && selectedEssay) startEssay(selectedEssay)
+    else loadTest()
+  }, [isEssaySet, selectedEssay, startEssay, loadTest])
+
+  /** "Config" (Escape / New Config): for essay modes there's no time/word
+      config to show, so it goes back to the essay picker instead. */
+  const goToConfigOrSelector = useCallback(() => {
+    if (isEssaySet) setStatus('essaySelector')
+    else setStatus('config')
+  }, [isEssaySet])
 
   /* ── Extend the word buffer for time mode as the user approaches the end ── */
   useEffect(() => {
@@ -392,19 +439,19 @@ export default function TypingPage() {
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (status === 'result') {
-      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); loadTest(); return }
-      if (e.key === 'Escape') { e.preventDefault(); setStatus('config'); return }
+      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); restartCurrent(); return }
+      if (e.key === 'Escape') { e.preventDefault(); goToConfigOrSelector(); return }
       return
     }
     if (status !== 'typing') return
 
-    if (e.key === 'Tab') { e.preventDefault(); loadTest(); return }
-    if (e.key === 'Escape') { e.preventDefault(); setStatus('config'); return }
+    if (e.key === 'Tab') { e.preventDefault(); restartCurrent(); return }
+    if (e.key === 'Escape') { e.preventDefault(); goToConfigOrSelector(); return }
     if (e.ctrlKey || e.metaKey || e.altKey) return // let browser shortcuts through
     if (e.key === 'Backspace') { e.preventDefault(); dispatch({ type: 'BACKSPACE' }); return }
     if (e.key === ' ') { e.preventDefault(); dispatch({ type: 'SPACE' }); return }
     if (e.key.length === 1) { e.preventDefault(); dispatch({ type: 'CHAR', ch: e.key }) }
-  }, [status, loadTest])
+  }, [status, restartCurrent, goToConfigOrSelector])
 
   /* ── Auto-focus the capture input ─────────────────────────────────── */
   useEffect(() => {
@@ -545,7 +592,7 @@ export default function TypingPage() {
           </div>
 
           <button
-            onClick={loadTest}
+            onClick={isEssaySet ? loadEssayList : loadTest}
             disabled={loadingWords}
             className="px-8 py-3 rounded-full font-bold text-base transition-all hover:opacity-90 disabled:opacity-50"
             style={{ background: '#6366f1', color: '#fff' }}
@@ -558,6 +605,42 @@ export default function TypingPage() {
               {loadError === 'noEssays' ? t('typing.noEssays') : t('typing.loadError')}
             </p>
           )}
+        </div>
+      )}
+
+      {status === 'essaySelector' && (
+        <div className="w-full max-w-3xl flex flex-col items-center gap-6">
+          <h2 className="text-lg font-bold" style={{ color: '#fff' }}>
+            {t('typing.essaySelector.chooseEssay')}
+          </h2>
+
+          {taskEssays.length === 0 ? (
+            <p className="text-sm text-center" style={{ color: '#f87171' }}>{t('typing.noEssays')}</p>
+          ) : (
+            <div className="grid gap-4 w-full sm:grid-cols-2 lg:grid-cols-3">
+              {taskEssays.map(essay => (
+                <button
+                  key={essay.id}
+                  onClick={() => startEssay(essay)}
+                  className="text-left p-4 rounded-xl transition-all hover:opacity-90 hover:-translate-y-0.5 active:scale-[0.99]"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div className="font-medium text-sm mb-1" style={{ color: '#fff' }}>{essay.title}</div>
+                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    {essay.word_count} {t('typing.essaySelector.words')}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => setStatus('config')}
+            className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+          >
+            <Settings size={14} /> {t('typing.essaySelector.back')}
+          </button>
         </div>
       )}
 
@@ -693,14 +776,14 @@ export default function TypingPage() {
 
           <div className="flex gap-3">
             <button
-              onClick={loadTest}
+              onClick={restartCurrent}
               className="flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm"
               style={{ background: '#6366f1', color: '#fff' }}
             >
               <RotateCcw size={14} /> {t('typing.tryAgain')} <span style={{ opacity: 0.6 }}>(tab)</span>
             </button>
             <button
-              onClick={() => setStatus('config')}
+              onClick={goToConfigOrSelector}
               className="flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm"
               style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}
             >

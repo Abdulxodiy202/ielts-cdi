@@ -589,6 +589,11 @@
       "ielts_vocabulary": "IELTS lug'ati",
       "task1": "Writing Task 1",
       "task2": "Writing Task 2"
+    },
+    "essaySelector": {
+      "chooseEssay": "Insho tanlang",
+      "words": "so'z",
+      "back": "Ortga"
     }
   }
 }

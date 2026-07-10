@@ -111,6 +111,13 @@ export default function ScriptExercisePage() {
     if (audioRef.current) audioRef.current.volume = volume
   }, [volume])
 
+  /* ── Stop audio on unmount (e.g. navigating away) ────────────────── */
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) audioRef.current.pause()
+    }
+  }, [])
+
   const togglePlay = useCallback(() => {
     const audio = audioRef.current
     if (!audio) return
@@ -140,6 +147,8 @@ export default function ScriptExercisePage() {
 
   async function handleCheck() {
     if (!script || wordCount < MIN_WORDS) return
+    if (audioRef.current) audioRef.current.pause()
+    setIsPlaying(false)
     const r = computeAlignment(answer, script.transcript)
     setResult(r)
     setStatus('result')
@@ -161,6 +170,11 @@ export default function ScriptExercisePage() {
   }
 
   function handleRetry() {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+    setIsPlaying(false)
     setResult(null)
     setStatus('exercise')
   }
