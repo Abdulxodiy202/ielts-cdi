@@ -3063,7 +3063,9 @@ function MusicTab() {
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ title: '', youtube_url: '', order_index: 0, is_active: true })
+  const [toast, setToast] = useState('')
 
   const load = async () => {
     setLoading(true)
@@ -3075,15 +3077,42 @@ function MusicTab() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
+
   const resetForm = () => {
     setForm({ title: '', youtube_url: '', order_index: tracks.length, is_active: true })
     setFormError('')
     setShowForm(false)
+    setEditingId(null)
+  }
+
+  const openAdd = () => {
+    setForm({ title: '', youtube_url: '', order_index: tracks.length, is_active: true })
+    setFormError('')
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  const openEdit = (t: MusicTrack) => {
+    setForm({ title: t.title, youtube_url: t.youtube_url, order_index: t.order_index, is_active: t.is_active })
+    setFormError('')
+    setEditingId(t.id)
+    setShowForm(true)
+  }
+
+  const validateForm = () => {
+    if (!form.title.trim() || form.title.trim().length < 3) { setFormError("Nomi kamida 3 belgidan iborat bo'lishi kerak"); return false }
+    if (!form.youtube_url.trim()) { setFormError('YouTube URL kiritilishi shart'); return false }
+    if (!Number.isInteger(form.order_index) || form.order_index < 0) { setFormError("Tartib raqami musbat butun son bo'lishi kerak"); return false }
+    return true
   }
 
   const handleAdd = async () => {
-    if (!form.title.trim()) { setFormError('Nomi kiritilishi shart'); return }
-    if (!form.youtube_url.trim()) { setFormError('YouTube URL kiritilishi shart'); return }
+    if (!validateForm()) return
     setSaving(true); setFormError('')
     const res = await fetch('/api/admin/music', {
       method: 'POST',
@@ -3096,6 +3125,24 @@ function MusicTab() {
     resetForm()
     setSaving(false)
   }
+
+  const handleEditSave = async () => {
+    if (!editingId || !validateForm()) return
+    setSaving(true); setFormError('')
+    const res = await fetch(`/api/admin/music/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    setTracks(prev => prev.map(x => x.id === editingId ? json : x))
+    resetForm()
+    setSaving(false)
+    setToast('Musiqa yangilandi')
+  }
+
+  const handleSubmit = editingId ? handleEditSave : handleAdd
 
   const handleToggle = async (t: MusicTrack) => {
     const res = await fetch(`/api/admin/music/${t.id}`, {
@@ -3136,10 +3183,18 @@ CREATE POLICY "Music readable by authenticated" ON background_music
 
   return (
     <div className="space-y-6">
-      {/* Add form */}
+      {toast && (
+        <div className="p-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Add / Edit form */}
       {showForm ? (
         <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
-          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>вћ• Yangi musiqa</h3>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            {editingId ? 'Musiqani tahrirlash' : 'Yangi musiqa'}
+          </h3>
           <div className="grid sm:grid-cols-2 gap-3 mb-3">
             <div className="sm:col-span-2">
               <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Nomi</label>
@@ -3183,15 +3238,16 @@ CREATE POLICY "Music readable by authenticated" ON background_music
           </div>
           {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>вќЊ {formError}</p>}
           <div className="flex gap-2">
-            <button onClick={handleAdd} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
-              <Plus size={14} /> {saving ? 'Saqlanmoqda...' : 'Qo\'shish'}
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              {editingId ? <Edit3 size={14} /> : <Plus size={14} />}
+              {saving ? 'Saqlanmoqda...' : editingId ? 'Saqlash' : 'Qo\'shish'}
             </button>
             <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
           </div>
         </div>
       ) : (
         <button
-          onClick={() => { setShowForm(true); setForm(f => ({ ...f, order_index: tracks.length })) }}
+          onClick={openAdd}
           className="btn-primary text-sm flex items-center gap-2"
         >
           <Plus size={14} /> Yangi musiqa qo&apos;shish
@@ -3207,13 +3263,13 @@ CREATE POLICY "Music readable by authenticated" ON background_music
       ) : (
         <div className="card overflow-hidden">
           <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-            style={{ gridTemplateColumns: '40px 1fr 1fr 80px 80px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            style={{ gridTemplateColumns: '40px 1fr 1fr 80px 108px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
             <span>#</span><span>Nomi</span><span>YouTube URL</span><span>Holat</span><span className="text-right">Amal</span>
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {tracks.map(t => (
               <div key={t.id} className="grid items-center px-4 py-3 text-sm"
-                style={{ gridTemplateColumns: '40px 1fr 1fr 80px 80px', gap: 8 }}>
+                style={{ gridTemplateColumns: '40px 1fr 1fr 80px 108px', gap: 8 }}>
                 <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{t.order_index}</span>
                 <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.title}</span>
                 <a
@@ -3241,6 +3297,13 @@ CREATE POLICY "Music readable by authenticated" ON background_music
                     className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
                     style={{ background: t.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: t.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
                     {t.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(t)}
+                    title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
                   </button>
                   <button
                     onClick={() => handleDelete(t.id)}
