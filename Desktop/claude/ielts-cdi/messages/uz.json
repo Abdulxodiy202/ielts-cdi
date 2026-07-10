@@ -441,7 +441,16 @@
     "subtitle": "IELTS uchun foydali inglizcha kitoblar",
     "read": "O'qish",
     "empty": "Hali kitoblar qo'shilmagan",
-    "premium": "Premium olish"
+    "premium": "Premium olish",
+    "filterAll": "Barchasi",
+    "countSuffix": "ta kitob",
+    "emptyCategory": "Hali {category} kitoblari yo'q. Keyinroq qayta tekshiring!",
+    "categories": {
+      "grammar": "Grammatika",
+      "ielts": "IELTS",
+      "vocabulary": "Lug'at",
+      "fun_reads": "Qiziqarli kitoblar"
+    }
   },
   "articles": {
     "title": "Maqolalar",

@@ -3,8 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 import { isAdmin } from '@/lib/admin-config'
+import { isBookCategory } from '@/lib/utils/bookCategories'
 
-const SELECT = 'id, title, author, heyzine_url, cover_image_url, recommendation, is_premium, is_published, created_at'
+const SELECT = 'id, title, author, heyzine_url, cover_image_url, recommendation, category, is_premium, is_published, created_at'
 
 export async function GET(
   _req: NextRequest,
@@ -38,7 +39,10 @@ export async function PATCH(
 
   const { id } = await params
   const body = await req.json()
-  const allowed = ['title', 'author', 'heyzine_url', 'cover_image_url', 'recommendation', 'is_premium', 'is_published']
+  if ('category' in body && !isBookCategory(body.category)) {
+    return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
+  }
+  const allowed = ['title', 'author', 'heyzine_url', 'cover_image_url', 'recommendation', 'category', 'is_premium', 'is_published']
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]

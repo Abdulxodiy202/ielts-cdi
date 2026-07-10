@@ -11,6 +11,7 @@ import {
   Loader2, Upload, FileText, X, Music, Play, Keyboard,
 } from 'lucide-react'
 import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
+import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
 import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
@@ -2321,9 +2322,26 @@ interface BookItem {
   heyzine_url: string
   cover_image_url: string | null
   recommendation: string | null
+  category: BookCategory
   is_premium: boolean
   is_published: boolean
   created_at: string
+}
+
+const BOOK_CATEGORY_LABELS: Record<BookCategory, string> = {
+  grammar: 'Grammatika',
+  ielts: 'IELTS',
+  vocabulary: "Lug'at",
+  fun_reads: 'Qiziqarli kitoblar',
+}
+
+function CategoryBadge({ category }: { category: BookCategory }) {
+  const c = BOOK_CATEGORY_COLORS[category]
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${c.bg} ${c.text} ${c.border}`}>
+      {BOOK_CATEGORY_LABELS[category]}
+    </span>
+  )
 }
 
 function BooksTab() {
@@ -2337,6 +2355,7 @@ function BooksTab() {
   const [editAuthor, setEditAuthor]                 = useState('')
   const [editUrl, setEditUrl]                       = useState('')
   const [editRecommendation, setEditRecommendation] = useState('')
+  const [editCategory, setEditCategory]             = useState<BookCategory>(DEFAULT_BOOK_CATEGORY)
   const [saving, setSaving]                         = useState(false)
 
   // Cover image
@@ -2355,6 +2374,7 @@ function BooksTab() {
   const [newAuthor, setNewAuthor]                   = useState('')
   const [newUrl, setNewUrl]                         = useState('')
   const [newPremium, setNewPremium]                 = useState(false)
+  const [newCategory, setNewCategory]               = useState<BookCategory>(DEFAULT_BOOK_CATEGORY)
   const [creating, setCreating]                     = useState(false)
 
   useEffect(() => {
@@ -2373,6 +2393,7 @@ function BooksTab() {
     setEditAuthor(b?.author ?? '')
     setEditUrl(b?.heyzine_url ?? '')
     setEditRecommendation(b?.recommendation ?? '')
+    setEditCategory(b?.category ?? DEFAULT_BOOK_CATEGORY)
     setSelectedCoverFile(null); setMessage(null); setShowDeleteBook(false)
     if (coverInputRef.current) coverInputRef.current.value = ''
   }
@@ -2383,7 +2404,8 @@ function BooksTab() {
     const authorChanged         = editAuthor.trim()         !== (selectedBook?.author         ?? '')
     const urlChanged            = editUrl.trim()    && editUrl.trim()           !== selectedBook?.heyzine_url
     const recommendationChanged = editRecommendation.trim() !== (selectedBook?.recommendation ?? '')
-    if (!titleChanged && !authorChanged && !urlChanged && !recommendationChanged) return
+    const categoryChanged       = editCategory !== (selectedBook?.category ?? DEFAULT_BOOK_CATEGORY)
+    if (!titleChanged && !authorChanged && !urlChanged && !recommendationChanged && !categoryChanged) return
     setSaving(true); setMessage(null)
     try {
       const body: Record<string, string> = {}
@@ -2391,6 +2413,7 @@ function BooksTab() {
       if (authorChanged)         body.author         = editAuthor.trim()
       if (urlChanged)            body.heyzine_url    = editUrl.trim()
       if (recommendationChanged) body.recommendation = editRecommendation.trim()
+      if (categoryChanged)       body.category       = editCategory
       const res = await fetch(`/api/books/${selectedId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -2481,13 +2504,13 @@ function BooksTab() {
     try {
       const res = await fetch('/api/books', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle.trim(), author: newAuthor.trim() || null, heyzine_url: newUrl.trim(), is_premium: newPremium }),
+        body: JSON.stringify({ title: newTitle.trim(), author: newAuthor.trim() || null, heyzine_url: newUrl.trim(), is_premium: newPremium, category: newCategory }),
       })
       if (res.ok) {
         const created = await res.json()
         setBooks(prev => [created, ...prev])
         setSelectedId(created.id); handleBookChange(created.id)
-        setShowCreate(false); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false)
+        setShowCreate(false); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false); setNewCategory(DEFAULT_BOOK_CATEGORY)
       }
     } finally { setCreating(false) }
   }
@@ -2503,7 +2526,7 @@ function BooksTab() {
     <div className="space-y-4 max-w-lg">
       <div className="flex items-center justify-between">
         <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{books.length} ta kitob</span>
-        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false) }}
+        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false); setNewCategory(DEFAULT_BOOK_CATEGORY) }}
           className="btn-primary flex items-center gap-2 text-sm">
           <Plus size={15} /> Yangi kitob
         </button>
@@ -2511,12 +2534,17 @@ function BooksTab() {
 
       <div className="card p-4">
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
-        <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field">
-          <option value="">вЂ” Kitob tanlang вЂ”</option>
-          {books.map(b => (
-            <option key={b.id} value={b.id}>{b.title}{!b.is_published ? ' (Draft)' : ''}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field flex-1">
+            <option value="">вЂ” Kitob tanlang вЂ”</option>
+            {books.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.title} - {BOOK_CATEGORY_LABELS[b.category ?? DEFAULT_BOOK_CATEGORY]}{!b.is_published ? ' (Draft)' : ''}
+              </option>
+            ))}
+          </select>
+          {selectedBook && <CategoryBadge category={selectedBook.category ?? DEFAULT_BOOK_CATEGORY} />}
+        </div>
       </div>
 
       {selectedId && selectedBook && (
@@ -2544,6 +2572,26 @@ function BooksTab() {
                 rows={3}
                 className="input-field w-full text-sm resize-none"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Kategoriya *</label>
+              <div className="flex flex-wrap gap-2">
+                {BOOK_CATEGORIES.map(cat => {
+                  const c = BOOK_CATEGORY_COLORS[cat]
+                  const active = editCategory === cat
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setEditCategory(cat)}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-all ${active ? `${c.bg} ${c.text} ${c.border}` : ''}`}
+                      style={!active ? { background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderColor: 'var(--border)' } : undefined}
+                    >
+                      {BOOK_CATEGORY_LABELS[cat]}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
@@ -2721,6 +2769,26 @@ function BooksTab() {
                   <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL *</label>
                   <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
                     placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Kategoriya *</label>
+                  <div className="flex flex-wrap gap-2">
+                    {BOOK_CATEGORIES.map(cat => {
+                      const c = BOOK_CATEGORY_COLORS[cat]
+                      const active = newCategory === cat
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setNewCategory(cat)}
+                          className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-all ${active ? `${c.bg} ${c.text} ${c.border}` : ''}`}
+                          style={!active ? { background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderColor: 'var(--border)' } : undefined}
+                        >
+                          {BOOK_CATEGORY_LABELS[cat]}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>

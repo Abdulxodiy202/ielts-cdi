@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, isBookCategory, type BookCategory } from '@/lib/utils/bookCategories'
 
 interface Book {
   id: string
@@ -14,6 +15,7 @@ interface Book {
   heyzine_url: string
   cover_image_url: string | null
   recommendation: string | null
+  category: BookCategory
   is_premium: boolean
   is_published: boolean
   created_at: string
@@ -34,10 +36,14 @@ function bookColor(id: string, arr: string[]) {
 
 export default function BooksPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { t } = useLanguage()
   const [books, setBooks]       = useState<Book[]>([])
   const [loading, setLoading]   = useState(true)
   const [isPremium, setIsPremium] = useState(false)
+
+  const categoryParam = searchParams.get('category')
+  const activeCategory: BookCategory | null = isBookCategory(categoryParam) ? categoryParam : null
 
   useEffect(() => {
     const supabase = createClient()
@@ -46,10 +52,30 @@ export default function BooksPage() {
       supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single()
         .then(({ data }) => setIsPremium(isActivePremium(data)))
     })
-    fetch('/api/books')
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    const url = activeCategory ? `/api/books?category=${activeCategory}` : '/api/books'
+    fetch(url)
       .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setBooks(d) })
       .finally(() => setLoading(false))
-  }, [])
+  }, [activeCategory])
+
+  const selectCategory = useCallback((category: BookCategory | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (category) params.set('category', category)
+    else params.delete('category')
+    const qs = params.toString()
+    router.replace(qs ? `/books?${qs}` : '/books')
+  }, [router, searchParams])
+
+  const categoryLabel = useCallback((category: BookCategory) => t(`books.categories.${category}`), [t])
+
+  const filterOptions = useMemo(
+    () => [{ id: null as BookCategory | null, label: t('books.filterAll') }, ...BOOK_CATEGORIES.map(c => ({ id: c, label: categoryLabel(c) }))],
+    [t, categoryLabel],
+  )
 
   if (loading) {
     return (
@@ -65,22 +91,53 @@ export default function BooksPage() {
       style={{ background: 'var(--bg-primary)' }}>
       {/* shelf background strip */}
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('books.title')}</h1>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+            {t('books.title')}
+            {activeCategory && (
+              <span className="text-sm font-normal ml-2" style={{ color: 'var(--text-muted)' }}>
+                ({books.length} {t('books.countSuffix')})
+              </span>
+            )}
+          </h1>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('books.subtitle')}</p>
+        </div>
+
+        {/* Filter bar */}
+        <div className="flex items-center gap-2 flex-wrap mb-8 overflow-x-auto pb-1">
+          {filterOptions.map(opt => {
+            const active = activeCategory === opt.id
+            const colors = opt.id ? BOOK_CATEGORY_COLORS[opt.id] : null
+            return (
+              <button
+                key={opt.id ?? 'all'}
+                onClick={() => selectCategory(opt.id)}
+                className={`shrink-0 text-sm px-4 py-1.5 rounded-full font-medium border transition-all ${active && colors ? `${colors.bg} ${colors.text} ${colors.border}` : ''}`}
+                style={!active
+                  ? { background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderColor: 'var(--border)' }
+                  : (!colors ? { background: 'rgba(99,102,241,0.18)', color: 'var(--accent)', borderColor: 'rgba(99,102,241,0.3)' } : undefined)}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
         </div>
 
         {books.length === 0 ? (
           <div className="py-20 text-center rounded-2xl"
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>📚</div>
-            <p className="font-medium">{t('books.empty')}</p>
+            <p className="font-medium">
+              {activeCategory ? t('books.emptyCategory', { category: categoryLabel(activeCategory) }) : t('books.empty')}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
             {books.map(book => {
               const locked = book.is_premium && !isPremium
               const gradient = bookColor(book.id, COVER_GRADIENTS)
+              const category = book.category ?? DEFAULT_BOOK_CATEGORY
+              const categoryColors = BOOK_CATEGORY_COLORS[category]
 
               return (
                 <div key={book.id} className="flex flex-col gap-3">
@@ -120,6 +177,13 @@ export default function BooksPage() {
                             </p>
                           </div>
                         )}
+
+                        {/* Category badge */}
+                        <div style={{ position: 'absolute', top: 8, left: 8 }}>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${categoryColors.bg} ${categoryColors.text} ${categoryColors.border}`} style={{ whiteSpace: 'nowrap', backdropFilter: 'blur(4px)' }}>
+                            {categoryLabel(category)}
+                          </span>
+                        </div>
 
                         {/* Premium badge */}
                         {book.is_premium && (

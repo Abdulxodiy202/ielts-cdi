@@ -441,7 +441,16 @@
     "subtitle": "Useful English books for IELTS",
     "read": "Read",
     "empty": "No books added yet",
-    "premium": "Get Premium"
+    "premium": "Get Premium",
+    "filterAll": "All",
+    "countSuffix": "books",
+    "emptyCategory": "No {category} books yet. Check back later!",
+    "categories": {
+      "grammar": "Grammar",
+      "ielts": "IELTS",
+      "vocabulary": "Vocabulary",
+      "fun_reads": "Fun Reads"
+    }
   },
   "articles": {
     "title": "Articles",
