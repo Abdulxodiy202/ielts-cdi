@@ -333,15 +333,10 @@ function ResultScreen({
           ))}
         </div>
         <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{t(STAR_MESSAGE_KEYS[stars])}</p>
-        {result.accuracy < 30 && result.attemptAccuracy > 70 && (
-          <p className="text-xs mt-2 max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
-            {t('script.result.incompleteButAccurate', { attemptAccuracy: result.attemptAccuracy })}
-          </p>
-        )}
       </div>
 
       {/* Stats box */}
-      <div className="card p-4 mb-6 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+      <div className="card p-4 mb-6 grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
         <div>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('script.result.total')}</p>
           <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{result.stats.totalOrig}</p>
@@ -355,12 +350,16 @@ function ResultScreen({
           <p className="font-bold" style={{ color: '#f59e0b' }}>{result.stats.partial}</p>
         </div>
         <div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>🔴 {t('script.result.missing')}</p>
-          <p className="font-bold" style={{ color: '#ef4444' }}>{result.stats.missing}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>🔴 {t('script.result.wrong')}</p>
+          <p className="font-bold" style={{ color: '#ef4444' }}>{result.stats.wrong}</p>
         </div>
         <div>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>⚪ {t('script.result.extra')}</p>
-          <p className="font-bold" style={{ color: 'var(--text-muted)' }}>{result.stats.extra}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>⚪ {t('script.result.missing')}</p>
+          <p className="font-bold" style={{ color: 'var(--text-muted)' }}>{result.stats.missing}</p>
+        </div>
+        <div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>🟠 {t('script.result.extra')}</p>
+          <p className="font-bold" style={{ color: '#f97316' }}>{result.stats.extra}</p>
         </div>
       </div>
 
@@ -384,18 +383,29 @@ function ResultScreen({
               </span>
             )
           }
+          if (item.status === 'wrong') {
+            // User typed something at this position, but it's the wrong word
+            return (
+              <span key={idx} className="inline-flex flex-col items-center mr-1.5 mb-1.5 px-2 py-0.5 rounded-lg text-sm relative"
+                style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#fff' }}>
+                <span className="line-through">{item.user}</span>
+                <sub className="text-[10px] leading-none" style={{ color: 'var(--text-muted)' }}>→ {item.orig}</sub>
+              </span>
+            )
+          }
           if (item.status === 'missing') {
+            // Original had a word here but the user didn't type anything
             return (
               <span key={idx} className="inline-block mr-1.5 mb-1.5 px-2 py-0.5 rounded-lg text-sm"
-                style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#fff' }}>
+                style={{ background: 'rgba(107,114,128,0.2)', border: '1px solid rgba(107,114,128,0.4)', color: '#9ca3af' }}>
                 {item.orig}
               </span>
             )
           }
-          // extra
+          // extra — user typed words past the end of the original
           return (
             <span key={idx} className="inline-block mr-1.5 mb-1.5 px-2 py-0.5 rounded-lg text-sm line-through"
-              style={{ background: 'rgba(107,114,128,0.2)', border: '1px solid rgba(107,114,128,0.4)', color: '#9ca3af' }}>
+              style={{ background: 'rgba(249,115,22,0.2)', border: '1px solid rgba(249,115,22,0.4)', color: '#fdba74' }}>
               {item.user}
             </span>
           )
@@ -406,8 +416,9 @@ function ResultScreen({
       <p className="text-xs mb-8 flex items-center gap-3 flex-wrap" style={{ color: 'var(--text-muted)' }}>
         <span>🟢 {t('script.result.exact')}</span>
         <span>🟡 {t('script.result.partial')}</span>
-        <span>🔴 {t('script.result.missing')}</span>
-        <span>⚪ {t('script.result.extra')}</span>
+        <span>🔴 {t('script.result.wrong')}</span>
+        <span>⚪ {t('script.result.missing')}</span>
+        <span>🟠 {t('script.result.extra')}</span>
       </p>
 
       {/* Actions */}

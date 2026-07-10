@@ -114,15 +114,15 @@
       "total": "Total",
       "exact": "Exact",
       "partial": "Almost right",
-      "missing": "Missing",
+      "wrong": "Wrong",
+      "missing": "Not written",
       "extra": "Extra",
-      "stars0": "Needs more practice. Try again.",
-      "stars1": "Could be better. Try again.",
-      "stars2": "Not bad!",
+      "stars0": "Needs more practice. Listen to the whole audio and try again.",
+      "stars1": "Could be better",
+      "stars2": "Not bad",
       "stars3": "Good job!",
       "stars4": "Great result!",
-      "stars5": "Excellent! Nearly perfect! 🎉",
-      "incompleteButAccurate": "What you typed was {attemptAccuracy}% accurate — you just typed a small part of the script. Try listening to the whole audio and writing it all down."
+      "stars5": "Excellent!"
     }
   },
   "mock": {

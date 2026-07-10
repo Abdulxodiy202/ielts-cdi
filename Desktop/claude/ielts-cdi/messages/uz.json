@@ -114,15 +114,15 @@
       "total": "Jami",
       "exact": "Aniq to'g'ri",
       "partial": "Deyarli to'g'ri",
-      "missing": "Yetishmagan",
+      "wrong": "Noto'g'ri",
+      "missing": "Yozilmagan",
       "extra": "Ortiqcha",
-      "stars0": "Ko'proq mashq kerak. Qayta urinib ko'ring.",
-      "stars1": "Yaxshiroq bo'lardi. Qayta urinib ko'ring.",
-      "stars2": "Yomon emas!",
+      "stars0": "Ko'proq mashq kerak. Butun audioni tinglab yozing.",
+      "stars1": "Yaxshiroq bo'lardi",
+      "stars2": "Yomon emas",
       "stars3": "Yaxshi!",
       "stars4": "Zo'r natija!",
-      "stars5": "Ajoyib! Deyarli mukammal! 🎉",
-      "incompleteButAccurate": "Yozganingiz {attemptAccuracy}% to'g'ri edi — lekin skriptning kichik qismini yozdingiz. Butun audioni tinglab, hammasini yozib ko'ring."
+      "stars5": "Ajoyib!"
     }
   },
   "mock": {

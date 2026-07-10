@@ -1,8 +1,13 @@
-/* Script Practice grading: normalize both texts into word lists, classify
-   each user/original word pair as exact/partial/none (typo-tolerant via
-   Levenshtein distance), then align the two word sequences IN ORDER with a
-   weighted LCS so a matched word can't jump to an unrelated position later
-   in the transcript. */
+/* Script Practice grading: normalize both texts into word lists, then
+   compare STRICTLY BY POSITION -- user word i vs. original word i, never
+   searching ahead. An LCS-style alignment was tried before this, but LCS
+   finds matching words anywhere (as long as their relative order holds),
+   which lets a user who happens to type real words that occur later in
+   the transcript get credited as if they'd transcribed the right part.
+   For a dictation exercise, position IS the point: you're reconstructing
+   what was said in the order it was said, not producing a word salad
+   drawn from the passage. Within a position, small typos are still
+   forgiven via compareWords()'s Levenshtein-based partial match. */
 
 export function normalize(text: string): string[] {
   return text
@@ -64,7 +69,7 @@ export function compareWords(user: string, orig: string): MatchLevel {
 export interface AlignItem {
   orig: string | null
   user: string | null
-  status: 'exact' | 'partial' | 'missing' | 'extra'
+  status: 'exact' | 'partial' | 'wrong' | 'missing' | 'extra'
 }
 
 export interface AlignmentStats {
@@ -72,6 +77,7 @@ export interface AlignmentStats {
   totalUser: number
   exact: number
   partial: number
+  wrong: number
   missing: number
   extra: number
 }
@@ -79,127 +85,81 @@ export interface AlignmentStats {
 export interface AlignmentResult {
   alignment: AlignItem[]
   accuracy: number
-  /** Accuracy of only the words the user actually typed, i.e. score /
-      userWords.length instead of score / origWords.length. Useful for
-      distinguishing "typed little, but what they typed was right" from
-      "typed a lot, and got most of it wrong" when `accuracy` alone (which
-      is always relative to the FULL transcript) is very low. */
-  attemptAccuracy: number
   stats: AlignmentStats
 }
 
 export function computeAlignment(userText: string, origText: string): AlignmentResult {
   const userWords = normalize(userText)
   const origWords = normalize(origText)
-  const m = origWords.length
-  const n = userWords.length
 
-  // DP table
-  const dp: number[][] = []
-  for (let i = 0; i <= m; i++) {
-    dp.push(new Array(n + 1).fill(0))
-  }
+  const alignment: AlignItem[] = []
+  const maxLen = Math.max(userWords.length, origWords.length)
 
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      const match = compareWords(userWords[j - 1], origWords[i - 1])
+  let exactCount = 0
+  let partialCount = 0
+  let missingCount = 0
+  let extraCount = 0
+
+  for (let i = 0; i < maxLen; i++) {
+    const userWord = userWords[i]
+    const origWord = origWords[i]
+
+    if (userWord === undefined) {
+      // User didn't type this position — missing
+      alignment.push({ orig: origWord, user: null, status: 'missing' })
+      missingCount++
+    } else if (origWord === undefined) {
+      // User typed extra words past the end of the original — extra
+      alignment.push({ orig: null, user: userWord, status: 'extra' })
+      extraCount++
+    } else {
+      // Both words exist at position i — compare
+      const match = compareWords(userWord, origWord)
       if (match === 'exact') {
-        dp[i][j] = dp[i - 1][j - 1] + 2
+        alignment.push({ orig: origWord, user: userWord, status: 'exact' })
+        exactCount++
       } else if (match === 'partial') {
-        dp[i][j] = Math.max(
-          dp[i - 1][j - 1] + 1, // partial match takes this position
-          dp[i - 1][j],         // skip original word (missing)
-          dp[i][j - 1],         // skip user word (extra)
-        )
+        alignment.push({ orig: origWord, user: userWord, status: 'partial' })
+        partialCount++
       } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
+        // Different word at this position — the right word wasn't typed
+        // AND a wrong one was, so it's neither a plain "missing" nor a
+        // plain "extra": it gets its own status.
+        alignment.push({ orig: origWord, user: userWord, status: 'wrong' })
       }
     }
   }
 
-  // Backtrack for detailed alignment
-  const alignment: AlignItem[] = []
-  let i = m, j = n
-  while (i > 0 && j > 0) {
-    const match = compareWords(userWords[j - 1], origWords[i - 1])
-    if (match === 'exact' && dp[i][j] === dp[i - 1][j - 1] + 2) {
-      alignment.unshift({ orig: origWords[i - 1], user: userWords[j - 1], status: 'exact' })
-      i--; j--
-    } else if (match === 'partial' && dp[i][j] === dp[i - 1][j - 1] + 1) {
-      alignment.unshift({ orig: origWords[i - 1], user: userWords[j - 1], status: 'partial' })
-      i--; j--
-    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
-      alignment.unshift({ orig: origWords[i - 1], user: null, status: 'missing' })
-      i--
-    } else {
-      alignment.unshift({ orig: null, user: userWords[j - 1], status: 'extra' })
-      j--
-    }
-  }
-  while (i > 0) {
-    alignment.unshift({ orig: origWords[i - 1], user: null, status: 'missing' })
-    i--
-  }
-  while (j > 0) {
-    alignment.unshift({ orig: null, user: userWords[j - 1], status: 'extra' })
-    j--
-  }
-
-  // Calculate score
-  const exactCount = alignment.filter(a => a.status === 'exact').length
-  const partialCount = alignment.filter(a => a.status === 'partial').length
-  const missingCount = alignment.filter(a => a.status === 'missing').length
-  const extraCount = alignment.filter(a => a.status === 'extra').length
+  const wrongCount = alignment.filter(a => a.status === 'wrong').length
 
   // Exact = 1.0 weight, partial = 0.6 weight
   const score = exactCount + partialCount * 0.6
   const accuracy = origWords.length > 0 ? Math.round((score / origWords.length) * 100) : 0
-  // Accuracy of only what the user actually typed (not the full transcript) —
-  // lets the result screen distinguish "typed little but correct" from
-  // "typed a lot but wrong" when `accuracy` alone is very low.
-  const attemptAccuracy = userWords.length > 0 ? Math.round((score / userWords.length) * 100) : 0
 
   /* eslint-disable no-console */
-  console.log('=== SCRIPT DEBUG ===')
-  console.log('User input word count:', userWords.length)
-  console.log('User words:', userWords)
-  console.log('Original word count:', origWords.length)
-  console.log('Original first 20:', origWords.slice(0, 20))
-  console.log('Original last 20:', origWords.slice(-20))
-  console.log('---')
-  console.log('Alignment stats:')
-  console.log('  Exact matches:', exactCount)
-  console.log('  Partial matches:', partialCount)
-  console.log('  Missing (in orig, not in user):', missingCount)
-  console.log('  Extra (in user, not in orig):', extraCount)
-  console.log('---')
-  console.log('Exact matched words (in order):')
-  alignment.filter(a => a.status === 'exact').forEach(a => console.log('  -', a.orig))
-  console.log('Partial matches:')
-  alignment.filter(a => a.status === 'partial').forEach(a => console.log('  -', a.user, '->', a.orig))
-  console.log('Extra words:')
-  alignment.filter(a => a.status === 'extra').forEach(a => console.log('  -', a.user))
-  console.log('---')
-  console.log('Score calculation:')
-  console.log('  Exact x 1.0 =', exactCount)
-  console.log('  Partial x 0.6 =', partialCount * 0.6)
-  console.log('  Total score:', score)
-  console.log('  Denominator (orig words):', origWords.length)
-  console.log('  Accuracy:', accuracy, '%')
-  console.log('  Attempt accuracy (score / user words typed):', attemptAccuracy, '%')
-  console.log('  Stars:', getStars(accuracy))
-  console.log('=== END DEBUG ===')
+  console.log('=== POSITION MATCHING DEBUG ===')
+  console.log('User words:', userWords.length)
+  console.log('Orig words:', origWords.length)
+  console.log('Position 0: user =', userWords[0], '| orig =', origWords[0])
+  console.log('Position 1: user =', userWords[1], '| orig =', origWords[1])
+  console.log('Position 2: user =', userWords[2], '| orig =', origWords[2])
+  console.log('Position 3: user =', userWords[3], '| orig =', origWords[3])
+  console.log('Position 4: user =', userWords[4], '| orig =', origWords[4])
+  console.log('Exact:', exactCount, '| Partial:', partialCount,
+    '| Wrong:', wrongCount, '| Missing:', missingCount,
+    '| Extra:', extraCount)
+  console.log('Accuracy:', accuracy, '%')
   /* eslint-enable no-console */
 
   return {
     alignment,
     accuracy,
-    attemptAccuracy,
     stats: {
       totalOrig: origWords.length,
       totalUser: userWords.length,
       exact: exactCount,
       partial: partialCount,
+      wrong: wrongCount,
       missing: missingCount,
       extra: extraCount,
     },
