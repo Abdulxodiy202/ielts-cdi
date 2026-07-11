@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -57,6 +57,36 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}m ${secs}s`
+}
+
+/* ── Essay paragraph handling (Task 1 / Task 2 only) ─────────────────
+   Admins write essays with \n, \n\n, or more between paragraphs. Collapse
+   any run of blank lines down to a single paragraph boundary, then tokenize
+   into a flat word list plus the set of word indices that end a paragraph
+   (except the very last one, which needs no trailing break). The typing
+   engine's `words: string[]` stays exactly what it always was — this is a
+   parallel, essay-only annotation, so Common English / IELTS Vocabulary
+   (which never populate it) are completely unaffected. ── */
+function normalizeEssayContent(content: string): string {
+  return content
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+
+function parseEssayWords(content: string): { words: string[]; paragraphBreakAfter: Set<number> } {
+  const normalized = normalizeEssayContent(content)
+  const paragraphs = normalized.split('\n').map(p => p.trim()).filter(Boolean)
+  const words: string[] = []
+  const paragraphBreakAfter = new Set<number>()
+  paragraphs.forEach((paragraph, pIdx) => {
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) words.push(word)
+    if (pIdx < paragraphs.length - 1 && words.length > 0) {
+      paragraphBreakAfter.add(words.length - 1)
+    }
+  })
+  return { words, paragraphBreakAfter }
 }
 
 /* ── Typing engine (reducer) ──────────────────────────────────────── */
@@ -192,6 +222,10 @@ export default function TypingPage() {
   const [taskEssays, setTaskEssays] = useState<TypingEssayListItem[]>([])
   const [selectedEssay, setSelectedEssay] = useState<TypingEssayListItem | null>(null)
   const wordPoolRef = useRef<string[]>([])
+  // Word indices that end a paragraph (essay modes only) — read during
+  // render to insert a visual break; empty for Common English/IELTS
+  // Vocabulary, which never populate it.
+  const paragraphBreaksRef = useRef<Set<number>>(new Set())
 
   const [typingState, dispatch] = useReducer(typingReducer, {
     words: [], inputs: [], currentIndex: 0, started: false, finished: false, endless: false,
@@ -251,6 +285,7 @@ export default function TypingPage() {
     setLoadingWords(true)
     setLoadError(null)
     setEssayTitle(null)
+    paragraphBreaksRef.current = new Set()
     try {
       const res = await fetch(`/api/typing/words/${wordSet}`)
       const data: { words?: string[] } = res.ok ? await res.json() : {}
@@ -300,7 +335,8 @@ export default function TypingPage() {
       the test — used both for the initial pick and for retrying the same
       essay (Tab / "Try Again" keep the current essay, not a new random one). */
   const startEssay = useCallback((essay: TypingEssayListItem) => {
-    const essayWords = essay.content.trim().split(/\s+/).filter(Boolean)
+    const { words: essayWords, paragraphBreakAfter } = parseEssayWords(essay.content)
+    paragraphBreaksRef.current = paragraphBreakAfter
     setSelectedEssay(essay)
     setEssayTitle(essay.title)
     wordPoolRef.current = []
@@ -368,7 +404,17 @@ export default function TypingPage() {
      too or the cached line map silently desyncs from the real DOM the
      moment a typo happens (which is most tests). Never re-measures during
      the scroll itself, so it can't be thrown off by a mid-transition
-     transform read. ── */
+     transform read.
+
+     A paragraph break (essay modes) forces its own extra blank LINE_HEIGHT
+     row via the break div rendered below, so two consecutive words can now
+     be TWO line-heights apart instead of one. Rounding the gap to the
+     nearest multiple of LINE_HEIGHT and inserting that many line "slots"
+     (with an empty array for the blank row) keeps every index into `lines`
+     — topLineIndex, currentLineIndex, the analytic cursor Y — meaning
+     exactly what it always did: one LINE_HEIGHT of vertical space. Without
+     this, a paragraph gap would silently disappear from the count and the
+     scroll transform would undershoot by however many blank rows it skipped. ── */
   useLayoutEffect(() => {
     const refs = wordRefs.current
     const newLines: number[][] = []
@@ -382,13 +428,15 @@ export default function TypingPage() {
         currentLine.push(i)
       } else {
         if (currentLine.length > 0) newLines.push(currentLine)
+        const linesSkipped = Math.max(1, Math.round((top - lastTop) / LINE_HEIGHT))
+        for (let blank = 1; blank < linesSkipped; blank++) newLines.push([])
         currentLine = [i]
       }
       lastTop = top
     }
     if (currentLine.length > 0) newLines.push(currentLine)
     setLines(newLines)
-  }, [typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick])
+  }, [typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick, LINE_HEIGHT])
 
   /* ── Which visual line the cursor is currently on ── */
   const currentLineIndex = useMemo(() => {
@@ -716,7 +764,7 @@ export default function TypingPage() {
                 // the end with extra characters already appended.
                 if (isCurrent && typed.length === len) chars.push(anchor)
 
-                return (
+                const wordSpan = (
                   <span
                     key={i}
                     ref={el => { wordRefs.current[i] = el }}
@@ -725,6 +773,22 @@ export default function TypingPage() {
                     {chars}
                   </span>
                 )
+
+                // Essay paragraph boundary: force the next word onto a new
+                // row with one blank LINE_HEIGHT row of spacing — purely
+                // visual, no Enter keypress involved and not part of
+                // `words`, so it never affects WPM/accuracy or the keyboard
+                // flow. Common English / IELTS Vocabulary never populate
+                // paragraphBreaksRef, so this is always empty there.
+                if (paragraphBreaksRef.current.has(i)) {
+                  return (
+                    <Fragment key={i}>
+                      {wordSpan}
+                      <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
+                    </Fragment>
+                  )
+                }
+                return wordSpan
               })}
             </div>
 
