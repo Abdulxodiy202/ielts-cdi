@@ -610,29 +610,41 @@ export default function TypingPage() {
     return lines.length > 0 ? lines.length - 1 : 0
   }, [lines, isEssaySet, essayState.currentIndex, typingState.currentIndex])
 
-  /* ── Keep the cursor's line pinned to the middle of the 3-line window once
-     the user has moved past the very first line, so the visible window is
-     always 1 finished line above + cursor's line + 1 upcoming line below.
-     In word mode this only advances forward — typing tests essentially
-     never backspace across a line, and keeping the pin monotonic there
-     preserves the previously-verified "scroll exactly one line at a time"
-     guarantee. In essay mode the user can hold Backspace / Ctrl+Backspace
-     back through many lines, so the pin also REWINDS to keep the cursor
-     on the middle line — otherwise the cursor would drop above the
-     visible window (topLineIndex stuck too far forward) and the user
-     would think Backspace stopped working. ── */
+  /* ── Word-mode scroll pin: keep the cursor's line at the middle of the
+     3-line window, only advancing forward. Typing tests essentially never
+     backspace across a line so monotonic is safe here, and it preserves
+     the previously-verified "scroll exactly one line at a time" guarantee. ── */
   useEffect(() => {
-    if (currentLineIndex === 0) {
-      if (isEssaySet && topLineIndex !== 0) setTopLineIndex(0)
-      return
-    }
+    if (isEssaySet) return
+    if (currentLineIndex === 0) return
     const desiredTopLine = currentLineIndex - 1
-    if (isEssaySet) {
-      if (desiredTopLine !== topLineIndex) setTopLineIndex(desiredTopLine)
-    } else {
-      if (desiredTopLine > topLineIndex) setTopLineIndex(desiredTopLine)
-    }
+    if (desiredTopLine > topLineIndex) setTopLineIndex(desiredTopLine)
   }, [currentLineIndex, topLineIndex, isEssaySet])
+
+  /* ── Essay-mode scroll pin: read the current char's LAYOUT position via
+     .offsetTop (which is measured in the offsetParent's coordinate space
+     and, critically, ignores CSS transforms — so it stays valid even
+     though the flex-wrap inner div is being translateY'd around by the
+     scroll transform). Divide by LINE_HEIGHT to figure out which visual
+     line the cursor is on, then keep the cursor pinned to the middle
+     (row 1) of the 3-line window once it's past the second line, per
+     spec. The <= 1 clamp keeps the very first two lines visible without
+     scrolling, and the Math.min(0, ...) clamp guarantees the transform
+     never becomes positive (which would push content DOWN — the exact
+     symptom the bug report describes). Queries the DOM directly via
+     `.typing-essay-current` rather than going through the derived
+     `lines`/`currentLineIndex` state, so it's insensitive to any lag or
+     staleness in that derived state. ── */
+  useLayoutEffect(() => {
+    if (!isEssaySet) return
+    const container = linesWrapRef.current
+    if (!container) return
+    const currentCharEl = container.querySelector<HTMLElement>('.typing-essay-current')
+    if (!currentCharEl) return // cursor is past the end (essay finished)
+    const currentLineIdx = Math.round(currentCharEl.offsetTop / LINE_HEIGHT)
+    const desiredTopLine = currentLineIdx <= 1 ? 0 : currentLineIdx - 1
+    if (desiredTopLine !== topLineIndex) setTopLineIndex(desiredTopLine)
+  }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, LINE_HEIGHT, topLineIndex])
 
   /* ── Track the cursor's target position so it can animate smoothly via a
      CSS transform transition, instead of jumping as an inline element.
@@ -783,10 +795,30 @@ export default function TypingPage() {
           content: '';
           position: absolute;
           left: -1px;
-          top: 5%;
-          bottom: 5%;
+          top: 0;
+          bottom: 0;
           width: 2px;
-          background: #e2b714;
+          background: #6366f1;
+          animation: typingCursorBlink 1s step-end infinite;
+          pointer-events: none;
+        }
+        /* End cursor (when the user has typed the whole essay and
+           currentIndex === chars.length — no char has the .current
+           class anymore, so we render a 0-width sibling to hold the
+           blinking bar in its place). */
+        .typing-essay-end-cursor {
+          display: inline-block;
+          width: 0;
+          position: relative;
+        }
+        .typing-essay-end-cursor::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 2px;
+          background: #6366f1;
           animation: typingCursorBlink 1s step-end infinite;
           pointer-events: none;
         }
@@ -962,7 +994,7 @@ export default function TypingPage() {
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
               }}
             >
-              {isEssaySet ? essayGroups.map((g, gi) => {
+              {isEssaySet ? <>{essayGroups.map((g, gi) => {
                 // Per-character span factory used by both the word-group
                 // path and the standalone-space path. Each character still
                 // gets its own charRefs slot so the cursor-position effect
@@ -1013,7 +1045,16 @@ export default function TypingPage() {
                 // g.type === 'space' — exhaustive by construction now
                 // that groupIntoWords no longer emits 'newline' groups.
                 return renderChar(' ', g.index)
-              }) : typingState.words.map((word, i) => {
+              })}
+              {/* When the user has typed every character, no char carries
+                  the .typing-essay-current class anymore. The essay auto-
+                  transitions to the result screen at that moment, but for
+                  the brief render frame between "last keystroke" and
+                  "status flips to result" we still want a visible cursor
+                  at the very end of the sequence. */}
+              {isEssaySet && essayState.chars.length > 0 && essayState.currentIndex >= essayState.chars.length && (
+                <span className="typing-essay-end-cursor" aria-hidden />
+              )}</> : typingState.words.map((word, i) => {
                 const typed = typingState.inputs[i] ?? ''
                 const isCurrent = i === typingState.currentIndex
                 const isDone = i < typingState.currentIndex
