@@ -81,6 +81,39 @@ function buildCharSequence(content: string): string[] {
   return normalizeEssayContent(content).split('')
 }
 
+/** Groups the flat character sequence into word / space / newline chunks so
+    word characters can be wrapped in an inline-block whiteSpace:nowrap span
+    at render time. Under `flex-wrap`, EVERY direct flex-item child is a
+    wrap boundary -- if each character is its own top-level span, the
+    browser will happily break mid-word (e.g. "ca" + "n" on next line).
+    Grouping a word's characters into a single flex item forces the whole
+    word to wrap as a unit. Kept as a separate helper (not baked into the
+    render loop) so it can be memoized on chars.length -- the group
+    structure only changes on RESET, not on every keystroke. */
+type EssayGroup =
+  | { type: 'word'; chars: { ch: string; index: number }[] }
+  | { type: 'space'; index: number }
+  | { type: 'newline'; index: number }
+
+function groupIntoWords(charSequence: string[]): EssayGroup[] {
+  const groups: EssayGroup[] = []
+  let currentWord: { type: 'word'; chars: { ch: string; index: number }[] } | null = null
+  charSequence.forEach((ch, index) => {
+    if (ch === '\n') {
+      if (currentWord) { groups.push(currentWord); currentWord = null }
+      groups.push({ type: 'newline', index })
+    } else if (ch === ' ') {
+      if (currentWord) { groups.push(currentWord); currentWord = null }
+      groups.push({ type: 'space', index })
+    } else {
+      if (!currentWord) currentWord = { type: 'word', chars: [] }
+      currentWord.chars.push({ ch, index })
+    }
+  })
+  if (currentWord) groups.push(currentWord)
+  return groups
+}
+
 /* ── Typing engine (reducer) ──────────────────────────────────────── */
 interface TypingState {
   words: string[]
@@ -208,6 +241,7 @@ type EssayAction =
   | { type: 'RESET'; chars: string[] }
   | { type: 'KEY'; key: string }
   | { type: 'BACKSPACE' }
+  | { type: 'BACKSPACE_WORD' }
 
 function essayReducer(state: EssayState, action: EssayAction): EssayState {
   switch (action.type) {
@@ -247,6 +281,22 @@ function essayReducer(state: EssayState, action: EssayAction): EssayState {
       const typedKeys = state.typedKeys.slice()
       typedKeys[prevIndex] = null
       return { ...state, currentIndex: prevIndex, typedKeys }
+    }
+    case 'BACKSPACE_WORD': {
+      // Ctrl/Cmd+Backspace: walk back through characters, resetting each
+      // to untyped, until we hit (and clear) the trailing separator of the
+      // previous word — a space or '\n'. Matches the standard "delete
+      // whole previous word" behavior in text inputs and terminals.
+      if (state.finished || state.currentIndex === 0) return state
+      const typedKeys = state.typedKeys.slice()
+      let idx = state.currentIndex
+      while (idx > 0) {
+        idx--
+        typedKeys[idx] = null
+        const ch = state.chars[idx]
+        if (ch === ' ' || ch === '\n') break
+      }
+      return { ...state, currentIndex: idx, typedKeys }
     }
     default:
       return state
@@ -292,6 +342,11 @@ export default function TypingPage() {
     chars: [], typedKeys: [], currentIndex: 0, started: false, finished: false,
     correctKeystrokes: 0, incorrectKeystrokes: 0, correctNonNewlineKeystrokes: 0,
   })
+  // Word/space/newline chunks for rendering — memoized because the group
+  // structure only depends on the immutable `chars` array (fixed once per
+  // RESET), not on which characters have been typed. Keeps render cheap
+  // even for long essays.
+  const essayGroups = useMemo(() => groupIntoWords(essayState.chars), [essayState.chars])
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [endedAt, setEndedAt] = useState<number | null>(null)
@@ -535,14 +590,27 @@ export default function TypingPage() {
 
   /* ── Keep the cursor's line pinned to the middle of the 3-line window once
      the user has moved past the very first line, so the visible window is
-     always 1 finished line above + cursor's line + 1 upcoming line below. ── */
+     always 1 finished line above + cursor's line + 1 upcoming line below.
+     In word mode this only advances forward — typing tests essentially
+     never backspace across a line, and keeping the pin monotonic there
+     preserves the previously-verified "scroll exactly one line at a time"
+     guarantee. In essay mode the user can hold Backspace / Ctrl+Backspace
+     back through many lines, so the pin also REWINDS to keep the cursor
+     on the middle line — otherwise the cursor would drop above the
+     visible window (topLineIndex stuck too far forward) and the user
+     would think Backspace stopped working. ── */
   useEffect(() => {
-    if (currentLineIndex === 0) return
-    const desiredTopLine = currentLineIndex - 1
-    if (desiredTopLine > topLineIndex) {
-      setTopLineIndex(desiredTopLine)
+    if (currentLineIndex === 0) {
+      if (isEssaySet && topLineIndex !== 0) setTopLineIndex(0)
+      return
     }
-  }, [currentLineIndex, topLineIndex])
+    const desiredTopLine = currentLineIndex - 1
+    if (isEssaySet) {
+      if (desiredTopLine !== topLineIndex) setTopLineIndex(desiredTopLine)
+    } else {
+      if (desiredTopLine > topLineIndex) setTopLineIndex(desiredTopLine)
+    }
+  }, [currentLineIndex, topLineIndex, isEssaySet])
 
   /* ── Track the cursor's target position so it can animate smoothly via a
      CSS transform transition, instead of jumping as an inline element.
@@ -602,7 +670,6 @@ export default function TypingPage() {
 
     if (e.key === 'Tab') { e.preventDefault(); restartCurrent(); return }
     if (e.key === 'Escape') { e.preventDefault(); goToConfigOrSelector(); return }
-    if (e.ctrlKey || e.metaKey || e.altKey) return // let browser shortcuts through
 
     if (isEssaySet) {
       // Character-sequence engine: every position (letter, space, or '\n')
@@ -615,11 +682,19 @@ export default function TypingPage() {
       // is dispatched as a normal key — it never skips/advances a "word"
       // the way it does in the word engine below, because there is no
       // word concept here at all.
+      // Ctrl/Cmd+Backspace has to be checked BEFORE the modifier
+      // early-return below, or it'd fall through as "browser shortcut".
+      if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault(); essayDispatch({ type: 'BACKSPACE_WORD' }); return
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === 'Backspace') { e.preventDefault(); essayDispatch({ type: 'BACKSPACE' }); return }
       if (e.key === 'Enter') { e.preventDefault(); essayDispatch({ type: 'KEY', key: '\n' }); return }
       if (e.key.length === 1) { e.preventDefault(); essayDispatch({ type: 'KEY', key: e.key }) }
       return
     }
+
+    if (e.ctrlKey || e.metaKey || e.altKey) return // let browser shortcuts through
 
     if (e.key === 'Backspace') { e.preventDefault(); dispatch({ type: 'BACKSPACE' }); return }
     if (e.key === ' ') { e.preventDefault(); dispatch({ type: 'SPACE' }); return }
@@ -852,59 +927,95 @@ export default function TypingPage() {
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
               }}
             >
-              {isEssaySet ? essayState.chars.map((ch, i) => {
+              {isEssaySet ? essayGroups.map((g, gi) => {
+                // Per-character span factory used by both the word-group
+                // path and the standalone-space path. Each character still
+                // gets its own charRefs slot so the cursor-position effect
+                // and the essay line-grouping effect can measure it.
+                const renderChar = (charStr: string, i: number) => {
+                  const typedKey = essayState.typedKeys[i]
+                  const isCurrent = i === essayState.currentIndex
+                  const isDone = i < essayState.currentIndex
+                  let color = 'rgba(255,255,255,0.35)'
+                  let underline = false
+                  if (typedKey !== null) {
+                    const correct = typedKey === charStr
+                    color = correct ? '#fff' : '#ca4754'
+                    underline = !correct
+                  }
+                  return (
+                    <span
+                      key={i}
+                      ref={el => { charRefs.current[i] = el }}
+                      style={{
+                        color, textDecoration: underline ? 'underline' : 'none',
+                        opacity: isDone || isCurrent ? 1 : 0.4,
+                      }}
+                    >
+                      {charStr === ' ' ? ' ' : charStr}
+                    </span>
+                  )
+                }
+
+                if (g.type === 'word') {
+                  // Whole-word wrap boundary: under `flex-wrap`, every
+                  // direct child of the flex container is a wrap point --
+                  // if each character is its own top-level flex item, the
+                  // browser will happily break mid-word (e.g. "ca" + "n"
+                  // on the next line). Grouping the word's characters
+                  // into a single inline-block, whiteSpace: nowrap span
+                  // makes them one flex item, so if the word doesn't fit
+                  // on the current line the WHOLE word wraps. Chars
+                  // inside stay `display: inline` (the default) so they
+                  // still flow naturally within the word.
+                  return (
+                    <span key={`w-${gi}`} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+                      {g.chars.map(({ ch, index }) => renderChar(ch, index))}
+                    </span>
+                  )
+                }
+                if (g.type === 'space') {
+                  return renderChar(' ', g.index)
+                }
+                // g.type === 'newline'
+                const i = g.index
                 const typedKey = essayState.typedKeys[i]
                 const isCurrent = i === essayState.currentIndex
                 const isDone = i < essayState.currentIndex
                 let color = 'rgba(255,255,255,0.35)'
                 let underline = false
                 if (typedKey !== null) {
-                  const correct = typedKey === ch
+                  const correct = typedKey === '\n'
                   color = correct ? '#fff' : '#ca4754'
                   underline = !correct
                 }
-
-                if (ch === '\n') {
-                  // Enter symbol: a real token the user must press Enter
-                  // for, same rules as any other character — just rendered
-                  // with the glyph edclub/TypingClub use for a paragraph
-                  // break instead of the literal character.
-                  const enterSpan = (
-                    <span
-                      key={i}
-                      ref={el => { charRefs.current[i] = el }}
-                      style={{
-                        display: 'inline-block', opacity: isDone || isCurrent ? (underline ? 1 : 0.5) : 0.3,
-                        fontSize: '0.9em', padding: '0 4px', color,
-                        textDecoration: underline ? 'underline' : 'none',
-                      }}
-                    >
-                      ↵
-                    </span>
-                  )
-                  return (
-                    <Fragment key={`f-${i}`}>
-                      {enterSpan}
-                      {/* Forces the next character onto a new row, with one
-                          blank LINE_HEIGHT row of spacing — see the essay
-                          line-grouping effect above for why this must be
-                          exactly LINE_HEIGHT and not an arbitrary value. */}
-                      <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
-                    </Fragment>
-                  )
-                }
-
-                return (
+                // Enter symbol: a real token the user must press Enter
+                // for, same rules as any other character — just rendered
+                // with the glyph edclub/TypingClub use for a paragraph
+                // break instead of the literal character. Followed by a
+                // width-100% break div that forces the next character
+                // onto a fresh row (see the essay line-grouping effect
+                // above for why the div's height must be exactly
+                // LINE_HEIGHT, not an arbitrary value).
+                const enterSpan = (
                   <span
                     key={i}
                     ref={el => { charRefs.current[i] = el }}
                     style={{
-                      color, textDecoration: underline ? 'underline' : 'none',
-                      opacity: isDone || isCurrent ? 1 : 0.4,
+                      display: 'inline-block',
+                      opacity: isDone || isCurrent ? (underline ? 1 : 0.5) : 0.3,
+                      fontSize: '0.9em', padding: '0 4px', color,
+                      textDecoration: underline ? 'underline' : 'none',
                     }}
                   >
-                    {ch === ' ' ? ' ' : ch}
+                    ↵
                   </span>
+                )
+                return (
+                  <Fragment key={`f-${gi}`}>
+                    {enterSpan}
+                    <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
+                  </Fragment>
                 )
               }) : typingState.words.map((word, i) => {
                 const typed = typingState.inputs[i] ?? ''
