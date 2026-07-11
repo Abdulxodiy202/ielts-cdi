@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo, Fragment } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -60,20 +60,20 @@ function formatTime(seconds: number): string {
 }
 
 /* ── Essay character sequence (Task 1 / Task 2 only) ─────────────────
-   Unlike Common English / IELTS Vocabulary, essays type like TypingClub/
-   edclub: the whole essay is ONE flat sequence of characters, where a
-   paragraph break is a real '\n' token the user must actively press Enter
-   for — not a visual-only divider and not something Space can skip past.
-   Admins may write \n, \n\n, \n\n\n... between paragraphs; collapse any
-   run down to a single \n so the user only ever has to press Enter once
-   per gap, however many blank lines the admin left. This is a completely
-   separate engine (see EssayState/essayReducer below) — Common English/
-   IELTS Vocabulary keep using `words`/`typingReducer` exactly as before. ── */
+   Essays type as ONE flat character stream, exactly like Common English
+   / IELTS Vocabulary — no paragraph tokens, no ↵ symbols, no Enter-key
+   requirement. Admins may write essays with any mix of \n / \n\n / \n\n\n
+   between paragraphs; every newline is collapsed to a single space so
+   the user sees a continuous block of words that wraps naturally at the
+   container edge. Any run of whitespace (spaces + newlines) is
+   normalized down to a single space so double-spaces from source docs
+   don't create weird wide gaps mid-sentence. ── */
 function normalizeEssayContent(content: string): string {
   return content
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/\n{2,}/g, '\n')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
@@ -93,16 +93,16 @@ function buildCharSequence(content: string): string[] {
 type EssayGroup =
   | { type: 'word'; chars: { ch: string; index: number }[] }
   | { type: 'space'; index: number }
-  | { type: 'newline'; index: number }
 
 function groupIntoWords(charSequence: string[]): EssayGroup[] {
   const groups: EssayGroup[] = []
   let currentWord: { type: 'word'; chars: { ch: string; index: number }[] } | null = null
+  // normalizeEssayContent has already collapsed any newlines to spaces,
+  // so we only need two group types: a whole word (which becomes a
+  // single inline-block/nowrap flex item to prevent mid-word wrapping)
+  // and a space (a natural wrap point on its own).
   charSequence.forEach((ch, index) => {
-    if (ch === '\n') {
-      if (currentWord) { groups.push(currentWord); currentWord = null }
-      groups.push({ type: 'newline', index })
-    } else if (ch === ' ') {
+    if (ch === ' ') {
       if (currentWord) { groups.push(currentWord); currentWord = null }
       groups.push({ type: 'space', index })
     } else {
@@ -477,17 +477,9 @@ export default function TypingPage() {
       essay (Tab / "Try Again" keep the current essay, not a new random one). */
   const startEssay = useCallback((essay: TypingEssayListItem) => {
     const chars = buildCharSequence(essay.content)
-    // Diagnostic: dump exactly where '\n' lands in the normalized
-    // sequence so a stray ↵ in the rendered output can be traced to
-    // either (a) admin data actually containing a newline there or (b)
-    // a tokenizer bug. The task's bug 2 report can be verified against
-    // this: ↵ only appears where chars[i] === '\n'.
-    const newlinePositions: number[] = []
-    for (let i = 0; i < chars.length; i++) if (chars[i] === '\n') newlinePositions.push(i)
     const wordCount = chars.join('').split(/\s+/).filter(Boolean).length
     // eslint-disable-next-line no-console
-    console.log('[typing] essay loaded:',
-      { title: essay.title, chars: chars.length, words: wordCount, newlinePositions })
+    console.log('[typing] essay loaded:', { title: essay.title, chars: chars.length, words: wordCount })
     setSelectedEssay(essay)
     setEssayTitle(essay.title)
     essayDispatch({ type: 'RESET', chars })
@@ -581,15 +573,12 @@ export default function TypingPage() {
   }, [isEssaySet, typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick])
 
   /* ── Same line-grouping, but for the essay engine's flat character
-     sequence. A paragraph break ('\n') is followed by a break div that
-     reserves one extra blank LINE_HEIGHT row (see the render below), so two
-     consecutive characters can land TWO line-heights apart instead of one.
-     Rounding the gap to the nearest multiple of LINE_HEIGHT and inserting
-     that many line "slots" (an empty array for the blank row) keeps every
-     index into `lines` meaning exactly what it always did: one LINE_HEIGHT
-     of vertical space. Without this, a paragraph gap would silently vanish
-     from the count and the scroll transform would undershoot by however
-     many blank rows it skipped. ── */
+     sequence. Groups consecutive characters that share a common `top`
+     into one visual line. Since normalizeEssayContent now flattens all
+     newlines into single spaces, the essay is one continuous stream and
+     every transition is exactly one natural wrap -- no paragraph gaps,
+     no empty line slots to insert. Same simple structure as the word
+     engine's line-grouping above. ── */
   useLayoutEffect(() => {
     if (!isEssaySet) return
     const refs = charRefs.current
@@ -604,15 +593,13 @@ export default function TypingPage() {
         currentLine.push(i)
       } else {
         if (currentLine.length > 0) newLines.push(currentLine)
-        const linesSkipped = Math.max(1, Math.round((top - lastTop) / LINE_HEIGHT))
-        for (let blank = 1; blank < linesSkipped; blank++) newLines.push([])
         currentLine = [i]
       }
       lastTop = top
     }
     if (currentLine.length > 0) newLines.push(currentLine)
     setLines(newLines)
-  }, [isEssaySet, essayState.chars.length, essayState.typedKeys, FONT_SIZE, resizeTick, LINE_HEIGHT])
+  }, [isEssaySet, essayState.chars.length, essayState.typedKeys, FONT_SIZE, resizeTick])
 
   /* ── Which visual line the cursor is currently on ── */
   const currentLineIndex = useMemo(() => {
@@ -708,24 +695,19 @@ export default function TypingPage() {
     if (e.key === 'Escape') { e.preventDefault(); goToConfigOrSelector(); return }
 
     if (isEssaySet) {
-      // Character-sequence engine: every position (letter, space, or '\n')
-      // takes exactly one keystroke. Enter is only "correct" when the
-      // cursor is on a '\n' position — the reducer's plain key===target
-      // comparison already handles that (and the reverse: pressing Enter
-      // where a letter was expected registers as wrong, same as any other
-      // mismatched key), so there's no special-casing needed here beyond
-      // mapping the Enter key to the '\n' token the sequence uses. Space
-      // is dispatched as a normal key — it never skips/advances a "word"
-      // the way it does in the word engine below, because there is no
-      // word concept here at all.
-      // Ctrl/Cmd+Backspace has to be checked BEFORE the modifier
-      // early-return below, or it'd fall through as "browser shortcut".
+      // Character-sequence engine: every position (letter or space)
+      // takes exactly one keystroke. There are no '\n' tokens in the
+      // sequence anymore (normalize collapses admin newlines to spaces),
+      // so Enter is treated like any other non-printable key: silently
+      // ignored (key.length !== 1) -- matching how the word engine below
+      // ignores Enter for Common English / IELTS Vocabulary.
+      // Ctrl/Cmd+Backspace has to be checked BEFORE the modifier early-
+      // return below, or it'd fall through as "browser shortcut".
       if (e.key === 'Backspace' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault(); essayDispatch({ type: 'BACKSPACE_WORD' }); return
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return
       if (e.key === 'Backspace') { e.preventDefault(); essayDispatch({ type: 'BACKSPACE' }); return }
-      if (e.key === 'Enter') { e.preventDefault(); essayDispatch({ type: 'KEY', key: '\n' }); return }
       if (e.key.length === 1) { e.preventDefault(); essayDispatch({ type: 'KEY', key: e.key }) }
       return
     }
@@ -1028,59 +1010,9 @@ export default function TypingPage() {
                     </span>
                   )
                 }
-                if (g.type === 'space') {
-                  return renderChar(' ', g.index)
-                }
-                // g.type === 'newline'
-                const i = g.index
-                const typedKey = essayState.typedKeys[i]
-                const isCurrent = i === essayState.currentIndex
-                const isDone = i < essayState.currentIndex
-                let color = 'rgba(255,255,255,0.35)'
-                let underline = false
-                if (typedKey !== null) {
-                  const correct = typedKey === '\n'
-                  color = correct ? '#fff' : '#ca4754'
-                  underline = !correct
-                }
-                // Enter symbol: a real token the user must press Enter
-                // for, same rules as any other character — just rendered
-                // with the glyph edclub/TypingClub use for a paragraph
-                // break instead of the literal character. Followed by a
-                // width-100% break div that forces the next character
-                // onto a fresh row (see the essay line-grouping effect
-                // above for why the div's height must be exactly
-                // LINE_HEIGHT, not an arbitrary value).
-                const enterSpan = (
-                  <span
-                    key={i}
-                    ref={el => { charRefs.current[i] = el }}
-                    className={isCurrent ? 'typing-essay-current' : undefined}
-                    style={{
-                      display: 'inline-block',
-                      opacity: isDone || isCurrent ? (underline ? 1 : 0.5) : 0.3,
-                      fontSize: '0.9em', padding: '0 4px', color,
-                      textDecoration: underline ? 'underline' : 'none',
-                    }}
-                  >
-                    ↵
-                  </span>
-                )
-                return (
-                  <Fragment key={`f-${gi}`}>
-                    {enterSpan}
-                    {/* height:0 — the break forces the next character
-                        onto a fresh visual line (via flexBasis: 100%)
-                        without inserting a whole blank row of vertical
-                        space. Previously this was height: LINE_HEIGHT,
-                        which stacked an empty row between the ↵ line
-                        and the next paragraph and made the cursor look
-                        stuck in a blank middle row. Now the very next
-                        visual line after the ↵ is the first line of the
-                        next paragraph, edclub-style. */}
-                    <div style={{ flexBasis: '100%', width: '100%', height: 0 }} />
-                  </Fragment>
-                )
+                // g.type === 'space' — exhaustive by construction now
+                // that groupIntoWords no longer emits 'newline' groups.
+                return renderChar(' ', g.index)
               }) : typingState.words.map((word, i) => {
                 const typed = typingState.inputs[i] ?? ''
                 const isCurrent = i === typingState.currentIndex
