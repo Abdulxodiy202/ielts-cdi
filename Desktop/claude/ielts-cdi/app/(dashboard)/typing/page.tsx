@@ -59,14 +59,16 @@ function formatTime(seconds: number): string {
   return `${mins}m ${secs}s`
 }
 
-/* ── Essay paragraph handling (Task 1 / Task 2 only) ─────────────────
-   Admins write essays with \n, \n\n, or more between paragraphs. Collapse
-   any run of blank lines down to a single paragraph boundary, then tokenize
-   into a flat word list plus the set of word indices that end a paragraph
-   (except the very last one, which needs no trailing break). The typing
-   engine's `words: string[]` stays exactly what it always was — this is a
-   parallel, essay-only annotation, so Common English / IELTS Vocabulary
-   (which never populate it) are completely unaffected. ── */
+/* ── Essay character sequence (Task 1 / Task 2 only) ─────────────────
+   Unlike Common English / IELTS Vocabulary, essays type like TypingClub/
+   edclub: the whole essay is ONE flat sequence of characters, where a
+   paragraph break is a real '\n' token the user must actively press Enter
+   for — not a visual-only divider and not something Space can skip past.
+   Admins may write \n, \n\n, \n\n\n... between paragraphs; collapse any
+   run down to a single \n so the user only ever has to press Enter once
+   per gap, however many blank lines the admin left. This is a completely
+   separate engine (see EssayState/essayReducer below) — Common English/
+   IELTS Vocabulary keep using `words`/`typingReducer` exactly as before. ── */
 function normalizeEssayContent(content: string): string {
   return content
     .replace(/\r\n/g, '\n')
@@ -75,18 +77,8 @@ function normalizeEssayContent(content: string): string {
     .trim()
 }
 
-function parseEssayWords(content: string): { words: string[]; paragraphBreakAfter: Set<number> } {
-  const normalized = normalizeEssayContent(content)
-  const paragraphs = normalized.split('\n').map(p => p.trim()).filter(Boolean)
-  const words: string[] = []
-  const paragraphBreakAfter = new Set<number>()
-  paragraphs.forEach((paragraph, pIdx) => {
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) words.push(word)
-    if (pIdx < paragraphs.length - 1 && words.length > 0) {
-      paragraphBreakAfter.add(words.length - 1)
-    }
-  })
-  return { words, paragraphBreakAfter }
+function buildCharSequence(content: string): string[] {
+  return normalizeEssayContent(content).split('')
 }
 
 /* ── Typing engine (reducer) ──────────────────────────────────────── */
@@ -195,6 +187,72 @@ function typingReducer(state: TypingState, action: TypingAction): TypingState {
   }
 }
 
+/* ── Essay engine (reducer) — separate from the word engine above. Every
+   position in `chars` (letters, spaces, and '\n' paragraph breaks alike)
+   takes exactly one keystroke: right key advances as correct, any other
+   key advances as wrong. There is no "extra" (nothing to overtype past —
+   the sequence has a fixed length) and no "missed" (the test only finishes
+   once every position has been typed). ── */
+interface EssayState {
+  chars: string[]
+  typedKeys: (string | null)[]
+  currentIndex: number
+  started: boolean
+  finished: boolean
+  correctKeystrokes: number    // all correct keystrokes incl. '\n' — used for accuracy
+  incorrectKeystrokes: number  // all incorrect keystrokes incl. wrong-key-at-'\n' — used for accuracy
+  correctNonNewlineKeystrokes: number // excludes '\n' — used for WPM only, per spec
+}
+
+type EssayAction =
+  | { type: 'RESET'; chars: string[] }
+  | { type: 'KEY'; key: string }
+  | { type: 'BACKSPACE' }
+
+function essayReducer(state: EssayState, action: EssayAction): EssayState {
+  switch (action.type) {
+    case 'RESET':
+      return {
+        chars: action.chars,
+        typedKeys: action.chars.map(() => null),
+        currentIndex: 0,
+        started: false,
+        finished: false,
+        correctKeystrokes: 0,
+        incorrectKeystrokes: 0,
+        correctNonNewlineKeystrokes: 0,
+      }
+    case 'KEY': {
+      if (state.finished || state.currentIndex >= state.chars.length) return state
+      const target = state.chars[state.currentIndex]
+      const typedKeys = state.typedKeys.slice()
+      typedKeys[state.currentIndex] = action.key
+      const isCorrect = action.key === target
+      const nextIndex = state.currentIndex + 1
+      const finished = nextIndex >= state.chars.length
+      return {
+        ...state,
+        typedKeys,
+        currentIndex: nextIndex,
+        started: true,
+        finished,
+        correctKeystrokes: state.correctKeystrokes + (isCorrect ? 1 : 0),
+        incorrectKeystrokes: state.incorrectKeystrokes + (isCorrect ? 0 : 1),
+        correctNonNewlineKeystrokes: state.correctNonNewlineKeystrokes + (isCorrect && target !== '\n' ? 1 : 0),
+      }
+    }
+    case 'BACKSPACE': {
+      if (state.finished || state.currentIndex === 0) return state
+      const prevIndex = state.currentIndex - 1
+      const typedKeys = state.typedKeys.slice()
+      typedKeys[prevIndex] = null
+      return { ...state, currentIndex: prevIndex, typedKeys }
+    }
+    default:
+      return state
+  }
+}
+
 /* ── Component ────────────────────────────────────────────────────── */
 export default function TypingPage() {
   const router = useRouter()
@@ -222,14 +280,17 @@ export default function TypingPage() {
   const [taskEssays, setTaskEssays] = useState<TypingEssayListItem[]>([])
   const [selectedEssay, setSelectedEssay] = useState<TypingEssayListItem | null>(null)
   const wordPoolRef = useRef<string[]>([])
-  // Word indices that end a paragraph (essay modes only) — read during
-  // render to insert a visual break; empty for Common English/IELTS
-  // Vocabulary, which never populate it.
-  const paragraphBreaksRef = useRef<Set<number>>(new Set())
 
   const [typingState, dispatch] = useReducer(typingReducer, {
     words: [], inputs: [], currentIndex: 0, started: false, finished: false, endless: false,
     correctKeystrokes: 0, incorrectKeystrokes: 0, extraKeystrokes: 0, missedChars: 0,
+  })
+
+  // Essay engine (Task 1 / Task 2 only) — a completely separate reducer so
+  // Common English / IELTS Vocabulary never touch it and are unaffected.
+  const [essayState, essayDispatch] = useReducer(essayReducer, {
+    chars: [], typedKeys: [], currentIndex: 0, started: false, finished: false,
+    correctKeystrokes: 0, incorrectKeystrokes: 0, correctNonNewlineKeystrokes: 0,
   })
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
@@ -238,6 +299,7 @@ export default function TypingPage() {
 
   const inputRef = useRef<HTMLInputElement>(null)
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const charRefs = useRef<(HTMLSpanElement | null)[]>([])
   const linesWrapRef = useRef<HTMLDivElement>(null)
   const cursorAnchorRef = useRef<HTMLSpanElement>(null)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
@@ -277,6 +339,7 @@ export default function TypingPage() {
     setLines([])
     setCursorPos({ x: 0, y: 0 })
     wordRefs.current = []
+    charRefs.current = []
     setStatus('typing')
   }, [])
 
@@ -285,7 +348,6 @@ export default function TypingPage() {
     setLoadingWords(true)
     setLoadError(null)
     setEssayTitle(null)
-    paragraphBreaksRef.current = new Set()
     try {
       const res = await fetch(`/api/typing/words/${wordSet}`)
       const data: { words?: string[] } = res.ok ? await res.json() : {}
@@ -335,12 +397,10 @@ export default function TypingPage() {
       the test — used both for the initial pick and for retrying the same
       essay (Tab / "Try Again" keep the current essay, not a new random one). */
   const startEssay = useCallback((essay: TypingEssayListItem) => {
-    const { words: essayWords, paragraphBreakAfter } = parseEssayWords(essay.content)
-    paragraphBreaksRef.current = paragraphBreakAfter
+    const chars = buildCharSequence(essay.content)
     setSelectedEssay(essay)
     setEssayTitle(essay.title)
-    wordPoolRef.current = []
-    dispatch({ type: 'RESET', words: essayWords, endless: false })
+    essayDispatch({ type: 'RESET', chars })
     resetTypingUiState()
   }, [resetTypingUiState])
 
@@ -371,8 +431,9 @@ export default function TypingPage() {
 
   /* ── Start the clock on the first keystroke ──────────────────────── */
   useEffect(() => {
-    if (typingState.started && startedAt === null) setStartedAt(Date.now())
-  }, [typingState.started, startedAt])
+    const started = isEssaySet ? essayState.started : typingState.started
+    if (started && startedAt === null) setStartedAt(Date.now())
+  }, [isEssaySet, essayState.started, typingState.started, startedAt])
 
   /* ── Ticking clock (drives the countdown + the timeout finish) ────── */
   useEffect(() => {
@@ -389,11 +450,12 @@ export default function TypingPage() {
 
   /* ── When the reducer marks the test finished, snapshot the end time ── */
   useEffect(() => {
-    if (typingState.finished && endedAt === null) {
+    const finished = isEssaySet ? essayState.finished : typingState.finished
+    if (finished && endedAt === null) {
       setEndedAt(Date.now())
       setStatus('result')
     }
-  }, [typingState.finished, endedAt])
+  }, [isEssaySet, essayState.finished, typingState.finished, endedAt])
 
   /* ── Group words into visual lines by measuring where the browser actually
      wrapped them (flex-wrap handles the wrapping; we just read it back).
@@ -404,23 +466,47 @@ export default function TypingPage() {
      too or the cached line map silently desyncs from the real DOM the
      moment a typo happens (which is most tests). Never re-measures during
      the scroll itself, so it can't be thrown off by a mid-transition
-     transform read.
-
-     A paragraph break (essay modes) forces its own extra blank LINE_HEIGHT
-     row via the break div rendered below, so two consecutive words can now
-     be TWO line-heights apart instead of one. Rounding the gap to the
-     nearest multiple of LINE_HEIGHT and inserting that many line "slots"
-     (with an empty array for the blank row) keeps every index into `lines`
-     — topLineIndex, currentLineIndex, the analytic cursor Y — meaning
-     exactly what it always did: one LINE_HEIGHT of vertical space. Without
-     this, a paragraph gap would silently disappear from the count and the
-     scroll transform would undershoot by however many blank rows it skipped. ── */
+     transform read. Word mode only — guarded so it doesn't clobber the
+     essay engine's own line-grouping effect below while an essay is active. ── */
   useLayoutEffect(() => {
+    if (isEssaySet) return
     const refs = wordRefs.current
     const newLines: number[][] = []
     let currentLine: number[] = []
     let lastTop: number | null = null
     for (let i = 0; i < typingState.words.length; i++) {
+      const el = refs[i]
+      if (!el) continue
+      const top = el.getBoundingClientRect().top
+      if (lastTop === null || Math.abs(top - lastTop) < 1) {
+        currentLine.push(i)
+      } else {
+        if (currentLine.length > 0) newLines.push(currentLine)
+        currentLine = [i]
+      }
+      lastTop = top
+    }
+    if (currentLine.length > 0) newLines.push(currentLine)
+    setLines(newLines)
+  }, [isEssaySet, typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick])
+
+  /* ── Same line-grouping, but for the essay engine's flat character
+     sequence. A paragraph break ('\n') is followed by a break div that
+     reserves one extra blank LINE_HEIGHT row (see the render below), so two
+     consecutive characters can land TWO line-heights apart instead of one.
+     Rounding the gap to the nearest multiple of LINE_HEIGHT and inserting
+     that many line "slots" (an empty array for the blank row) keeps every
+     index into `lines` meaning exactly what it always did: one LINE_HEIGHT
+     of vertical space. Without this, a paragraph gap would silently vanish
+     from the count and the scroll transform would undershoot by however
+     many blank rows it skipped. ── */
+  useLayoutEffect(() => {
+    if (!isEssaySet) return
+    const refs = charRefs.current
+    const newLines: number[][] = []
+    let currentLine: number[] = []
+    let lastTop: number | null = null
+    for (let i = 0; i < essayState.chars.length; i++) {
       const el = refs[i]
       if (!el) continue
       const top = el.getBoundingClientRect().top
@@ -436,15 +522,16 @@ export default function TypingPage() {
     }
     if (currentLine.length > 0) newLines.push(currentLine)
     setLines(newLines)
-  }, [typingState.words.length, typingState.inputs, FONT_SIZE, resizeTick, LINE_HEIGHT])
+  }, [isEssaySet, essayState.chars.length, essayState.typedKeys, FONT_SIZE, resizeTick, LINE_HEIGHT])
 
   /* ── Which visual line the cursor is currently on ── */
   const currentLineIndex = useMemo(() => {
+    const idx = isEssaySet ? essayState.currentIndex : typingState.currentIndex
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(typingState.currentIndex)) return i
+      if (lines[i].includes(idx)) return i
     }
     return lines.length > 0 ? lines.length - 1 : 0
-  }, [lines, typingState.currentIndex])
+  }, [lines, isEssaySet, essayState.currentIndex, typingState.currentIndex])
 
   /* ── Keep the cursor's line pinned to the middle of the 3-line window once
      the user has moved past the very first line, so the visible window is
@@ -473,8 +560,11 @@ export default function TypingPage() {
      deferred behind a requestAnimationFrame) so the very first paint of a
      fresh test already shows the corrected, offset position instead of
      briefly flashing the uncentered {0,0} reset value until the first
-     keystroke happens to re-trigger the old rAF-based measurement. ── */
+     keystroke happens to re-trigger the old rAF-based measurement.
+     Word mode only — guarded so it doesn't fight the essay engine's own
+     cursor-position effect below while an essay is active. ── */
   useLayoutEffect(() => {
+    if (isEssaySet) return
     if (!cursorAnchorRef.current || !linesWrapRef.current) return
     const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
     const wrapRect = linesWrapRef.current.getBoundingClientRect()
@@ -482,7 +572,24 @@ export default function TypingPage() {
       x: anchorRect.left - wrapRect.left,
       y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
     })
-  }, [typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
+  }, [isEssaySet, typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
+
+  /* ── Same cursor tracking, but for the essay engine. Every position in
+     the flat character sequence already has its own rendered span (no
+     "anchor" trick needed like word mode's variable-length words), so X is
+     measured directly off the current character's span. Y is still
+     analytic for the same mid-transition-read reason as above. ── */
+  useLayoutEffect(() => {
+    if (!isEssaySet) return
+    const el = charRefs.current[essayState.currentIndex]
+    if (!el || !linesWrapRef.current) return
+    const charRect = el.getBoundingClientRect()
+    const wrapRect = linesWrapRef.current.getBoundingClientRect()
+    setCursorPos({
+      x: charRect.left - wrapRect.left,
+      y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
+    })
+  }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -496,10 +603,28 @@ export default function TypingPage() {
     if (e.key === 'Tab') { e.preventDefault(); restartCurrent(); return }
     if (e.key === 'Escape') { e.preventDefault(); goToConfigOrSelector(); return }
     if (e.ctrlKey || e.metaKey || e.altKey) return // let browser shortcuts through
+
+    if (isEssaySet) {
+      // Character-sequence engine: every position (letter, space, or '\n')
+      // takes exactly one keystroke. Enter is only "correct" when the
+      // cursor is on a '\n' position — the reducer's plain key===target
+      // comparison already handles that (and the reverse: pressing Enter
+      // where a letter was expected registers as wrong, same as any other
+      // mismatched key), so there's no special-casing needed here beyond
+      // mapping the Enter key to the '\n' token the sequence uses. Space
+      // is dispatched as a normal key — it never skips/advances a "word"
+      // the way it does in the word engine below, because there is no
+      // word concept here at all.
+      if (e.key === 'Backspace') { e.preventDefault(); essayDispatch({ type: 'BACKSPACE' }); return }
+      if (e.key === 'Enter') { e.preventDefault(); essayDispatch({ type: 'KEY', key: '\n' }); return }
+      if (e.key.length === 1) { e.preventDefault(); essayDispatch({ type: 'KEY', key: e.key }) }
+      return
+    }
+
     if (e.key === 'Backspace') { e.preventDefault(); dispatch({ type: 'BACKSPACE' }); return }
     if (e.key === ' ') { e.preventDefault(); dispatch({ type: 'SPACE' }); return }
     if (e.key.length === 1) { e.preventDefault(); dispatch({ type: 'CHAR', ch: e.key }) }
-  }, [status, restartCurrent, goToConfigOrSelector])
+  }, [status, restartCurrent, goToConfigOrSelector, isEssaySet])
 
   /* ── Auto-focus the capture input ─────────────────────────────────── */
   useEffect(() => {
@@ -508,10 +633,18 @@ export default function TypingPage() {
 
   /* ── Stats for the result screen — every keystroke counts, including ones
      later fixed with backspace, so accuracy reflects mistakes actually made
-     rather than just diffing the final text against the target. ── */
-  const { correctKeystrokes, incorrectKeystrokes, extraKeystrokes, missedChars } = typingState
+     rather than just diffing the final text against the target. For essay
+     mode, accuracy includes '\n' keystrokes (the user had to actively press
+     Enter for them) but WPM's word count excludes them, per spec — there's
+     no "extra"/"missed" concept in the essay engine (fixed-length sequence,
+     always fully consumed), so those are just 0 there. ── */
+  const correctKeystrokes = isEssaySet ? essayState.correctKeystrokes : typingState.correctKeystrokes
+  const incorrectKeystrokes = isEssaySet ? essayState.incorrectKeystrokes : typingState.incorrectKeystrokes
+  const extraKeystrokes = isEssaySet ? 0 : typingState.extraKeystrokes
+  const missedChars = isEssaySet ? 0 : typingState.missedChars
+  const correctForWpm = isEssaySet ? essayState.correctNonNewlineKeystrokes : typingState.correctKeystrokes
   const elapsedMinutes = startedAt && endedAt ? Math.max((endedAt - startedAt) / 60000, 1 / 600) : 0
-  const wpm = elapsedMinutes > 0 ? Math.round((correctKeystrokes / 5) / elapsedMinutes) : 0
+  const wpm = elapsedMinutes > 0 ? Math.round((correctForWpm / 5) / elapsedMinutes) : 0
   const totalKeystrokes = correctKeystrokes + incorrectKeystrokes + extraKeystrokes
   const accuracy = totalKeystrokes > 0 ? Math.round((correctKeystrokes / totalKeystrokes) * 100) : 0
   const elapsedSeconds = startedAt && endedAt ? Math.round((endedAt - startedAt) / 1000) : 0
@@ -522,6 +655,10 @@ export default function TypingPage() {
       if (startedAt === null) return String(duration)
       const remaining = Math.max(0, duration - Math.floor((nowTick - startedAt) / 1000))
       return String(remaining)
+    }
+    if (isEssaySet) {
+      const current = Math.min(essayState.currentIndex + 1, essayState.chars.length)
+      return `${current}/${essayState.chars.length}`
     }
     const current = Math.min(typingState.currentIndex + 1, typingState.words.length)
     return `${current}/${typingState.words.length}`
@@ -715,7 +852,61 @@ export default function TypingPage() {
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
               }}
             >
-              {typingState.words.map((word, i) => {
+              {isEssaySet ? essayState.chars.map((ch, i) => {
+                const typedKey = essayState.typedKeys[i]
+                const isCurrent = i === essayState.currentIndex
+                const isDone = i < essayState.currentIndex
+                let color = 'rgba(255,255,255,0.35)'
+                let underline = false
+                if (typedKey !== null) {
+                  const correct = typedKey === ch
+                  color = correct ? '#fff' : '#ca4754'
+                  underline = !correct
+                }
+
+                if (ch === '\n') {
+                  // Enter symbol: a real token the user must press Enter
+                  // for, same rules as any other character — just rendered
+                  // with the glyph edclub/TypingClub use for a paragraph
+                  // break instead of the literal character.
+                  const enterSpan = (
+                    <span
+                      key={i}
+                      ref={el => { charRefs.current[i] = el }}
+                      style={{
+                        display: 'inline-block', opacity: isDone || isCurrent ? (underline ? 1 : 0.5) : 0.3,
+                        fontSize: '0.9em', padding: '0 4px', color,
+                        textDecoration: underline ? 'underline' : 'none',
+                      }}
+                    >
+                      ↵
+                    </span>
+                  )
+                  return (
+                    <Fragment key={`f-${i}`}>
+                      {enterSpan}
+                      {/* Forces the next character onto a new row, with one
+                          blank LINE_HEIGHT row of spacing — see the essay
+                          line-grouping effect above for why this must be
+                          exactly LINE_HEIGHT and not an arbitrary value. */}
+                      <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
+                    </Fragment>
+                  )
+                }
+
+                return (
+                  <span
+                    key={i}
+                    ref={el => { charRefs.current[i] = el }}
+                    style={{
+                      color, textDecoration: underline ? 'underline' : 'none',
+                      opacity: isDone || isCurrent ? 1 : 0.4,
+                    }}
+                  >
+                    {ch === ' ' ? ' ' : ch}
+                  </span>
+                )
+              }) : typingState.words.map((word, i) => {
                 const typed = typingState.inputs[i] ?? ''
                 const isCurrent = i === typingState.currentIndex
                 const isDone = i < typingState.currentIndex
@@ -764,7 +955,7 @@ export default function TypingPage() {
                 // the end with extra characters already appended.
                 if (isCurrent && typed.length === len) chars.push(anchor)
 
-                const wordSpan = (
+                return (
                   <span
                     key={i}
                     ref={el => { wordRefs.current[i] = el }}
@@ -773,22 +964,6 @@ export default function TypingPage() {
                     {chars}
                   </span>
                 )
-
-                // Essay paragraph boundary: force the next word onto a new
-                // row with one blank LINE_HEIGHT row of spacing — purely
-                // visual, no Enter keypress involved and not part of
-                // `words`, so it never affects WPM/accuracy or the keyboard
-                // flow. Common English / IELTS Vocabulary never populate
-                // paragraphBreaksRef, so this is always empty there.
-                if (paragraphBreaksRef.current.has(i)) {
-                  return (
-                    <Fragment key={i}>
-                      {wordSpan}
-                      <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
-                    </Fragment>
-                  )
-                }
-                return wordSpan
               })}
             </div>
 
