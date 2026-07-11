@@ -521,13 +521,33 @@ export function Sidebar() {
               className="flex items-center gap-3 w-full rounded-xl px-2 py-2 -mx-2 transition-colors hover:opacity-80"
               style={{ background: dropdownOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
             >
-              <div className="relative w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-bold text-white"
-                style={{ background: 'var(--accent)' }}>
-                {avatarUrl
-                  ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                  : avatarLetter}
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-bold text-white"
+                  style={{ background: 'var(--accent)' }}>
+                  {avatarUrl
+                    ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                    : avatarLetter}
+                </div>
                 {unreadCount > 0 && (
-                  <span style={{ position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: '50%', background: '#ef4444', border: '1.5px solid var(--bg-secondary)' }} />
+                  <span
+                    // Same unreadCount that already feeds the "Messages [N]"
+                    // badge in the dropdown — no separate query, so the
+                    // count updates in lockstep with the dropdown badge.
+                    aria-label={`${unreadCount} unread messages`}
+                    className="flex items-center justify-center font-semibold text-white"
+                    style={{
+                      position: 'absolute',
+                      top: -4, right: -4,
+                      minWidth: 18, height: 18,
+                      padding: '0 5px',
+                      borderRadius: 9,
+                      background: '#ef4444',
+                      fontSize: 11,
+                      lineHeight: 1,
+                      border: '2px solid var(--bg-primary)',
+                    }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
                 )}
               </div>
               <div className="flex-1 min-w-0 text-left">

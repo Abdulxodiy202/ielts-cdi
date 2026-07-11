@@ -1014,7 +1014,16 @@ export default function TypingPage() {
                 return (
                   <Fragment key={`f-${gi}`}>
                     {enterSpan}
-                    <div style={{ flexBasis: '100%', width: '100%', height: LINE_HEIGHT }} />
+                    {/* height:0 — the break forces the next character
+                        onto a fresh visual line (via flexBasis: 100%)
+                        without inserting a whole blank row of vertical
+                        space. Previously this was height: LINE_HEIGHT,
+                        which stacked an empty row between the ↵ line
+                        and the next paragraph and made the cursor look
+                        stuck in a blank middle row. Now the very next
+                        visual line after the ↵ is the first line of the
+                        next paragraph, edclub-style. */}
+                    <div style={{ flexBasis: '100%', width: '100%', height: 0 }} />
                   </Fragment>
                 )
               }) : typingState.words.map((word, i) => {
