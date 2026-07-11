@@ -246,7 +246,7 @@ export function ListeningPageClient({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={() => setMode('full')}
-            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99]"
+            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
           >
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -272,7 +272,7 @@ export function ListeningPageClient({
               ))}
             </div>
             <div
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
               style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}
             >
               {t('test.chooseTest')} <ChevronRight size={15} />
@@ -285,7 +285,7 @@ export function ListeningPageClient({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.07 }}
             onClick={() => setMode('sections')}
-            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99]"
+            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
           >
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -311,7 +311,7 @@ export function ListeningPageClient({
               ))}
             </div>
             <div
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
               style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
             >
               {t('test.choosePart')} <ChevronRight size={15} />
@@ -319,12 +319,12 @@ export function ListeningPageClient({
           </motion.button>
 
           {/* Script Practice card */}
-          <Link href="/listening/script" className="block">
+          <Link href="/listening/script" className="block h-full">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.14 }}
-              className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] h-full"
+              className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
             >
               <div
                 className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 relative"
@@ -351,7 +351,7 @@ export function ListeningPageClient({
                 ))}
               </div>
               <div
-                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
                 style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))', color: '#10b981' }}
               >
                 {t('test.start')} <ChevronRight size={15} />

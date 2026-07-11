@@ -380,6 +380,12 @@ export default function TypingPage() {
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const charRefs = useRef<(HTMLSpanElement | null)[]>([])
   const linesWrapRef = useRef<HTMLDivElement>(null)
+  // Essay-mode flex-wrap inner + a single persistent cursor <div> that
+  // animates its `transform` between char positions via a CSS transition,
+  // so the cursor glides smoothly instead of teleporting (which is what
+  // a per-char ::before pseudo did on each cursorIndex change).
+  const essayInnerRef = useRef<HTMLDivElement>(null)
+  const essayCursorRef = useRef<HTMLDivElement>(null)
   const cursorAnchorRef = useRef<HTMLSpanElement>(null)
   const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
 
@@ -646,6 +652,37 @@ export default function TypingPage() {
     if (desiredTopLine !== topLineIndex) setTopLineIndex(desiredTopLine)
   }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, LINE_HEIGHT, topLineIndex])
 
+  /* ── Essay-mode smooth cursor: on every cursor move (or scroll change),
+     query the current char, measure its rect relative to the flex inner,
+     and write the transform/height directly onto essayCursorRef. The
+     cursor element has a CSS `transition: transform 0.1s ease-out` in the
+     <style> block above, so the browser interpolates the transform change
+     -- cursor glides between char positions instead of teleporting the
+     way a per-char ::before pseudo did on every cursorIndex change.
+     Rects are read with getBoundingClientRect() (both the char AND the
+     inner have the same active translateY, so their difference is the
+     untransformed layout position). ── */
+  useLayoutEffect(() => {
+    if (!isEssaySet) return
+    const inner = essayInnerRef.current
+    const cursor = essayCursorRef.current
+    if (!inner || !cursor) return
+    const currentCharEl = inner.querySelector<HTMLElement>('.typing-essay-current')
+    if (!currentCharEl) {
+      // Finished — hide the cursor. status flips to 'result' momentarily.
+      cursor.style.opacity = '0'
+      return
+    }
+    cursor.style.opacity = '1'
+    const charRect = currentCharEl.getBoundingClientRect()
+    const innerRect = inner.getBoundingClientRect()
+    // -1 to sit 1px to the left of the char, matching the previous pseudo.
+    const x = charRect.left - innerRect.left - 1
+    const y = charRect.top - innerRect.top
+    cursor.style.transform = `translate(${x}px, ${y}px)`
+    cursor.style.height = `${charRect.height}px`
+  }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, topLineIndex, LINE_HEIGHT])
+
   /* ── Track the cursor's target position so it can animate smoothly via a
      CSS transform transition, instead of jumping as an inline element.
      Y is computed analytically from (currentLineIndex - topLineIndex) *
@@ -785,42 +822,25 @@ export default function TypingPage() {
       onClick={() => inputRef.current?.focus()}
     >
       <style>{`
-        @keyframes typingCursorBlink { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
-        /* Essay-mode cursor: attach as a ::before pseudo to the current
-           char span itself, so the cursor is always exactly on
-           charSequence[currentIndex] regardless of wrap/scroll/resize --
-           no getBoundingClientRect() measurement to go stale. */
-        .typing-essay-current { position: relative; }
-        .typing-essay-current::before {
-          content: '';
+        @keyframes typingCursorBlink { 0%,50% { opacity:1 } 51%,100% { opacity:0 } }
+        /* Essay-mode cursor: ONE persistent element that animates its
+           transform between char positions, so cursor movement glides
+           smoothly (Monkeytype-style) instead of teleporting when a
+           per-char pseudo-element flips from one span to another. The
+           .typing-essay-current class is now just a data marker used by
+           the scroll effect and the cursor-position effect to identify
+           which char the cursor is on -- no visual styling of its own. */
+        .typing-essay-cursor {
           position: absolute;
-          left: -1px;
           top: 0;
-          bottom: 0;
-          width: 2px;
-          background: #6366f1;
-          animation: typingCursorBlink 1s step-end infinite;
-          pointer-events: none;
-        }
-        /* End cursor (when the user has typed the whole essay and
-           currentIndex === chars.length — no char has the .current
-           class anymore, so we render a 0-width sibling to hold the
-           blinking bar in its place). */
-        .typing-essay-end-cursor {
-          display: inline-block;
-          width: 0;
-          position: relative;
-        }
-        .typing-essay-end-cursor::before {
-          content: '';
-          position: absolute;
           left: 0;
-          top: 0;
-          bottom: 0;
           width: 2px;
           background: #6366f1;
-          animation: typingCursorBlink 1s step-end infinite;
+          border-radius: 1px;
           pointer-events: none;
+          transition: transform 0.1s ease-out, height 0.1s ease-out;
+          animation: typingCursorBlink 1s step-end infinite;
+          will-change: transform;
         }
       `}</style>
 
@@ -988,12 +1008,21 @@ export default function TypingPage() {
             onClick={() => inputRef.current?.focus()}
           >
             <div
+              ref={essayInnerRef}
               className="flex flex-wrap content-start transition-transform duration-200"
               style={{
                 fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, letterSpacing: '0.02em',
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
+                position: 'relative', // for the absolute-positioned essay cursor
               }}
             >
+              {isEssaySet && (
+                // ONE persistent cursor whose transform animates between
+                // char positions -- see the useLayoutEffect further up
+                // that reads .typing-essay-current's rect and writes the
+                // transform/height here directly on ref.
+                <div ref={essayCursorRef} className="typing-essay-cursor" style={{ height: FONT_SIZE }} />
+              )}
               {isEssaySet ? <>{essayGroups.map((g, gi) => {
                 // Per-character span factory used by both the word-group
                 // path and the standalone-space path. Each character still
@@ -1045,16 +1074,7 @@ export default function TypingPage() {
                 // g.type === 'space' — exhaustive by construction now
                 // that groupIntoWords no longer emits 'newline' groups.
                 return renderChar(' ', g.index)
-              })}
-              {/* When the user has typed every character, no char carries
-                  the .typing-essay-current class anymore. The essay auto-
-                  transitions to the result screen at that moment, but for
-                  the brief render frame between "last keystroke" and
-                  "status flips to result" we still want a visible cursor
-                  at the very end of the sequence. */}
-              {isEssaySet && essayState.chars.length > 0 && essayState.currentIndex >= essayState.chars.length && (
-                <span className="typing-essay-end-cursor" aria-hidden />
-              )}</> : typingState.words.map((word, i) => {
+              })}</> : typingState.words.map((word, i) => {
                 const typed = typingState.inputs[i] ?? ''
                 const isCurrent = i === typingState.currentIndex
                 const isDone = i < typingState.currentIndex
