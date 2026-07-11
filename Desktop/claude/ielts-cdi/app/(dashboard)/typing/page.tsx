@@ -347,6 +347,30 @@ export default function TypingPage() {
   // RESET), not on which characters have been typed. Keeps render cheap
   // even for long essays.
   const essayGroups = useMemo(() => groupIntoWords(essayState.chars), [essayState.chars])
+  // Total word count for the essay progress counter -- computed on the
+  // normalized character sequence itself (splits on whitespace INCLUDING
+  // '\n' the same way as Common English / IELTS Vocabulary counts words),
+  // so it's guaranteed to match what a reader of the essay would count.
+  const essayTotalWords = useMemo(() => {
+    if (essayState.chars.length === 0) return 0
+    return essayState.chars.join('').split(/\s+/).filter(Boolean).length
+  }, [essayState.chars])
+  // "Completed" words: words in chars[0..currentIndex) where the cursor
+  // has moved PAST the word's last character. If the last typed char is
+  // a separator (space/newline), the preceding word is complete. If the
+  // cursor is mid-word (last typed char is a letter and we're not at the
+  // end of the essay), the last word in the split isn't done yet, so
+  // subtract 1. Once the essay is fully consumed, all words count.
+  const essayTypedWords = useMemo(() => {
+    const idx = essayState.currentIndex
+    if (idx === 0) return 0
+    const before = essayState.chars.slice(0, idx).join('')
+    const words = before.split(/\s+/).filter(Boolean)
+    const atEnd = idx >= essayState.chars.length
+    const lastChar = before[before.length - 1]
+    const midWord = !atEnd && lastChar !== undefined && lastChar !== ' ' && lastChar !== '\n'
+    return midWord ? Math.max(0, words.length - 1) : words.length
+  }, [essayState.chars, essayState.currentIndex])
 
   const [startedAt, setStartedAt] = useState<number | null>(null)
   const [endedAt, setEndedAt] = useState<number | null>(null)
@@ -453,6 +477,17 @@ export default function TypingPage() {
       essay (Tab / "Try Again" keep the current essay, not a new random one). */
   const startEssay = useCallback((essay: TypingEssayListItem) => {
     const chars = buildCharSequence(essay.content)
+    // Diagnostic: dump exactly where '\n' lands in the normalized
+    // sequence so a stray ↵ in the rendered output can be traced to
+    // either (a) admin data actually containing a newline there or (b)
+    // a tokenizer bug. The task's bug 2 report can be verified against
+    // this: ↵ only appears where chars[i] === '\n'.
+    const newlinePositions: number[] = []
+    for (let i = 0; i < chars.length; i++) if (chars[i] === '\n') newlinePositions.push(i)
+    const wordCount = chars.join('').split(/\s+/).filter(Boolean).length
+    // eslint-disable-next-line no-console
+    console.log('[typing] essay loaded:',
+      { title: essay.title, chars: chars.length, words: wordCount, newlinePositions })
     setSelectedEssay(essay)
     setEssayTitle(essay.title)
     essayDispatch({ type: 'RESET', chars })
@@ -642,22 +677,23 @@ export default function TypingPage() {
     })
   }, [isEssaySet, typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
 
-  /* ── Same cursor tracking, but for the essay engine. Every position in
-     the flat character sequence already has its own rendered span (no
-     "anchor" trick needed like word mode's variable-length words), so X is
-     measured directly off the current character's span. Y is still
-     analytic for the same mid-transition-read reason as above. ── */
-  useLayoutEffect(() => {
+  /* ── Debug log for essay-mode cursor tracking. Fires on every cursor
+     move so the console shows exactly which char index the state points
+     at and what character is there — used to diagnose the earlier
+     "cursor lands on the wrong character" report. The essay engine has
+     no DOM-measurement cursor effect anymore; the visible cursor is a
+     CSS ::before pseudo-element on the current char's span (see the
+     .typing-essay-current class in the <style> block below), so it's
+     structurally impossible for the cursor position to disagree with
+     essayState.currentIndex the way an absolute-pixel-positioned overlay
+     could when its measurements went stale. ── */
+  useEffect(() => {
     if (!isEssaySet) return
-    const el = charRefs.current[essayState.currentIndex]
-    if (!el || !linesWrapRef.current) return
-    const charRect = el.getBoundingClientRect()
-    const wrapRect = linesWrapRef.current.getBoundingClientRect()
-    setCursorPos({
-      x: charRect.left - wrapRect.left,
-      y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
-    })
-  }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
+    // eslint-disable-next-line no-console
+    console.log('[typing] cursorIndex:', essayState.currentIndex,
+      '| char at cursor:', JSON.stringify(essayState.chars[essayState.currentIndex]),
+      '| prev char:', JSON.stringify(essayState.chars[essayState.currentIndex - 1]))
+  }, [isEssaySet, essayState.currentIndex, essayState.chars])
 
   /* ── Keyboard handling ────────────────────────────────────────────── */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -732,8 +768,9 @@ export default function TypingPage() {
       return String(remaining)
     }
     if (isEssaySet) {
-      const current = Math.min(essayState.currentIndex + 1, essayState.chars.length)
-      return `${current}/${essayState.chars.length}`
+      // Words progress, not characters -- matches the "N/M" the word
+      // engine shows for Common English / IELTS Vocabulary.
+      return `${essayTypedWords}/${essayTotalWords}`
     }
     const current = Math.min(typingState.currentIndex + 1, typingState.words.length)
     return `${current}/${typingState.words.length}`
@@ -755,6 +792,22 @@ export default function TypingPage() {
     >
       <style>{`
         @keyframes typingCursorBlink { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
+        /* Essay-mode cursor: attach as a ::before pseudo to the current
+           char span itself, so the cursor is always exactly on
+           charSequence[currentIndex] regardless of wrap/scroll/resize --
+           no getBoundingClientRect() measurement to go stale. */
+        .typing-essay-current { position: relative; }
+        .typing-essay-current::before {
+          content: '';
+          position: absolute;
+          left: -1px;
+          top: 5%;
+          bottom: 5%;
+          width: 2px;
+          background: #e2b714;
+          animation: typingCursorBlink 1s step-end infinite;
+          pointer-events: none;
+        }
       `}</style>
 
       {/* Hidden/minimal capture input — always focused; visible+tappable on mobile */}
@@ -947,6 +1000,7 @@ export default function TypingPage() {
                     <span
                       key={i}
                       ref={el => { charRefs.current[i] = el }}
+                      className={isCurrent ? 'typing-essay-current' : undefined}
                       style={{
                         color, textDecoration: underline ? 'underline' : 'none',
                         opacity: isDone || isCurrent ? 1 : 0.4,
@@ -1001,6 +1055,7 @@ export default function TypingPage() {
                   <span
                     key={i}
                     ref={el => { charRefs.current[i] = el }}
+                    className={isCurrent ? 'typing-essay-current' : undefined}
                     style={{
                       display: 'inline-block',
                       opacity: isDone || isCurrent ? (underline ? 1 : 0.5) : 0.3,
@@ -1087,16 +1142,22 @@ export default function TypingPage() {
               })}
             </div>
 
-            {/* Smoothly-animated cursor, positioned via the measured anchor above */}
-            <div
-              style={{
-                position: 'absolute', top: 0, left: 0, width: 3, height: CURSOR_HEIGHT,
-                background: '#e2b714', pointerEvents: 'none',
-                transform: `translate(${cursorPos.x}px, ${cursorPos.y}px)`,
-                transition: 'transform 0.1s ease-out',
-                animation: 'typingCursorBlink 1s step-end infinite',
-              }}
-            />
+            {/* Smoothly-animated cursor, positioned via the measured anchor above.
+                Word mode only -- essay mode uses a CSS ::before pseudo-element
+                attached directly to the current char (see the <style> block up
+                top), which can't desync from wrap/scroll/resize the way a
+                measured absolute position can. */}
+            {!isEssaySet && (
+              <div
+                style={{
+                  position: 'absolute', top: 0, left: 0, width: 3, height: CURSOR_HEIGHT,
+                  background: '#e2b714', pointerEvents: 'none',
+                  transform: `translate(${cursorPos.x}px, ${cursorPos.y}px)`,
+                  transition: 'transform 0.1s ease-out',
+                  animation: 'typingCursorBlink 1s step-end infinite',
+                }}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
