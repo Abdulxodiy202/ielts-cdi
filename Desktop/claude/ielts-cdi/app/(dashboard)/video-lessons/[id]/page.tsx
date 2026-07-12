@@ -184,15 +184,15 @@ export default function VideoDetailPage() {
               allowFullScreen
               title={video.title}
             />
-            {/* Corner overlays block clicks on YouTube's branding but leave
-                the CENTER (play/pause), the BOTTOM STRIP (progress bar +
-                controls), and the top-right CC/settings/volume cluster
-                fully clickable. Dimensions match the branding footprint at
-                standard controls sizing; tune here after visual testing at
-                different aspect ratios if branding creeps out. */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 90, height: 60, pointerEvents: 'auto', zIndex: 2 }} />
-            <div style={{ position: 'absolute', bottom: 8, right: 8, width: 110, height: 35, pointerEvents: 'auto', zIndex: 2 }} />
-            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 200, height: 35, pointerEvents: 'auto', zIndex: 2 }} />
+            {/* Corner overlays visually COVER YouTube's branding with
+                solid black (matching the player background) so the title
+                bar, watermark, share URL, and end-card don't show through.
+                They also block clicks. The CENTER (play/pause), the
+                BOTTOM STRIP (progress bar + controls), and the top-right
+                CC/settings/volume cluster remain fully clickable. */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 130, height: 55, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
+            <div style={{ position: 'absolute', bottom: 8, right: 8, width: 250, height: 90, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
+            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 200, height: 35, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
           </div>
         ) : null}
       </div>
