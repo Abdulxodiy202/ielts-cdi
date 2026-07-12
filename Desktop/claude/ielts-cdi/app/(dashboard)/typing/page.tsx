@@ -380,14 +380,14 @@ export default function TypingPage() {
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([])
   const charRefs = useRef<(HTMLSpanElement | null)[]>([])
   const linesWrapRef = useRef<HTMLDivElement>(null)
-  // Essay-mode flex-wrap inner + a single persistent cursor <div> that
-  // animates its `transform` between char positions via a CSS transition,
-  // so the cursor glides smoothly instead of teleporting (which is what
-  // a per-char ::before pseudo did on each cursorIndex change).
-  const essayInnerRef = useRef<HTMLDivElement>(null)
-  const essayCursorRef = useRef<HTMLDivElement>(null)
+  // Flex-wrap inner + a single persistent cursor <div> that animates its
+  // `transform` between target positions via a CSS transition, so the
+  // cursor glides smoothly instead of teleporting. Shared across all four
+  // modes (Common English, IELTS Vocabulary, Task 1, Task 2) -- both
+  // engines' flex-wrap inner is the same DOM node, so one ref is enough.
+  const typingInnerRef = useRef<HTMLDivElement>(null)
+  const typingCursorRef = useRef<HTMLDivElement>(null)
   const cursorAnchorRef = useRef<HTMLSpanElement>(null)
-  const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 })
 
   /* ── Visual-line grouping (independent of word index): which line each
      word actually wrapped onto, computed by measuring the DOM. Scrolling is
@@ -413,7 +413,6 @@ export default function TypingPage() {
   // itself, so anchoring the cursor's top to the row's top left it sitting
   // above the letters instead of level with them.
   const CURSOR_HEIGHT = FONT_SIZE * 0.9
-  const CURSOR_Y_OFFSET = (LINE_HEIGHT - CURSOR_HEIGHT) / 2
 
   /* ── Shared reset of the typing-engine UI state, used whenever a fresh
      set of words/an essay is about to be typed from scratch. ── */
@@ -422,7 +421,11 @@ export default function TypingPage() {
     setEndedAt(null)
     setTopLineIndex(0)
     setLines([])
-    setCursorPos({ x: 0, y: 0 })
+    // Hide the shared cursor until the first useLayoutEffect run places
+    // it at the correct spot — prevents the "floats above the text" flash
+    // where a stale (0, 0) transform paints for one frame before the
+    // effect corrects it.
+    if (typingCursorRef.current) typingCursorRef.current.style.opacity = '0'
     wordRefs.current = []
     charRefs.current = []
     setStatus('typing')
@@ -638,91 +641,65 @@ export default function TypingPage() {
      scrolling, and the Math.min(0, ...) clamp guarantees the transform
      never becomes positive (which would push content DOWN — the exact
      symptom the bug report describes). Queries the DOM directly via
-     `.typing-essay-current` rather than going through the derived
+     `.typing-cursor-anchor` rather than going through the derived
      `lines`/`currentLineIndex` state, so it's insensitive to any lag or
      staleness in that derived state. ── */
   useLayoutEffect(() => {
     if (!isEssaySet) return
     const container = linesWrapRef.current
     if (!container) return
-    const currentCharEl = container.querySelector<HTMLElement>('.typing-essay-current')
+    const currentCharEl = container.querySelector<HTMLElement>('.typing-cursor-anchor')
     if (!currentCharEl) return // cursor is past the end (essay finished)
     const currentLineIdx = Math.round(currentCharEl.offsetTop / LINE_HEIGHT)
     const desiredTopLine = currentLineIdx <= 1 ? 0 : currentLineIdx - 1
     if (desiredTopLine !== topLineIndex) setTopLineIndex(desiredTopLine)
   }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, LINE_HEIGHT, topLineIndex])
 
-  /* ── Essay-mode smooth cursor: on every cursor move (or scroll change),
-     query the current char, measure its rect relative to the flex inner,
-     and write the transform/height directly onto essayCursorRef. The
-     cursor element has a CSS `transition: transform 0.1s ease-out` in the
-     <style> block above, so the browser interpolates the transform change
-     -- cursor glides between char positions instead of teleporting the
-     way a per-char ::before pseudo did on every cursorIndex change.
-     Rects are read with getBoundingClientRect() (both the char AND the
-     inner have the same active translateY, so their difference is the
-     untransformed layout position). ── */
+  /* ── Shared smooth-cursor effect for ALL four modes. Queries the
+     `.typing-cursor-anchor` element inside the flex-wrap inner (present in
+     both engines: essay marks the current char with the class; word mode
+     puts the class on its zero-width anchor span at the current word/char
+     position). Reads the anchor's rect and the inner's rect, diffs them
+     for the untransformed layout position within the inner (both rects
+     include the same active scroll translateY so it cancels out), then
+     writes transform + height straight onto the shared cursor <div>.
+     Because the cursor <div>'s CSS carries `transition: transform 0.1s
+     ease-out`, every keystroke's transform change is interpolated by the
+     browser -- the cursor glides between positions instead of teleporting.
+     Falls back to CURSOR_HEIGHT when the anchor is zero-height (word-mode
+     anchors are a 0×0 marker), so the cursor always has a visible bar. ── */
   useLayoutEffect(() => {
-    if (!isEssaySet) return
-    const inner = essayInnerRef.current
-    const cursor = essayCursorRef.current
+    const inner = typingInnerRef.current
+    const cursor = typingCursorRef.current
     if (!inner || !cursor) return
-    const currentCharEl = inner.querySelector<HTMLElement>('.typing-essay-current')
-    if (!currentCharEl) {
-      // Finished — hide the cursor. status flips to 'result' momentarily.
+    const target = inner.querySelector<HTMLElement>('.typing-cursor-anchor')
+    if (!target) {
       cursor.style.opacity = '0'
       return
     }
     cursor.style.opacity = '1'
-    const charRect = currentCharEl.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
     const innerRect = inner.getBoundingClientRect()
-    // -1 to sit 1px to the left of the char, matching the previous pseudo.
-    const x = charRect.left - innerRect.left - 1
-    const y = charRect.top - innerRect.top
+    const x = targetRect.left - innerRect.left - 1
+    const y = targetRect.top - innerRect.top
     cursor.style.transform = `translate(${x}px, ${y}px)`
-    cursor.style.height = `${charRect.height}px`
-  }, [isEssaySet, essayState.currentIndex, essayState.typedKeys, topLineIndex, LINE_HEIGHT])
-
-  /* ── Track the cursor's target position so it can animate smoothly via a
-     CSS transform transition, instead of jumping as an inline element.
-     Y is computed analytically from (currentLineIndex - topLineIndex) *
-     LINE_HEIGHT rather than measured off the anchor's live DOM position.
-     The lines container animates via its own CSS transition whenever
-     topLineIndex changes (e.g. on every scroll, and on restart snapping
-     back to 0), so a getBoundingClientRect() read taken shortly after is
-     racing that transition — it can land mid-animation and capture a
-     position partway between the old and new scroll offset. Computing Y
-     from state sidesteps the race entirely. X is still DOM-measured since
-     translateY never affects the horizontal axis, so it's unaffected by
-     the transition's progress — which also means it no longer needs to
-     wait a frame. This runs as a layout effect (not a passive effect
-     deferred behind a requestAnimationFrame) so the very first paint of a
-     fresh test already shows the corrected, offset position instead of
-     briefly flashing the uncentered {0,0} reset value until the first
-     keystroke happens to re-trigger the old rAF-based measurement.
-     Word mode only — guarded so it doesn't fight the essay engine's own
-     cursor-position effect below while an essay is active. ── */
-  useLayoutEffect(() => {
-    if (isEssaySet) return
-    if (!cursorAnchorRef.current || !linesWrapRef.current) return
-    const anchorRect = cursorAnchorRef.current.getBoundingClientRect()
-    const wrapRect = linesWrapRef.current.getBoundingClientRect()
-    setCursorPos({
-      x: anchorRect.left - wrapRect.left,
-      y: (currentLineIndex - topLineIndex) * LINE_HEIGHT + CURSOR_Y_OFFSET,
-    })
-  }, [isEssaySet, typingState.currentIndex, typingState.inputs[typingState.currentIndex], topLineIndex, currentLineIndex, LINE_HEIGHT, CURSOR_Y_OFFSET])
+    cursor.style.height = `${targetRect.height || CURSOR_HEIGHT}px`
+  }, [
+    isEssaySet, topLineIndex, LINE_HEIGHT, CURSOR_HEIGHT,
+    // Fire on either engine's cursor changes:
+    essayState.currentIndex, essayState.typedKeys,
+    typingState.currentIndex, typingState.inputs[typingState.currentIndex],
+  ])
 
   /* ── Debug log for essay-mode cursor tracking. Fires on every cursor
      move so the console shows exactly which char index the state points
      at and what character is there — used to diagnose the earlier
-     "cursor lands on the wrong character" report. The essay engine has
-     no DOM-measurement cursor effect anymore; the visible cursor is a
-     CSS ::before pseudo-element on the current char's span (see the
-     .typing-essay-current class in the <style> block below), so it's
-     structurally impossible for the cursor position to disagree with
-     essayState.currentIndex the way an absolute-pixel-positioned overlay
-     could when its measurements went stale. ── */
+     "cursor lands on the wrong character" report. The visible cursor is
+     the shared .typing-cursor <div> that queries .typing-cursor-anchor
+     on every layout effect, so it's structurally impossible for the
+     cursor to point at anything other than the char with the anchor
+     class -- and the anchor class is only ever added to the char at
+     essayState.currentIndex, so the two stay in lockstep. ── */
   useEffect(() => {
     if (!isEssaySet) return
     // eslint-disable-next-line no-console
@@ -823,14 +800,18 @@ export default function TypingPage() {
     >
       <style>{`
         @keyframes typingCursorBlink { 0%,50% { opacity:1 } 51%,100% { opacity:0 } }
-        /* Essay-mode cursor: ONE persistent element that animates its
-           transform between char positions, so cursor movement glides
-           smoothly (Monkeytype-style) instead of teleporting when a
-           per-char pseudo-element flips from one span to another. The
-           .typing-essay-current class is now just a data marker used by
-           the scroll effect and the cursor-position effect to identify
-           which char the cursor is on -- no visual styling of its own. */
-        .typing-essay-cursor {
+        /* Single shared cursor used by ALL four modes (Common English,
+           IELTS Vocabulary, Task 1, Task 2). ONE persistent element that
+           animates its transform between target positions -- cursor
+           glides smoothly (Monkeytype-style) instead of teleporting. The
+           .typing-cursor-anchor class is a data marker on either the
+           essay's current char span OR the word engine's zero-width anchor
+           span; the shared useLayoutEffect finds it and writes transform
+           + height straight to this cursor's ref. Starts with opacity:0
+           so it stays hidden until the first layout effect places it
+           (prevents the "floats above the text" flash at (0,0) before
+           the first measurement lands). */
+        .typing-cursor {
           position: absolute;
           top: 0;
           left: 0;
@@ -841,6 +822,8 @@ export default function TypingPage() {
           transition: transform 0.1s ease-out, height 0.1s ease-out;
           animation: typingCursorBlink 1s step-end infinite;
           will-change: transform;
+          opacity: 0;
+          z-index: 2;
         }
       `}</style>
 
@@ -1008,21 +991,20 @@ export default function TypingPage() {
             onClick={() => inputRef.current?.focus()}
           >
             <div
-              ref={essayInnerRef}
+              ref={typingInnerRef}
               className="flex flex-wrap content-start transition-transform duration-200"
               style={{
                 fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, letterSpacing: '0.02em',
                 transform: `translateY(-${topLineIndex * LINE_HEIGHT}px)`,
-                position: 'relative', // for the absolute-positioned essay cursor
+                position: 'relative', // for the absolute-positioned cursor
               }}
             >
-              {isEssaySet && (
-                // ONE persistent cursor whose transform animates between
-                // char positions -- see the useLayoutEffect further up
-                // that reads .typing-essay-current's rect and writes the
-                // transform/height here directly on ref.
-                <div ref={essayCursorRef} className="typing-essay-cursor" style={{ height: FONT_SIZE }} />
-              )}
+              {/* Single shared cursor for every mode -- position/height
+                  written directly to its ref by the shared useLayoutEffect
+                  further up. Rendered unconditionally so its DOM node is
+                  ready for the very first measurement (no first-paint
+                  flash at 0,0). */}
+              <div ref={typingCursorRef} className="typing-cursor" style={{ height: CURSOR_HEIGHT }} />
               {isEssaySet ? <>{essayGroups.map((g, gi) => {
                 // Per-character span factory used by both the word-group
                 // path and the standalone-space path. Each character still
@@ -1043,7 +1025,7 @@ export default function TypingPage() {
                     <span
                       key={i}
                       ref={el => { charRefs.current[i] = el }}
-                      className={isCurrent ? 'typing-essay-current' : undefined}
+                      className={isCurrent ? 'typing-cursor-anchor' : undefined}
                       style={{
                         color, textDecoration: underline ? 'underline' : 'none',
                         opacity: isDone || isCurrent ? 1 : 0.4,
@@ -1093,7 +1075,19 @@ export default function TypingPage() {
                   <span
                     key="anchor"
                     ref={cursorAnchorRef}
-                    style={{ display: 'inline-block', width: 0, verticalAlign: 'text-top' }}
+                    className="typing-cursor-anchor"
+                    style={{
+                      display: 'inline-block',
+                      width: 0,
+                      // Explicit height so the shared cursor effect can
+                      // read anchor.getBoundingClientRect().height and
+                      // size the cursor properly. Without this the
+                      // zero-width span reports height 0 and the cursor
+                      // would fall through to CURSOR_HEIGHT -- fine, but
+                      // an explicit height keeps top/left math exact.
+                      height: '1em',
+                      verticalAlign: 'text-top',
+                    }}
                   />
                 )
                 const chars = []
@@ -1135,22 +1129,10 @@ export default function TypingPage() {
               })}
             </div>
 
-            {/* Smoothly-animated cursor, positioned via the measured anchor above.
-                Word mode only -- essay mode uses a CSS ::before pseudo-element
-                attached directly to the current char (see the <style> block up
-                top), which can't desync from wrap/scroll/resize the way a
-                measured absolute position can. */}
-            {!isEssaySet && (
-              <div
-                style={{
-                  position: 'absolute', top: 0, left: 0, width: 3, height: CURSOR_HEIGHT,
-                  background: '#e2b714', pointerEvents: 'none',
-                  transform: `translate(${cursorPos.x}px, ${cursorPos.y}px)`,
-                  transition: 'transform 0.1s ease-out',
-                  animation: 'typingCursorBlink 1s step-end infinite',
-                }}
-              />
-            )}
+            {/* Old yellow word-mode cursor removed: the shared .typing-cursor
+                <div> up inside the flex-wrap inner now handles all four
+                modes uniformly (blue, 2px, smooth glide via CSS
+                transition). */}
           </div>
 
           <div className="flex items-center gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
