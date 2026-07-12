@@ -91,6 +91,29 @@ export default function VideoDetailPage() {
   const locked  = video.is_premium && !userPremium
   const thumbSrc = video.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` : null)
 
+  // YouTube-nocookie embed with every branding-suppression flag Google
+  // still honors: no related videos, modest branding, hide old
+  // title/uploader chrome, no annotations, keep controls + fullscreen.
+  // `origin` gates postMessage security for the embed. `typeof window`
+  // guard is belt-and-suspenders (the file is `use client` and this only
+  // runs after `loading` flips false, but a stray SSR path would crash
+  // without it).
+  const ytEmbedUrl = ytId
+    ? `https://www.youtube-nocookie.com/embed/${ytId}?` + new URLSearchParams({
+        rel: '0',
+        modestbranding: '1',
+        showinfo: '0',
+        iv_load_policy: '3',
+        fs: '1',
+        cc_load_policy: '0',
+        disablekb: '0',
+        playsinline: '1',
+        controls: '1',
+        autoplay: '1',
+        origin: typeof window !== 'undefined' ? window.location.origin : '',
+      }).toString()
+    : null
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#000', overflow: 'hidden' }}>
       {/* Top bar */}
@@ -142,13 +165,35 @@ export default function VideoDetailPage() {
             controls autoPlay
             onPlay={handlePlay}
           />
-        ) : ytId ? (
-          <iframe
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
-            src={`https://www.youtube-nocookie.com/embed/${ytId}?rel=0&modestbranding=1&autoplay=1`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen title={video.title}
-          />
+        ) : ytId && ytEmbedUrl ? (
+          // NOTE: Overlays hide YouTube UI elements (title bar top-left,
+          // watermark bottom-right, share URL popup bottom-left). This is
+          // a grey area under YouTube ToS. For a fully clean, ToS-
+          // compliant player, migrate to self-hosted video via
+          // Cloudflare Stream, Mux, or Bunny CDN and use <video>.
+          // Right-click is suppressed to also hide YouTube's "Watch on
+          // YouTube" / "Copy video URL" context menu.
+          <div
+            onContextMenu={e => e.preventDefault()}
+            style={{ position: 'absolute', inset: 0, background: '#000' }}
+          >
+            <iframe
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+              src={ytEmbedUrl}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              title={video.title}
+            />
+            {/* Corner overlays block clicks on YouTube's branding but leave
+                the CENTER (play/pause), the BOTTOM STRIP (progress bar +
+                controls), and the top-right CC/settings/volume cluster
+                fully clickable. Dimensions match the branding footprint at
+                standard controls sizing; tune here after visual testing at
+                different aspect ratios if branding creeps out. */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 90, height: 60, pointerEvents: 'auto', zIndex: 2 }} />
+            <div style={{ position: 'absolute', bottom: 8, right: 8, width: 110, height: 35, pointerEvents: 'auto', zIndex: 2 }} />
+            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 200, height: 35, pointerEvents: 'auto', zIndex: 2 }} />
+          </div>
         ) : null}
       </div>
 
