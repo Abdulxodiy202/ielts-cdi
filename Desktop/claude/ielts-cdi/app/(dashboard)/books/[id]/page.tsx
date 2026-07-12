@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { BackButton } from '@/components/ui/BackButton'
 import { PremiumLockScreen } from '@/components/ui/PremiumLockScreen'
 import MusicPlayer from '@/components/MusicPlayer'
+import { isBookCategory } from '@/lib/utils/bookCategories'
+import CategoryBooksView from './CategoryBooksView'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -18,6 +20,16 @@ export default async function BookPage({ params }: Props) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  // The [id] segment covers TWO cases: a book UUID (this file's original
+  // purpose -- the reader) OR one of the four category slugs (introduced
+  // by the /books hub redesign). Book IDs are UUIDs; category slugs are
+  // one of a fixed 4-value string set, so there's no overlap. Category
+  // slugs get the client-rendered book grid; everything else falls
+  // through to the reader below (which 404s on unknown UUIDs, unchanged).
+  if (isBookCategory(id)) {
+    return <CategoryBooksView category={id} />
+  }
 
   const admin = createAdminClient()
   const [{ data: book }, profileRes] = await Promise.all([

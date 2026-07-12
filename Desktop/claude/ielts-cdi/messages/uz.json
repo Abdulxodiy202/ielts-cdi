@@ -444,12 +444,21 @@
     "premium": "Premium olish",
     "filterAll": "Barchasi",
     "countSuffix": "ta kitob",
+    "bookCount": "{count} ta kitob",
+    "open": "Ochish",
+    "back": "Orqaga",
     "emptyCategory": "Hali {category} kitoblari yo'q. Keyinroq qayta tekshiring!",
     "categories": {
       "grammar": "Grammatika",
       "ielts": "IELTS",
       "vocabulary": "Lug'at",
       "fun_reads": "Qiziqarli kitoblar"
+    },
+    "categoryDescs": {
+      "grammar": "IELTS uchun ingliz tili grammatikasi qoidalari va tuzilmalarini o'rganing.",
+      "ielts": "Rasmiy IELTS tayyorlov kitoblari va Band 9 namunali javoblari.",
+      "vocabulary": "Mavzuli lug'at kitoblari bilan so'z boyligingizni oshiring.",
+      "fun_reads": "O'qish ravonligini oshirish uchun qiziqarli inglizcha kitoblar."
     }
   },
   "articles": {

@@ -444,12 +444,21 @@
     "premium": "Get Premium",
     "filterAll": "All",
     "countSuffix": "books",
+    "bookCount": "{count} books",
+    "open": "Open",
+    "back": "Back",
     "emptyCategory": "No {category} books yet. Check back later!",
     "categories": {
       "grammar": "Grammar",
       "ielts": "IELTS",
       "vocabulary": "Vocabulary",
       "fun_reads": "Fun Reads"
+    },
+    "categoryDescs": {
+      "grammar": "Master English grammar rules and structures for IELTS.",
+      "ielts": "Official IELTS prep books and band 9 model answers.",
+      "vocabulary": "Build your word bank with topic-based vocabulary books.",
+      "fun_reads": "Enjoyable English books to improve reading fluency."
     }
   },
   "articles": {
