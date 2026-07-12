@@ -166,34 +166,13 @@ export default function VideoDetailPage() {
             onPlay={handlePlay}
           />
         ) : ytId && ytEmbedUrl ? (
-          // NOTE: Overlays hide YouTube UI elements (title bar top-left,
-          // watermark bottom-right, share URL popup bottom-left). This is
-          // a grey area under YouTube ToS. For a fully clean, ToS-
-          // compliant player, migrate to self-hosted video via
-          // Cloudflare Stream, Mux, or Bunny CDN and use <video>.
-          // Right-click is suppressed to also hide YouTube's "Watch on
-          // YouTube" / "Copy video URL" context menu.
-          <div
-            onContextMenu={e => e.preventDefault()}
-            style={{ position: 'absolute', inset: 0, background: '#000' }}
-          >
-            <iframe
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
-              src={ytEmbedUrl}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              title={video.title}
-            />
-            {/* Corner overlays visually COVER YouTube's branding with
-                solid black (matching the player background) so the title
-                bar, watermark, share URL, and end-card don't show through.
-                They also block clicks. The CENTER (play/pause), the
-                BOTTOM STRIP (progress bar + controls), and the top-right
-                CC/settings/volume cluster remain fully clickable. */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 130, height: 55, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
-            <div style={{ position: 'absolute', bottom: 8, right: 8, width: 250, height: 90, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
-            <div style={{ position: 'absolute', bottom: 8, left: 8, width: 200, height: 35, background: '#000', pointerEvents: 'auto', zIndex: 2 }} />
-          </div>
+          <iframe
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+            src={ytEmbedUrl}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            title={video.title}
+          />
         ) : null}
       </div>
 
