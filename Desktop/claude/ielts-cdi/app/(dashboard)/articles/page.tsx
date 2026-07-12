@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, ChevronRight, BookOpen } from 'lucide-react'
+import { Lock, ChevronRight, BookOpen, Star, ClipboardCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -16,6 +16,11 @@ interface Article {
   is_published: boolean
   created_at: string
 }
+
+// Best-star lookup, keyed by article_id, populated once at mount from
+// article_test_results for the current user. Missing key = user hasn't
+// taken the test yet.
+type StarMap = Record<string, number>
 
 const GRADIENTS = [
   'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
@@ -36,6 +41,7 @@ export default function ArticlesPage() {
   const [articles, setArticles]   = useState<Article[]>([])
   const [loading, setLoading]     = useState(true)
   const [isPremium, setIsPremium] = useState(false)
+  const [stars, setStars]         = useState<StarMap>({})
 
   useEffect(() => {
     const supabase = createClient()
@@ -43,6 +49,18 @@ export default function ArticlesPage() {
       if (!user) return
       supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single()
         .then(({ data }) => setIsPremium(isActivePremium(data)))
+      supabase
+        .from('article_test_results')
+        .select('article_id, best_stars')
+        .eq('user_id', user.id)
+        .then(({ data }) => {
+          if (!Array.isArray(data)) return
+          const map: StarMap = {}
+          for (const r of data as { article_id: string; best_stars: number }[]) {
+            map[r.article_id] = r.best_stars
+          }
+          setStars(map)
+        })
     })
     fetch('/api/articles')
       .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setArticles(d) })
@@ -75,17 +93,16 @@ export default function ArticlesPage() {
           {articles.map(article => {
             const locked = article.is_premium && !isPremium
             const canRead = !locked && !!article.file_url
+            const bestStars = stars[article.id] ?? 0
 
             return (
               <div
                 key={article.id}
-                onClick={() => router.push(`/articles/${article.id}`)}
                 className="rounded-2xl flex flex-col transition-all duration-200"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  cursor: 'pointer',
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'translateY(-3px)'
@@ -131,6 +148,26 @@ export default function ArticlesPage() {
                     </div>
                   )}
 
+                  {/* Best-stars badge (only if user has scored >=1 star). Top-
+                      right so it doesn't collide with the premium badge in
+                      the title row. */}
+                  {bestStars > 0 && (
+                    <div
+                      className="absolute flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold"
+                      style={{
+                        top: 8,
+                        right: 8,
+                        background: 'rgba(0,0,0,0.55)',
+                        color: '#fbbf24',
+                        border: '1px solid rgba(251,191,36,0.6)',
+                        backdropFilter: 'blur(4px)',
+                      }}
+                    >
+                      <Star size={12} fill="#fbbf24" strokeWidth={0} />
+                      {bestStars}
+                    </div>
+                  )}
+
                   {/* Lock overlay */}
                   {locked && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"
@@ -144,28 +181,44 @@ export default function ArticlesPage() {
                   )}
                 </div>
 
-                {/* ── BOTTOM: Action button ── */}
-                <div className="px-4 pt-3 pb-4" style={{ marginTop: 'auto' }}>
+                {/* ── BOTTOM: Action buttons (Read + Test) ── */}
+                <div className="px-4 pt-3 pb-4 flex gap-2" style={{ marginTop: 'auto' }}>
                   {locked ? (
                     <button
-                      onClick={e => { e.stopPropagation(); router.push(`/articles/${article.id}`) }}
+                      onClick={() => router.push(`/articles/${article.id}`)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     >
                       <Lock size={13} /> {t('articles.premium')}
                     </button>
-                  ) : !article.file_url ? (
-                    <div className="w-full py-2.5 text-center text-sm rounded-xl"
-                      style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                      {t('articles.soon')}
-                    </div>
                   ) : (
-                    <button
-                      className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold"
-                      style={{ background: 'var(--accent)', color: 'white' }}
-                    >
-                      {t('articles.read')} <ChevronRight size={15} />
-                    </button>
+                    <>
+                      {canRead ? (
+                        <button
+                          onClick={() => router.push(`/articles/${article.id}`)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
+                          style={{ background: 'var(--accent)', color: 'white' }}
+                          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                        >
+                          {t('articles.read')} <ChevronRight size={15} />
+                        </button>
+                      ) : (
+                        <div className="flex-1 py-2.5 text-center text-sm rounded-xl"
+                          style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                          {t('articles.soon')}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => router.push(`/articles/${article.id}/test`)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
+                        style={{ background: '#10b981', color: 'white' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                      >
+                        <ClipboardCheck size={14} /> {t('articles.takeTest')}
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
