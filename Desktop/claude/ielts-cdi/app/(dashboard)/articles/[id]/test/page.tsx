@@ -8,11 +8,12 @@ import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
 
-// Per-article 30-question multiple-choice test. Flow: intro -> question
-// (one at a time, no timer, no auto-submit) -> result. Result upsert
-// keeps best_score/best_stars monotonic; last_score/last_stars/attempts
-// always refreshed. RLS on article_test_results already restricts writes
-// to auth.uid() = user_id, so client-side writes are safe.
+// Per-article 30-question multiple-choice test. Flow: quiz (one question
+// at a time, no timer, no auto-submit) -> result. No intro screen -- the
+// hub's "Test ishlash" button lands the user directly on Q1. Result
+// upsert keeps best_score/best_stars monotonic while
+// last_score/last_stars/attempts always refresh. RLS on
+// article_test_results already restricts writes to auth.uid() = user_id.
 
 const TOTAL_QUESTIONS = 30
 type Option = 'A' | 'B' | 'C' | 'D'
@@ -27,12 +28,7 @@ interface Question {
   correct_option: Option
 }
 
-type Phase = 'loading' | 'unavailable' | 'intro' | 'quiz' | 'result'
-
-interface ArticleMeta {
-  id: string
-  title: string
-}
+type Phase = 'loading' | 'unavailable' | 'quiz' | 'result'
 
 interface BestResult {
   best_score: number
@@ -46,7 +42,6 @@ export default function ArticleTestPage() {
   const { t } = useLanguage()
 
   const [phase, setPhase] = useState<Phase>('loading')
-  const [article, setArticle] = useState<ArticleMeta | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [answers, setAnswers] = useState<Record<number, Option>>({})
   const [currentIdx, setCurrentIdx] = useState(0)
@@ -62,8 +57,7 @@ export default function ArticleTestPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [articleRes, questionsRes, bestRes] = await Promise.all([
-        fetch(`/api/articles/${articleId}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      const [questionsRes, bestRes] = await Promise.all([
         supabase
           .from('article_tests')
           .select('question_number, question_text, option_a, option_b, option_c, option_d, correct_option')
@@ -77,7 +71,6 @@ export default function ArticleTestPage() {
           .maybeSingle(),
       ])
 
-      setArticle(articleRes ? { id: articleRes.id, title: articleRes.title } : null)
       setPreviousBest((bestRes.data as BestResult | null) ?? null)
 
       const qs = (questionsRes.data ?? []) as Question[]
@@ -88,7 +81,7 @@ export default function ArticleTestPage() {
         return
       }
       setQuestions(qs)
-      setPhase('intro')
+      setPhase('quiz')
     }
     load()
   }, [articleId, router])
@@ -161,7 +154,7 @@ export default function ArticleTestPage() {
     setCurrentIdx(0)
     setFinalScore(0)
     setFinalStars(0)
-    setPhase('intro')
+    setPhase('quiz')
   }
 
   if (phase === 'loading') {
@@ -194,87 +187,6 @@ export default function ArticleTestPage() {
     )
   }
 
-  if (phase === 'intro') {
-    return (
-      <div className="p-6 md:p-10 max-w-2xl mx-auto">
-        <Link
-          href="/articles"
-          className="inline-flex items-center gap-1 text-sm mb-6 hover:opacity-80"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <ChevronLeft size={14} /> {t('articleTest.backToArticles')}
-        </Link>
-
-        <div
-          className="rounded-2xl p-6 md:p-8"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-        >
-          <div className="flex items-center gap-3 mb-2">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981' }}
-            >
-              <ClipboardCheck size={22} />
-            </div>
-            <div>
-              <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-                {t('articleTest.articleTest')}
-              </p>
-              <h1 className="text-lg md:text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                {article?.title ?? '...'}
-              </h1>
-            </div>
-          </div>
-
-          <p className="mt-4 mb-6 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {t('articleTest.introDesc')}
-          </p>
-
-          <div
-            className="rounded-xl p-4 mb-6"
-            style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-xs font-bold mb-3 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-              {t('articleTest.gradingRules')}
-            </p>
-            <ul className="space-y-1.5 text-sm" style={{ color: 'var(--text-primary)' }}>
-              <li>30/30 → ⭐⭐⭐⭐⭐</li>
-              <li>29/30 → ⭐⭐⭐⭐</li>
-              <li>28/30 → ⭐⭐⭐</li>
-              <li>27/30 → ⭐⭐</li>
-              <li>26/30 → ⭐</li>
-              <li style={{ color: 'var(--text-muted)' }}>
-                ≤ 25/30 → {t('articleTest.noStars')}
-              </li>
-            </ul>
-          </div>
-
-          {previousBest && previousBest.best_score > 0 && (
-            <div
-              className="rounded-xl p-3 mb-6 text-sm"
-              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--text-primary)' }}
-            >
-              {t('articleTest.previousBest', {
-                score: previousBest.best_score,
-                stars: previousBest.best_stars,
-              })}
-            </div>
-          )}
-
-          <button
-            onClick={() => setPhase('quiz')}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-opacity"
-            style={{ background: 'var(--accent)', color: 'white' }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-          >
-            {t('articleTest.startTest')} <ChevronRight size={16} />
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   if (phase === 'quiz' && currentQuestion) {
     const progress = ((currentIdx + 1) / TOTAL_QUESTIONS) * 100
     const options: { key: Option; text: string }[] = [
@@ -286,6 +198,14 @@ export default function ArticleTestPage() {
 
     return (
       <div className="p-4 md:p-6 max-w-2xl mx-auto">
+        <Link
+          href="/articles"
+          className="inline-flex items-center gap-1 text-sm mb-4 hover:opacity-80"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <ChevronLeft size={14} /> {t('articleTest.backToArticles')}
+        </Link>
+
         <div className="mb-4 flex items-center justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
           <span>{t('articleTest.questionCounter', { current: currentIdx + 1, total: TOTAL_QUESTIONS })}</span>
           <span>{t('articleTest.answered', { count: answeredCount })}</span>
