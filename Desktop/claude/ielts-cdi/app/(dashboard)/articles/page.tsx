@@ -151,18 +151,17 @@ export default function ArticlesPage() {
                   {/* Best-stars badge (only if user has scored >=1 star).
                       Sits top-LEFT of the poster; the Free/Premium chip
                       lives in the header row above the poster, so the two
-                      never collide. Size + glow tuned to be noticeable
-                      from a scroll away. */}
+                      never collide. Shows all 5 slots -- gold filled for
+                      earned, dimmed outline for the rest -- matching the
+                      Script Practice result styling. */}
                   {bestStars > 0 && (
                     <div
-                      className="absolute inline-flex items-center rounded-full font-bold"
+                      className="absolute inline-flex items-center rounded-full"
                       style={{
                         top: 12,
                         left: 12,
-                        gap: 6,
-                        padding: '8px 14px',
-                        fontSize: 18,
-                        color: 'white',
+                        gap: 3,
+                        padding: '8px 12px',
                         background: 'rgba(0, 0, 0, 0.75)',
                         backdropFilter: 'blur(4px)',
                         WebkitBackdropFilter: 'blur(4px)',
@@ -172,8 +171,18 @@ export default function ArticlesPage() {
                         pointerEvents: 'none',
                       }}
                     >
-                      <Star size={22} fill="#fbbf24" strokeWidth={0} />
-                      {bestStars}
+                      {[1, 2, 3, 4, 5].map(n => {
+                        const filled = n <= bestStars
+                        return (
+                          <Star
+                            key={n}
+                            size={20}
+                            strokeWidth={filled ? 0 : 2}
+                            fill={filled ? '#fbbf24' : 'none'}
+                            color={filled ? '#fbbf24' : 'rgba(255, 255, 255, 0.35)'}
+                          />
+                        )
+                      })}
                     </div>
                   )}
 
