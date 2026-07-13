@@ -6,10 +6,12 @@ import Link from 'next/link'
 import {
   Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X,
   ChevronLeft, ChevronRight, Headphones, Zap,
-  MessageSquare, Mic, GraduationCap, BookOpen, PenLine,
+  MessageSquare, Mic, GraduationCap, BookOpen, PenLine, ListChecks,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StarsBadge } from '@/components/ui/StarsBadge'
+import { TestAttemptsModal } from '@/components/test/TestAttemptsModal'
 
 interface Test {
   id: string
@@ -25,11 +27,18 @@ interface SectionMeta {
   section: number
 }
 
+interface TestSummary {
+  best_stars: number
+  best_band: number
+  attempts: number
+}
+
 interface ListeningPageClientProps {
   fullTests: Test[]
   sectionTests: Test[]
   isPremium: boolean
   sessionMap: Record<string, string>
+  summaryMap?: Record<string, TestSummary>
 }
 
 type Mode = 'select' | 'full' | 'sections'
@@ -82,12 +91,14 @@ export function ListeningPageClient({
   sectionTests,
   isPremium,
   sessionMap,
+  summaryMap = {},
 }: ListeningPageClientProps) {
   const { t } = useLanguage()
   const [mode, setMode] = useState<Mode>('select')
   const [activePart, setActivePart] = useState<number | null>(null)
   const [showLockModal, setShowLockModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [attemptsModal, setAttemptsModal] = useState<{ id: string; title: string; total: number } | null>(null)
 
   const canAccess = (test: Test) => !test.is_premium || isPremium
 
@@ -110,6 +121,11 @@ export function ListeningPageClient({
 
     const meta = sectionMode ? parseMeta(test.description) : null
     const label = meta ? `Test ${meta.section}` : test.title
+    const summary = summaryMap[test.id]
+    const hasStars = (summary?.best_stars ?? 0) > 0
+    const attemptCount = summary?.attempts ?? 0
+    // Full listening test = 40 questions; section training = 10.
+    const totalQuestions = sectionMode ? 10 : 40
     const displayNumber: React.ReactNode = completed ? (
       <CheckCircle size={22} />
     ) : inProgress ? (
@@ -170,7 +186,9 @@ export function ListeningPageClient({
                   className="text-xs px-2 py-0.5 rounded-full"
                   style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                 >
-                  {t('test.completed')}
+                  {attemptCount > 1
+                    ? t('test.completedTimes', { count: attemptCount })
+                    : t('test.completed')}
                 </span>
               )}
               {inProgress && (
@@ -181,6 +199,7 @@ export function ListeningPageClient({
                   {t('test.inProgress')}
                 </span>
               )}
+              {hasStars && <StarsBadge stars={summary!.best_stars} size={12} variant="chip" />}
             </div>
             <div
               className="text-sm flex items-center gap-3 flex-wrap"
@@ -204,7 +223,17 @@ export function ListeningPageClient({
         </div>
 
         {/* Right */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          {accessible && attemptCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setAttemptsModal({ id: test.id, title: label, total: totalQuestions })}
+              title={t('testAttempts.viewButton')}
+              className="btn-outline text-sm flex items-center gap-1.5"
+            >
+              <ListChecks size={14} /> <span className="hidden sm:inline">{t('testAttempts.viewButton')}</span>
+            </button>
+          )}
           {!accessible ? (
             <button
               type="button"
@@ -569,6 +598,16 @@ export function ListeningPageClient({
         type="premium"
         amount={50000}
       />
+
+      {attemptsModal && (
+        <TestAttemptsModal
+          open={!!attemptsModal}
+          onClose={() => setAttemptsModal(null)}
+          testId={attemptsModal.id}
+          testTitle={attemptsModal.title}
+          totalQuestions={attemptsModal.total}
+        />
+      )}
     </>
   )
 }

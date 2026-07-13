@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Lock, ChevronRight, BookOpen, Star, ClipboardCheck } from 'lucide-react'
+import { Lock, ChevronRight, BookOpen, ClipboardCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StarsBadge } from '@/components/ui/StarsBadge'
 
 interface Article {
   id: string
@@ -148,43 +149,7 @@ export default function ArticlesPage() {
                     </div>
                   )}
 
-                  {/* Best-stars badge (only if user has scored >=1 star).
-                      Sits top-LEFT of the poster; the Free/Premium chip
-                      lives in the header row above the poster, so the two
-                      never collide. Shows all 5 slots -- gold filled for
-                      earned, dimmed outline for the rest -- matching the
-                      Script Practice result styling. */}
-                  {bestStars > 0 && (
-                    <div
-                      className="absolute inline-flex items-center rounded-full"
-                      style={{
-                        top: 12,
-                        left: 12,
-                        gap: 3,
-                        padding: '8px 12px',
-                        background: 'rgba(0, 0, 0, 0.75)',
-                        backdropFilter: 'blur(4px)',
-                        WebkitBackdropFilter: 'blur(4px)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        boxShadow: '0 4px 12px rgba(251, 191, 36, 0.35)',
-                        zIndex: 2,
-                        pointerEvents: 'none',
-                      }}
-                    >
-                      {[1, 2, 3, 4, 5].map(n => {
-                        const filled = n <= bestStars
-                        return (
-                          <Star
-                            key={n}
-                            size={20}
-                            strokeWidth={filled ? 0 : 2}
-                            fill={filled ? '#fbbf24' : 'none'}
-                            color={filled ? '#fbbf24' : 'rgba(255, 255, 255, 0.35)'}
-                          />
-                        )
-                      })}
-                    </div>
-                  )}
+                  {bestStars > 0 && <StarsBadge stars={bestStars} variant="poster" />}
 
                   {/* Lock overlay */}
                   {locked && (

@@ -60,6 +60,7 @@
     "free": "Free",
     "premium": "Premium",
     "completed": "Completed",
+    "completedTimes": "Completed {count} times",
     "inProgress": "In Progress",
     "minutes": "min",
     "sections": "sections",
@@ -77,6 +78,16 @@
     "tests": "tests",
     "parts": "parts",
     "testsEach": "tests each"
+  },
+  "testAttempts": {
+    "title": "Results",
+    "viewButton": "Results",
+    "empty": "No attempts yet",
+    "attempt": "Attempt",
+    "attemptN": "Attempt #{n}",
+    "correct": "CORRECT",
+    "band": "BAND",
+    "stars": "STARS"
   },
   "reading": {
     "title": "Reading Tests",

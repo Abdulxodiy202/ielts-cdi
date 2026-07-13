@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateBandScore } from '@/lib/utils/bandScore'
+import { calcStarsFromBand } from '@/lib/stars'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   const bandScore = calculateBandScore(score)
+  const stars = calcStarsFromBand(bandScore)
   const admin = createAdminClient()
 
   // Save result to test_results
@@ -27,6 +29,7 @@ export async function POST(req: NextRequest) {
       session_id: sessionId,
       raw_score: score,
       band_score: bandScore,
+      stars,
       time_taken: typeof timeTaken === 'number' && timeTaken > 0 ? timeTaken : null,
       answers: answers || null,
     })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateBandScore } from '@/lib/utils/bandScore'
+import { calcStarsFromBand } from '@/lib/stars'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -38,9 +39,11 @@ export async function POST(req: NextRequest) {
   }
 
   const bandScore = calculateBandScore(rawScore)
+  const stars = calcStarsFromBand(bandScore)
   const timeTaken = 3600 - timeRemaining
 
-  // Save result
+  // Save result. `stars` is derived here at submission time so display
+  // paths never recompute it -- see [[stars-shared-lib]] for the mapping.
   const { data: result, error } = await supabase
     .from('test_results')
     .insert({
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
       session_id: sessionId,
       raw_score: rawScore,
       band_score: bandScore,
+      stars,
       time_taken: timeTaken,
     })
     .select()
@@ -62,7 +66,7 @@ export async function POST(req: NextRequest) {
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  return NextResponse.json({ rawScore, bandScore, timeTaken, result })
+  return NextResponse.json({ rawScore, bandScore, stars, timeTaken, result })
 }
 
 export async function GET(req: NextRequest) {

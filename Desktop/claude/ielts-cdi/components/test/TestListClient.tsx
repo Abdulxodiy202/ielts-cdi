@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { BookOpen, Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X } from 'lucide-react'
+import { BookOpen, Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X, ListChecks } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StarsBadge } from '@/components/ui/StarsBadge'
+import { TestAttemptsModal } from '@/components/test/TestAttemptsModal'
 
 interface Test {
   id: string
@@ -15,17 +17,25 @@ interface Test {
   order_number: number
 }
 
+interface TestSummary {
+  best_stars: number
+  best_band: number
+  attempts: number
+}
+
 interface TestListClientProps {
   tests: Test[]
   isPremium: boolean
   sessionMap: Record<string, string>
+  summaryMap?: Record<string, TestSummary>
   type: 'reading' | 'listening'
 }
 
-export function TestListClient({ tests, isPremium, sessionMap, type }: TestListClientProps) {
+export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, type }: TestListClientProps) {
   const { t } = useLanguage()
   const [showLockModal, setShowLockModal] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [attemptsModal, setAttemptsModal] = useState<{ id: string; title: string } | null>(null)
 
   const canAccess = (test: Test) => !test.is_premium || isPremium
 
@@ -47,6 +57,9 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
           const completed = sessionStatus === 'completed'
           const inProgress = sessionStatus === 'in_progress'
 
+          const summary = summaryMap[test.id]
+          const hasStars = (summary?.best_stars ?? 0) > 0
+          const attemptCount = summary?.attempts ?? 0
           return (
             <motion.div
               key={test.id}
@@ -102,7 +115,9 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                         className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                       >
-                        {t('test.completed')}
+                        {attemptCount > 1
+                          ? t('test.completedTimes', { count: attemptCount })
+                          : t('test.completed')}
                       </span>
                     )}
                     {inProgress && (
@@ -113,6 +128,7 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                         {t('test.inProgress')}
                       </span>
                     )}
+                    {hasStars && <StarsBadge stars={summary!.best_stars} size={12} variant="chip" />}
                   </div>
                   <div className="text-sm flex items-center gap-3 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                     {type === 'reading' ? (
@@ -132,7 +148,17 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
                 </div>
               </div>
 
-              <div className="shrink-0">
+              <div className="shrink-0 flex items-center gap-2">
+                {accessible && attemptCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAttemptsModal({ id: test.id, title: test.title })}
+                    title={t('testAttempts.viewButton')}
+                    className="btn-outline text-sm flex items-center gap-1.5"
+                  >
+                    <ListChecks size={14} /> <span className="hidden sm:inline">{t('testAttempts.viewButton')}</span>
+                  </button>
+                )}
                 {!accessible ? (
                   <button
                     type="button"
@@ -245,6 +271,16 @@ export function TestListClient({ tests, isPremium, sessionMap, type }: TestListC
         type="premium"
         amount={50000}
       />
+
+      {attemptsModal && (
+        <TestAttemptsModal
+          open={!!attemptsModal}
+          onClose={() => setAttemptsModal(null)}
+          testId={attemptsModal.id}
+          testTitle={attemptsModal.title}
+          totalQuestions={40}
+        />
+      )}
     </>
   )
 }

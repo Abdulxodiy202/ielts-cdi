@@ -48,16 +48,31 @@ export default async function ListeningListPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [fullTests, sectionTests, profileRes, sessionsRes] = await Promise.all([
+  const [fullTests, sectionTests, profileRes, sessionsRes, resultsRes] = await Promise.all([
     getCachedFullListeningTests(),
     getCachedSectionTests(),
     supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
     supabase.from('test_sessions').select('test_id, status').eq('user_id', user.id),
+    // Rolled up in JS to avoid depending on `user_test_summary` view.
+    supabase.from('test_results').select('test_id, stars, band_score').eq('user_id', user.id),
   ])
 
   const isPremium = isActivePremium(profileRes.data)
   const sessions = sessionsRes.data ?? []
   const sessionMap = Object.fromEntries(sessions.map(s => [s.test_id, s.status]))
+
+  const summaryMap: Record<string, { best_stars: number; best_band: number; attempts: number }> = {}
+  for (const r of resultsRes.data ?? []) {
+    const testId = r.test_id as string
+    const stars = (r.stars as number | null) ?? 0
+    const band = (r.band_score as number | null) ?? 0
+    const cur = summaryMap[testId] ?? { best_stars: 0, best_band: 0, attempts: 0 }
+    summaryMap[testId] = {
+      best_stars: Math.max(cur.best_stars, stars),
+      best_band: Math.max(cur.best_band, band),
+      attempts: cur.attempts + 1,
+    }
+  }
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
@@ -67,6 +82,7 @@ export default async function ListeningListPage() {
         sectionTests={sectionTests}
         isPremium={isPremium}
         sessionMap={sessionMap}
+        summaryMap={summaryMap}
       />
     </div>
   )

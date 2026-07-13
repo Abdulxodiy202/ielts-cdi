@@ -60,6 +60,7 @@
     "free": "Bepul",
     "premium": "Premium",
     "completed": "Tugallangan",
+    "completedTimes": "{count} marta bajarilgan",
     "inProgress": "Davom etmoqda",
     "minutes": "daq",
     "sections": "bo'lim",
@@ -77,6 +78,16 @@
     "tests": "ta test",
     "parts": "qism",
     "testsEach": "ta testdan"
+  },
+  "testAttempts": {
+    "title": "Natijalar",
+    "viewButton": "Natijalar",
+    "empty": "Hali urinishlar yo'q",
+    "attempt": "Urinish",
+    "attemptN": "{n}-urinish",
+    "correct": "TO'G'RI",
+    "band": "BAND",
+    "stars": "YULDUZ"
   },
   "reading": {
     "title": "Reading Testlar",

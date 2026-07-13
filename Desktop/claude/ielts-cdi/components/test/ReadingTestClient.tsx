@@ -12,6 +12,8 @@ import { getBandColor, getBandLabel } from '@/lib/utils/bandScore'
 import { formatTime } from '@/lib/utils/formatters'
 import { buildInjectScript } from '@/lib/utils/injectScript'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StarsBadge } from '@/components/ui/StarsBadge'
+import { calcStarsFromBand } from '@/lib/stars'
 
 interface Passage {
   id: string
@@ -44,7 +46,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
-  const [result, setResult] = useState<{ rawScore: number; bandScore: number; timeTaken: number } | null>(null)
+  const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [showExit, setShowExit] = useState(false)
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
@@ -237,6 +239,9 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
     const color = getBandColor(result.bandScore)
     const label = getBandLabel(result.bandScore)
     const percentage = Math.round((result.rawScore / questions.length) * 100)
+    // API returns `stars`, but fall back to a local calc so a schema-
+    // less DB still renders correctly during rollout.
+    const stars = result.stars ?? calcStarsFromBand(result.bandScore)
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
@@ -271,6 +276,9 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               <div className="text-7xl font-black mb-1" style={{ color }}>{result.bandScore}</div>
               <div className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>
                 {t('testTaking.bandScoreLabel', { label })}
+              </div>
+              <div className="mt-3 flex justify-center">
+                <StarsBadge stars={stars} size={28} variant="inline" />
               </div>
             </motion.div>
 
