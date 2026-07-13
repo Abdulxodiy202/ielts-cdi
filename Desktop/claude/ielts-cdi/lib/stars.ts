@@ -24,3 +24,15 @@ export function calcStarsFromBand(band: number): number {
   if (band >= 6.0) return 1
   return 0
 }
+
+// Accuracy percentage (0-100) -> stars. Used by Script Practice.
+// scriptGrading.getStars() delegates here so the mapping is defined
+// once and stays consistent between what's saved and what's displayed.
+export function calcStarsFromAccuracy(accuracy: number): number {
+  if (accuracy >= 95) return 5
+  if (accuracy >= 85) return 4
+  if (accuracy >= 75) return 3
+  if (accuracy >= 65) return 2
+  if (accuracy >= 50) return 1
+  return 0
+}

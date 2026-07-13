@@ -143,8 +143,14 @@
       "stars2": "Not bad",
       "stars3": "Good job!",
       "stars4": "Great result!",
-      "stars5": "Excellent!"
+      "stars5": "Excellent!",
+      "celebration5": "Excellent! You earned 5 stars!"
     }
+  },
+  "scriptAttempts": {
+    "accuracy": "ACCURACY",
+    "bestSummary": "Your best: {pct}%",
+    "totalAttempts": "Total attempts: {count}"
   },
   "mock": {
     "title": "Mock IELTS Test",

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import confetti from 'canvas-confetti'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatTime } from '@/lib/utils/formatters'
@@ -334,8 +335,38 @@ function ResultScreen({
   const stars = getStars(result.accuracy)
   const passed = isPassed(result.accuracy)
 
+  // Confetti + inline celebration only on a perfect run. Fires once
+  // when this screen first mounts (or when stars flips to 5 after a
+  // retry), not on every re-render.
+  useEffect(() => {
+    if (stars === 5) {
+      confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } })
+    }
+  }, [stars])
+
   return (
     <div>
+      {stars === 5 && (
+        <div
+          className="text-center mb-4"
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#fbbf24',
+            filter: 'drop-shadow(0 0 12px rgba(251, 191, 36, 0.5))',
+            animation: 'script-celebration-in 0.4s ease-out',
+          }}
+        >
+          🎉 {t('script.result.celebration5')}
+          <style>{`
+            @keyframes script-celebration-in {
+              from { transform: translateY(-8px); opacity: 0; }
+              to   { transform: translateY(0); opacity: 1; }
+            }
+          `}</style>
+        </div>
+      )}
+
       {/* Accuracy + stars */}
       <div className="text-center mb-6">
         <div className="text-5xl font-black mb-2" style={{ color: passed ? 'var(--success)' : 'var(--error)' }}>

@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { isAdmin } from '@/lib/admin-config'
 import { formatTime } from '@/lib/utils/formatters'
-import { Headphones, Lock, Star, ChevronLeft } from 'lucide-react'
+import { Headphones, Lock, Star, ChevronLeft, ListChecks } from 'lucide-react'
+import { ScriptAttemptsModal } from '@/components/test/ScriptAttemptsModal'
 
 interface ScriptProgress {
   script_id: number
@@ -39,6 +40,7 @@ export default function ScriptListPage() {
   const [scripts, setScripts] = useState<Script[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [attemptsModal, setAttemptsModal] = useState<{ id: number; title: string } | null>(null)
 
   useEffect(() => {
     const sb = createClient()
@@ -174,6 +176,27 @@ export default function ScriptListPage() {
                           <Star key={si} size={11} fill={si < progress.best_stars ? '#f59e0b' : 'none'} style={{ color: si < progress.best_stars ? '#f59e0b' : 'var(--border)' }} />
                         ))}
                       </span>
+                      {progress.attempts > 0 && (
+                        // Button lives inside the Link; preventDefault
+                        // keeps the parent navigation from firing when the
+                        // user just wants attempt history.
+                        <button
+                          type="button"
+                          onClick={e => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setAttemptsModal({ id: script.id, title: script.title })
+                          }}
+                          className="ml-auto text-xs flex items-center gap-1 px-2 py-1 rounded-full transition-opacity hover:opacity-80"
+                          style={{
+                            background: 'rgba(99,102,241,0.1)',
+                            color: 'var(--accent)',
+                            border: '1px solid rgba(99,102,241,0.25)',
+                          }}
+                        >
+                          <ListChecks size={11} /> {t('testAttempts.viewButton')}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -196,6 +219,15 @@ export default function ScriptListPage() {
             )
           })}
         </div>
+      )}
+
+      {attemptsModal && (
+        <ScriptAttemptsModal
+          open={!!attemptsModal}
+          onClose={() => setAttemptsModal(null)}
+          scriptId={attemptsModal.id}
+          scriptTitle={attemptsModal.title}
+        />
       )}
     </div>
   )

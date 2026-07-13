@@ -166,13 +166,12 @@ export function computeAlignment(userText: string, origText: string): AlignmentR
   }
 }
 
+// Kept for callers that already import from scriptGrading; delegates to
+// the shared lib/stars mapping so we never diverge from what other
+// features use.
+import { calcStarsFromAccuracy } from '@/lib/stars'
 export function getStars(accuracy: number): number {
-  if (accuracy >= 90) return 5
-  if (accuracy >= 80) return 4
-  if (accuracy >= 70) return 3
-  if (accuracy >= 60) return 2
-  if (accuracy >= 50) return 1
-  return 0
+  return calcStarsFromAccuracy(accuracy)
 }
 
 export const PASS_THRESHOLD = 70

@@ -13,6 +13,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'script_id va accuracy kerak' }, { status: 400 })
   }
 
+  // Every submit gets its own row in script_attempts so the Results
+  // modal can list history. Best-effort -- if the table doesn't exist
+  // yet or the insert fails, we still update script_progress below.
+  supabase
+    .from('script_attempts')
+    .insert({
+      user_id: user.id,
+      script_id,
+      accuracy,
+      stars: stars ?? 0,
+      user_answer: last_answer ?? null,
+    })
+    .then(() => { /* fire and forget */ })
+
   const { data: existing } = await supabase
     .from('script_progress')
     .select('*')
