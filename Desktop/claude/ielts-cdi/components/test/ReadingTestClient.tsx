@@ -121,7 +121,9 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         return
       }
       if (e.data?.type === 'CDI_GO_DASHBOARD') {
-        router.push('/dashboard')
+        // Historically routed to /dashboard; per spec it now returns
+        // to the same-skill test list so users stay in-context.
+        router.push(exitHref)
         return
       }
       // Only accept CDI_SUBMIT from the HTML file itself (flagged by CDI_NATIVE)
@@ -208,7 +210,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push(exitHref)}
             style={{
               position: 'fixed',
               bottom: '20px',
@@ -278,8 +280,11 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
                 {t('testTaking.bandScoreLabel', { label })}
               </div>
               <div className="mt-3 flex justify-center">
-                <StarsBadge stars={stars} size={28} variant="inline" />
+                <StarsBadge stars={stars} size={36} variant="inline" />
               </div>
+              <p className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {t(`testTaking.starMsg${stars}`)}
+              </p>
             </motion.div>
 
             <div className="grid grid-cols-3 gap-4 mb-8">

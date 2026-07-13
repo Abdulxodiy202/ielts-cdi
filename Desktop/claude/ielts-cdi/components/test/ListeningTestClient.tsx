@@ -168,7 +168,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/listening')}
             style={{
               position: 'fixed',
               bottom: '20px',
@@ -236,8 +236,11 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
                 {t('testTaking.bandScoreLabel', { label })}
               </div>
               <div className="mt-3 flex justify-center">
-                <StarsBadge stars={stars} size={28} variant="inline" />
+                <StarsBadge stars={stars} size={36} variant="inline" />
               </div>
+              <p className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                {t(`testTaking.starMsg${stars}`)}
+              </p>
             </motion.div>
 
             <div className="grid grid-cols-3 gap-4 mb-8">

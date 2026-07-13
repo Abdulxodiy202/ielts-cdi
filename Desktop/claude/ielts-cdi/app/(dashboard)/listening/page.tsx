@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { ListeningPageClient } from '@/components/test/ListeningPageClient'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { isActivePremium } from '@/lib/utils/premium'
 
 /* ── Cached: full listening tests (order < 1000), revalidate 5 min ── */
@@ -73,10 +74,15 @@ export default async function ListeningListPage() {
       attempts: cur.attempts + 1,
     }
   }
+  const sectionTotal = Object.values(summaryMap).reduce((s, x) => s + x.best_stars, 0)
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <PageHeader titleKey="listening.title" subtitleKey="listening.subtitle" />
+      <PageHeader
+        titleKey="listening.title"
+        subtitleKey="listening.subtitle"
+        endSlot={<SectionStarsChip total={sectionTotal} />}
+      />
       <ListeningPageClient
         fullTests={fullTests}
         sectionTests={sectionTests}

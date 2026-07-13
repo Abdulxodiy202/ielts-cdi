@@ -115,9 +115,7 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
                         className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)' }}
                       >
-                        {attemptCount > 1
-                          ? t('test.completedTimes', { count: attemptCount })
-                          : t('test.completed')}
+                        {t('test.completed')}
                       </span>
                     )}
                     {inProgress && (
@@ -128,7 +126,19 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
                         {t('test.inProgress')}
                       </span>
                     )}
-                    {hasStars && <StarsBadge stars={summary!.best_stars} size={12} variant="chip" />}
+                    {hasStars && <StarsBadge stars={summary!.best_stars} size={22} variant="chip" />}
+                    {summary && summary.best_band > 0 && (
+                      <span
+                        className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                        style={{
+                          background: 'rgba(99, 102, 241, 0.15)',
+                          color: '#a5b4fc',
+                          border: '1px solid rgba(99, 102, 241, 0.3)',
+                        }}
+                      >
+                        {t('test.bandChip', { band: summary.best_band })}
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm flex items-center gap-3 flex-wrap" style={{ color: 'var(--text-muted)' }}>
                     {type === 'reading' ? (

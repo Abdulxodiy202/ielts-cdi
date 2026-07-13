@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { TestListClient } from '@/components/test/TestListClient'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { isActivePremium } from '@/lib/utils/premium'
 
 /* ── Cached: reading test list (same for all users, revalidate every 5 min) ── */
@@ -56,10 +57,17 @@ export default async function ReadingListPage() {
       attempts: cur.attempts + 1,
     }
   }
+  // Sum best-stars across THIS section's tests only. Per spec: never
+  // combine star totals across sections.
+  const sectionTotal = Object.values(summaryMap).reduce((s, x) => s + x.best_stars, 0)
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <PageHeader titleKey="reading.title" subtitleKey="reading.subtitle" />
+      <PageHeader
+        titleKey="reading.title"
+        subtitleKey="reading.subtitle"
+        endSlot={<SectionStarsChip total={sectionTotal} />}
+      />
       <TestListClient
         tests={tests}
         isPremium={isPremium}
