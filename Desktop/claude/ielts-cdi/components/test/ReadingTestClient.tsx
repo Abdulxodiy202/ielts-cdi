@@ -46,7 +46,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
-  const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; timeTaken: number } | null>(null)
+  const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; isFullTest?: boolean; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [showExit, setShowExit] = useState(false)
   // Stars earned in the CDI iframe run; captured from the /api/results/cdi

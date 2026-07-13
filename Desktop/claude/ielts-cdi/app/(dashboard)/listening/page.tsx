@@ -76,7 +76,13 @@ export default async function ListeningListPage() {
       attempts: cur.attempts + 1,
     }
   }
-  const sectionTotal = Object.values(summaryMap).reduce((s, x) => s + x.best_stars, 0)
+  // Full listening tests only -- section-training rows carry no stars
+  // per FIX 2 and never enter test_results after this rollout, but
+  // filtering by fullTests keeps historical rows out too.
+  const sectionTotal = fullTests.reduce(
+    (s, t) => s + (summaryMap[t.id]?.best_stars ?? 0),
+    0,
+  )
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { calculateBandScore } from '@/lib/utils/bandScore'
 import { calcStarsFromBand } from '@/lib/stars'
+import { isFullTest } from '@/lib/utils/testCategory'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -20,21 +21,31 @@ export async function POST(req: NextRequest) {
   const stars = calcStarsFromBand(bandScore)
   const admin = createAdminClient()
 
-  // Save result to test_results
-  const { error } = await supabase
-    .from('test_results')
-    .insert({
-      user_id: user.id,
-      test_id: testId,
-      session_id: sessionId,
-      raw_score: score,
-      band_score: bandScore,
-      stars,
-      time_taken: typeof timeTaken === 'number' && timeTaken > 0 ? timeTaken : null,
-      answers: answers || null,
-    })
+  // Look up the test's category so we can skip test_results for
+  // training/section runs (practice only -- no stars, no history).
+  const { data: testMeta } = await admin
+    .from('tests')
+    .select('type, order_number')
+    .eq('id', testId)
+    .single()
+  const fullTest = isFullTest(testMeta?.type, testMeta?.order_number)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (fullTest) {
+    const { error } = await supabase
+      .from('test_results')
+      .insert({
+        user_id: user.id,
+        test_id: testId,
+        session_id: sessionId,
+        raw_score: score,
+        band_score: bandScore,
+        stars,
+        time_taken: typeof timeTaken === 'number' && timeTaken > 0 ? timeTaken : null,
+        answers: answers || null,
+      })
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   // Mark session completed via admin client (bypasses RLS; unique constraint fixed by migration 015)
   await admin
@@ -46,6 +57,12 @@ export async function POST(req: NextRequest) {
   revalidatePath('/dashboard')
 
   // Return the derived stars so the CDI iframe client can attach
-  // ?justEarned to the exit href and trigger the list-page celebration.
-  return NextResponse.json({ ok: true, stars, bandScore })
+  // ?justEarned to the exit href and trigger the list-page celebration
+  // -- but only when it's actually a full test.
+  return NextResponse.json({
+    ok: true,
+    stars: fullTest ? stars : 0,
+    isFullTest: fullTest,
+    bandScore,
+  })
 }

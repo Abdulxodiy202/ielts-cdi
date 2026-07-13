@@ -197,8 +197,10 @@ export function ListeningPageClient({
                   {t('test.inProgress')}
                 </span>
               )}
-              {hasStars && <StarsBadge stars={summary!.best_stars} size={22} variant="chip" />}
-              {summary && summary.best_band > 0 && (
+              {/* Star badge + band chip are gamification for full tests
+                  only. Training/section rows stay plain -- see FIX 2. */}
+              {!sectionMode && hasStars && <StarsBadge stars={summary!.best_stars} size={22} variant="chip" />}
+              {!sectionMode && summary && summary.best_band > 0 && (
                 <span
                   className="text-xs font-semibold px-2.5 py-1 rounded-full"
                   style={{
@@ -234,7 +236,9 @@ export function ListeningPageClient({
 
         {/* Right */}
         <div className="shrink-0 flex items-center gap-2">
-          {accessible && attemptCount > 0 && (
+          {/* Results modal is a full-test feature only. Training rows
+              don't persist attempts and shouldn't offer history. */}
+          {!sectionMode && accessible && attemptCount > 0 && (
             <button
               type="button"
               onClick={() => setAttemptsModal({ id: test.id, title: label, total: totalQuestions })}
@@ -261,11 +265,13 @@ export function ListeningPageClient({
             <Link href={`/listening/${test.id}`} className="btn-primary text-sm flex items-center gap-1.5">
               <RotateCcw size={14} /> {t('test.continue')}
             </Link>
-          ) : completed ? (
+          ) : completed && !sectionMode ? (
             <Link href={`/listening/${test.id}`} className="btn-outline text-sm">
               {t('test.retake')}
             </Link>
           ) : (
+            // Section training completed rows collapse to plain "Start"
+            // -- no Retake, since training doesn't build up a history.
             <Link href={`/listening/${test.id}`} className="btn-primary text-sm flex items-center gap-1.5">
               <Play size={14} /> {t('test.start')}
             </Link>

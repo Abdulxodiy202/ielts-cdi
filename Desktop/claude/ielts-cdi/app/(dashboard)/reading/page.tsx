@@ -59,9 +59,14 @@ export default async function ReadingListPage() {
       attempts: cur.attempts + 1,
     }
   }
-  // Sum best-stars across THIS section's tests only. Per spec: never
-  // combine star totals across sections.
-  const sectionTotal = Object.values(summaryMap).reduce((s, x) => s + x.best_stars, 0)
+  // Sum best-stars across THIS section's tests only. Iterating the
+  // reading tests array (not the summaryMap) guarantees the total
+  // excludes any listening rows that may sit in the same test_results
+  // pool for this user.
+  const sectionTotal = tests.reduce(
+    (s, t) => s + (summaryMap[t.id]?.best_stars ?? 0),
+    0,
+  )
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">

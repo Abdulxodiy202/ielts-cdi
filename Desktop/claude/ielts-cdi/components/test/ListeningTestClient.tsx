@@ -37,7 +37,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [submitting, setSubmitting] = useState(false)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; timeTaken: number } | null>(null)
+  const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; isFullTest?: boolean; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [showExit, setShowExit] = useState(false)
   // Stars earned in the CDI iframe run; captured from /api/results/cdi so
@@ -108,7 +108,10 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
         })
           .then(async r => {
             if (!r.ok) { setCdiSaveError(true); return }
-            const body = await r.json().catch(() => null) as { stars?: number } | null
+            const body = await r.json().catch(() => null) as { stars?: number; isFullTest?: boolean } | null
+            // Training/section runs never trigger the celebration --
+            // only propagate stars when the server confirms full-test.
+            if (body?.isFullTest === false) return
             const s = body?.stars
             if (typeof s === 'number' && s >= 0 && s <= 5) {
               setCdiEarnedStars(s)
@@ -215,9 +218,11 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
     const label = getBandLabel(result.bandScore)
     const percentage = Math.round((result.rawScore / questions.length) * 100)
     const stars = result.stars ?? calcStarsFromBand(result.bandScore)
-    // Attach the just-earned stars so the list page can celebrate; the
-    // toast filters out 0-star runs itself, so we always set it here.
-    const exitWithCelebration = `/listening?justEarned=${stars}`
+    // Only attach the celebration param for full tests. Training/
+    // section runs don't earn stars, so no toast on return.
+    const exitWithCelebration = result.isFullTest === false
+      ? '/listening'
+      : `/listening?justEarned=${stars}`
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
@@ -253,12 +258,16 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
               <div className="text-lg font-semibold" style={{ color: 'var(--text-secondary)' }}>
                 {t('testTaking.bandScoreLabel', { label })}
               </div>
-              <div className="mt-3 flex justify-center">
-                <StarsBadge stars={stars} size={36} variant="inline" />
-              </div>
-              <p className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-                {t(`testTaking.starMsg${stars}`)}
-              </p>
+              {result.isFullTest !== false && (
+                <>
+                  <div className="mt-3 flex justify-center">
+                    <StarsBadge stars={stars} size={36} variant="inline" />
+                  </div>
+                  <p className="mt-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                    {t(`testTaking.starMsg${stars}`)}
+                  </p>
+                </>
+              )}
             </motion.div>
 
             <div className="grid grid-cols-3 gap-4 mb-8">

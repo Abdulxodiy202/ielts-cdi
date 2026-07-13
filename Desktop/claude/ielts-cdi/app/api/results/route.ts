@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { calculateBandScore } from '@/lib/utils/bandScore'
 import { calcStarsFromBand } from '@/lib/stars'
+import { isFullTest } from '@/lib/utils/testCategory'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -10,13 +11,24 @@ export async function POST(req: NextRequest) {
 
   const { sessionId, testId, timeRemaining } = await req.json()
 
-  // Fetch answers with correct answers
-  const { data: answers } = await supabase
-    .from('user_answers')
-    .select('question_id, user_answer, questions(correct_answer)')
-    .eq('session_id', sessionId)
+  // Pulled in parallel with answers so we know if this test is a
+  // training/section run (no star save, no celebration) or a full test.
+  const [answersRes, testRes] = await Promise.all([
+    supabase
+      .from('user_answers')
+      .select('question_id, user_answer, questions(correct_answer)')
+      .eq('session_id', sessionId),
+    supabase
+      .from('tests')
+      .select('type, order_number')
+      .eq('id', testId)
+      .single(),
+  ])
 
+  const answers = answersRes.data
   if (!answers) return NextResponse.json({ error: 'No answers found' }, { status: 400 })
+
+  const fullTest = isFullTest(testRes.data?.type, testRes.data?.order_number)
 
   // Score answers (case-insensitive)
   let rawScore = 0
@@ -42,31 +54,42 @@ export async function POST(req: NextRequest) {
   const stars = calcStarsFromBand(bandScore)
   const timeTaken = 3600 - timeRemaining
 
-  // Save result. `stars` is derived here at submission time so display
-  // paths never recompute it -- see [[stars-shared-lib]] for the mapping.
-  const { data: result, error } = await supabase
-    .from('test_results')
-    .insert({
-      user_id: user.id,
-      test_id: testId,
-      session_id: sessionId,
-      raw_score: rawScore,
-      band_score: bandScore,
-      stars,
-      time_taken: timeTaken,
-    })
-    .select()
-    .single()
+  // Full tests get a persistent row + stars; training/section tests are
+  // practice only -- no test_results row, no stars, no history. The
+  // session is still marked completed so the card status pill updates.
+  let result: unknown = null
+  if (fullTest) {
+    const { data, error } = await supabase
+      .from('test_results')
+      .insert({
+        user_id: user.id,
+        test_id: testId,
+        session_id: sessionId,
+        raw_score: rawScore,
+        band_score: bandScore,
+        stars,
+        time_taken: timeTaken,
+      })
+      .select()
+      .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    result = data
+  }
 
-  // Mark session completed
   await supabase
     .from('test_sessions')
     .update({ status: 'completed', completed_at: new Date().toISOString() })
     .eq('id', sessionId)
 
-  return NextResponse.json({ rawScore, bandScore, stars, timeTaken, result })
+  return NextResponse.json({
+    rawScore,
+    bandScore,
+    stars: fullTest ? stars : 0,
+    isFullTest: fullTest,
+    timeTaken,
+    result,
+  })
 }
 
 export async function GET(req: NextRequest) {
