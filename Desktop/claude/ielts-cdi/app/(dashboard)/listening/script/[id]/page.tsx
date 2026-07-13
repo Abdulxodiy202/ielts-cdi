@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import confetti from 'canvas-confetti'
+import { fireCenteredConfetti } from '@/lib/confetti'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatTime } from '@/lib/utils/formatters'
@@ -340,7 +340,7 @@ function ResultScreen({
   // retry), not on every re-render.
   useEffect(() => {
     if (stars === 5) {
-      confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } })
+      fireCenteredConfetti()
     }
   }, [stars])
 

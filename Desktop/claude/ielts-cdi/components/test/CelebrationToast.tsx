@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Star, X } from 'lucide-react'
-import confetti from 'canvas-confetti'
+import { fireCenteredConfetti } from '@/lib/confetti'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 // Reads the `?justEarned=N` query param dropped by the test-taking
@@ -37,7 +37,7 @@ export function CelebrationToast() {
 
   useEffect(() => {
     if (stars === 5) {
-      confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } })
+      fireCenteredConfetti()
     }
   }, [stars])
 
