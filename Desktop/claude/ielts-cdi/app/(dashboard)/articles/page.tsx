@@ -148,22 +148,31 @@ export default function ArticlesPage() {
                     </div>
                   )}
 
-                  {/* Best-stars badge (only if user has scored >=1 star). Top-
-                      right so it doesn't collide with the premium badge in
-                      the title row. */}
+                  {/* Best-stars badge (only if user has scored >=1 star).
+                      Sits top-LEFT of the poster; the Free/Premium chip
+                      lives in the header row above the poster, so the two
+                      never collide. Size + glow tuned to be noticeable
+                      from a scroll away. */}
                   {bestStars > 0 && (
                     <div
-                      className="absolute flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold"
+                      className="absolute inline-flex items-center rounded-full font-bold"
                       style={{
-                        top: 8,
-                        right: 8,
-                        background: 'rgba(0,0,0,0.55)',
-                        color: '#fbbf24',
-                        border: '1px solid rgba(251,191,36,0.6)',
+                        top: 12,
+                        left: 12,
+                        gap: 6,
+                        padding: '8px 14px',
+                        fontSize: 18,
+                        color: 'white',
+                        background: 'rgba(0, 0, 0, 0.75)',
                         backdropFilter: 'blur(4px)',
+                        WebkitBackdropFilter: 'blur(4px)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        boxShadow: '0 4px 12px rgba(251, 191, 36, 0.35)',
+                        zIndex: 2,
+                        pointerEvents: 'none',
                       }}
                     >
-                      <Star size={12} fill="#fbbf24" strokeWidth={0} />
+                      <Star size={22} fill="#fbbf24" strokeWidth={0} />
                       {bestStars}
                     </div>
                   )}
