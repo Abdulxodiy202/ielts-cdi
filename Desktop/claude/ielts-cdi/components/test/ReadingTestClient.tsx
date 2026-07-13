@@ -49,6 +49,13 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [showExit, setShowExit] = useState(false)
+  // Stars earned in the CDI iframe run; captured from the /api/results/cdi
+  // response so we can pass ?justEarned to the list page. `null` = no
+  // submit has landed yet (so exit paths shouldn't celebrate).
+  // Ref-backed so the postMessage handler (registered once on mount) can
+  // read the latest value without re-subscribing on every state change.
+  const [cdiEarnedStars, setCdiEarnedStars] = useState<number | null>(null)
+  const cdiEarnedStarsRef = useRef<number | null>(null)
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
   const submittedRef = useRef(false)
@@ -122,8 +129,12 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
       }
       if (e.data?.type === 'CDI_GO_DASHBOARD') {
         // Historically routed to /dashboard; per spec it now returns
-        // to the same-skill test list so users stay in-context.
-        router.push(exitHref)
+        // to the same-skill test list so users stay in-context. When
+        // stars have already been reported by the CDI save, attach
+        // them so the list page shows the celebration.
+        const s = cdiEarnedStarsRef.current
+        const dest = s !== null ? `${exitHref}?justEarned=${s}` : exitHref
+        router.push(dest)
         return
       }
       // Only accept CDI_SUBMIT from the HTML file itself (flagged by CDI_NATIVE)
@@ -142,7 +153,17 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken, answers }),
-        }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
+        })
+          .then(async r => {
+            if (!r.ok) { setCdiSaveError(true); return }
+            const body = await r.json().catch(() => null) as { stars?: number } | null
+            const s = body?.stars
+            if (typeof s === 'number' && s >= 0 && s <= 5) {
+              setCdiEarnedStars(s)
+              cdiEarnedStarsRef.current = s
+            }
+          })
+          .catch(() => setCdiSaveError(true))
         setShowExit(true)
         return
       }
@@ -210,7 +231,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
           <button
-            onClick={() => router.push(exitHref)}
+            onClick={() => router.push(cdiEarnedStars !== null ? `${exitHref}?justEarned=${cdiEarnedStars}` : exitHref)}
             style={{
               position: 'fixed',
               bottom: '20px',
@@ -244,6 +265,11 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
     // API returns `stars`, but fall back to a local calc so a schema-
     // less DB still renders correctly during rollout.
     const stars = result.stars ?? calcStarsFromBand(result.bandScore)
+    // Passing justEarned in the query lets the list page know to show the
+    // celebration toast. Toast is suppressed for 0-star runs by the toast
+    // component itself, so we always attach the param when the user has a
+    // submitted result in hand.
+    const exitWithCelebration = `${exitHref}?justEarned=${stars}`
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
@@ -252,7 +278,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
           style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <Link href={exitHref} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
+            <Link href={exitWithCelebration} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
               <ArrowLeft size={14} /> <span>{t('testTaking.exit')}</span>
             </Link>
             <h1 className="font-bold text-sm sm:text-base truncate" style={{ color: 'var(--text-primary)' }}>
@@ -326,7 +352,7 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
             </div>
 
             <div className="flex gap-3">
-              <Link href={exitHref} className="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
+              <Link href={exitWithCelebration} className="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
                 <ArrowLeft size={14} /> {t('testTaking.allTests')}
               </Link>
               <Link href="/results" className="btn-primary flex-1 text-sm flex items-center justify-center gap-1.5">

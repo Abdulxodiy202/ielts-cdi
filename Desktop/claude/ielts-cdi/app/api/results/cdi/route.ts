@@ -45,5 +45,7 @@ export async function POST(req: NextRequest) {
   // Bust the 60-second dashboard cache so results appear immediately
   revalidatePath('/dashboard')
 
-  return NextResponse.json({ ok: true })
+  // Return the derived stars so the CDI iframe client can attach
+  // ?justEarned to the exit href and trigger the list-page celebration.
+  return NextResponse.json({ ok: true, stars, bandScore })
 }

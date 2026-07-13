@@ -4,7 +4,9 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { TestListClient } from '@/components/test/TestListClient'
+import { CelebrationToast } from '@/components/test/CelebrationToast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { isActivePremium } from '@/lib/utils/premium'
@@ -63,6 +65,11 @@ export default async function ReadingListPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      {/* Suspense is required because CelebrationToast reads useSearchParams,
+          which Next.js treats as a dynamic API. */}
+      <Suspense fallback={null}>
+        <CelebrationToast />
+      </Suspense>
       <PageHeader
         titleKey="reading.title"
         subtitleKey="reading.subtitle"

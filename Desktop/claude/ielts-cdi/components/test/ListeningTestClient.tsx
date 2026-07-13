@@ -40,6 +40,11 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [result, setResult] = useState<{ rawScore: number; bandScore: number; stars?: number; timeTaken: number } | null>(null)
   const [cdiSaveError, setCdiSaveError] = useState(false)
   const [showExit, setShowExit] = useState(false)
+  // Stars earned in the CDI iframe run; captured from /api/results/cdi so
+  // exit paths can attach ?justEarned for the list-page celebration. See
+  // ReadingTestClient for the mirror implementation.
+  const [cdiEarnedStars, setCdiEarnedStars] = useState<number | null>(null)
+  const cdiEarnedStarsRef = useRef<number | null>(null)
   const router = useRouter()
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
@@ -100,7 +105,17 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: session.id, testId: test.id, score, timeTaken }),
-        }).then(r => { if (!r.ok) setCdiSaveError(true) }).catch(() => setCdiSaveError(true))
+        })
+          .then(async r => {
+            if (!r.ok) { setCdiSaveError(true); return }
+            const body = await r.json().catch(() => null) as { stars?: number } | null
+            const s = body?.stars
+            if (typeof s === 'number' && s >= 0 && s <= 5) {
+              setCdiEarnedStars(s)
+              cdiEarnedStarsRef.current = s
+            }
+          })
+          .catch(() => setCdiSaveError(true))
         setShowExit(true)
         return
       }
@@ -168,7 +183,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
           <button
-            onClick={() => router.push('/listening')}
+            onClick={() => router.push(cdiEarnedStars !== null ? `/listening?justEarned=${cdiEarnedStars}` : '/listening')}
             style={{
               position: 'fixed',
               bottom: '20px',
@@ -200,6 +215,9 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
     const label = getBandLabel(result.bandScore)
     const percentage = Math.round((result.rawScore / questions.length) * 100)
     const stars = result.stars ?? calcStarsFromBand(result.bandScore)
+    // Attach the just-earned stars so the list page can celebrate; the
+    // toast filters out 0-star runs itself, so we always set it here.
+    const exitWithCelebration = `/listening?justEarned=${stars}`
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
@@ -208,7 +226,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <Link href="/listening" className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
+            <Link href={exitWithCelebration} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
               <ArrowLeft size={14} /> <span>{t('testTaking.exit')}</span>
             </Link>
             <h1 className="font-bold text-sm sm:text-base truncate" style={{ color: 'var(--text-primary)' }}>
@@ -282,7 +300,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             </div>
 
             <div className="flex gap-3">
-              <Link href="/listening" className="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
+              <Link href={exitWithCelebration} className="btn-outline flex-1 text-sm flex items-center justify-center gap-1.5">
                 <ArrowLeft size={14} /> {t('testTaking.allTests')}
               </Link>
               <Link href="/results" className="btn-primary flex-1 text-sm flex items-center justify-center gap-1.5">

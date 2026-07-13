@@ -90,6 +90,13 @@
     "band": "BAND",
     "stars": "STARS"
   },
+  "celebration": {
+    "msg5": "Excellent! 🎉 You earned 5 stars!",
+    "msg4": "Great! You earned 4 stars.",
+    "msg3": "Well done! You earned 3 stars.",
+    "msg2": "You earned 2 stars.",
+    "msg1": "You earned 1 star."
+  },
   "reading": {
     "title": "Reading Tests",
     "subtitle": "Academic reading practice · 3 passages · 40 questions · 60 minutes"

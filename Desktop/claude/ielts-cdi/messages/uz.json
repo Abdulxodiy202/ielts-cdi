@@ -90,6 +90,13 @@
     "band": "BAND",
     "stars": "YULDUZ"
   },
+  "celebration": {
+    "msg5": "Ajoyib! 🎉 Siz 5 yulduz qo'lga kiritdingiz!",
+    "msg4": "Zo'r! Siz 4 yulduz oldingiz.",
+    "msg3": "Yaxshi! Siz 3 yulduz oldingiz.",
+    "msg2": "Siz 2 yulduz oldingiz.",
+    "msg1": "Siz 1 yulduz oldingiz."
+  },
   "reading": {
     "title": "Reading Testlar",
     "subtitle": "Akademik o'qish · 3 matn · 40 savol · 60 daqiqa"

@@ -4,7 +4,9 @@ import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { ListeningPageClient } from '@/components/test/ListeningPageClient'
+import { CelebrationToast } from '@/components/test/CelebrationToast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { isActivePremium } from '@/lib/utils/premium'
@@ -78,6 +80,9 @@ export default async function ListeningListPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <Suspense fallback={null}>
+        <CelebrationToast />
+      </Suspense>
       <PageHeader
         titleKey="listening.title"
         subtitleKey="listening.subtitle"
