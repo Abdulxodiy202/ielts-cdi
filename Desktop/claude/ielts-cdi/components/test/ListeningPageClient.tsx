@@ -286,11 +286,13 @@ export function ListeningPageClient({
       {/* Mode selector */}
       {mode === 'select' && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Full Test card */}
-          <motion.button
+          {/* Full Test card. Navigates to /listening/full (its own route)
+              so post-submit exits land here and the ⭐ chip + celebration
+              toast can live alongside the numbered test list. */}
+          <motion.a
+            href="/listening/full"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            onClick={() => setMode('full')}
             className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
           >
             <div
@@ -322,7 +324,7 @@ export function ListeningPageClient({
             >
               {t('test.chooseTest')} <ChevronRight size={15} />
             </div>
-          </motion.button>
+          </motion.a>
 
           {/* Training with Sections card */}
           <motion.button

@@ -67,6 +67,7 @@ export default async function ReadingListPage() {
     (s, t) => s + (summaryMap[t.id]?.best_stars ?? 0),
     0,
   )
+  const maxStars = tests.length * 5
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
@@ -78,7 +79,7 @@ export default async function ReadingListPage() {
       <PageHeader
         titleKey="reading.title"
         subtitleKey="reading.subtitle"
-        endSlot={<SectionStarsChip total={sectionTotal} />}
+        endSlot={<SectionStarsChip total={sectionTotal} max={maxStars} />}
       />
       <TestListClient
         tests={tests}

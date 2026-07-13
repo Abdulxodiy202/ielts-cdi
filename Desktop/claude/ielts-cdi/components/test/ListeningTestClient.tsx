@@ -186,7 +186,7 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
         {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
         {showExit && (
           <button
-            onClick={() => router.push(cdiEarnedStars !== null ? `/listening?justEarned=${cdiEarnedStars}` : '/listening')}
+            onClick={() => router.push(cdiEarnedStars !== null ? `/listening/full?justEarned=${cdiEarnedStars}` : '/listening')}
             style={{
               position: 'fixed',
               bottom: '20px',
@@ -218,11 +218,12 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
     const label = getBandLabel(result.bandScore)
     const percentage = Math.round((result.rawScore / questions.length) * 100)
     const stars = result.stars ?? calcStarsFromBand(result.bandScore)
-    // Only attach the celebration param for full tests. Training/
-    // section runs don't earn stars, so no toast on return.
+    // Full tests return to /listening/full so users land back on the
+    // numbered test list with fresh stars visible; training/section
+    // runs return to the mode selector without a celebration param.
     const exitWithCelebration = result.isFullTest === false
       ? '/listening'
-      : `/listening?justEarned=${stars}`
+      : `/listening/full?justEarned=${stars}`
 
     return (
       <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
