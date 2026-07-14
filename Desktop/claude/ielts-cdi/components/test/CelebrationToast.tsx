@@ -18,6 +18,8 @@ export function CelebrationToast() {
   const { t } = useLanguage()
   const [stars, setStars] = useState<number | null>(null)
   const toastRef = useRef<HTMLDivElement>(null)
+  // Guard so a rerender of the same 5-star state doesn't re-fire.
+  const firedRef = useRef(false)
 
   // Pluck the param exactly once. We consume it right away and clean the
   // URL so a subsequent reload doesn't fire the celebration again.
@@ -37,10 +39,14 @@ export function CelebrationToast() {
   }, [searchParams])
 
   useEffect(() => {
-    if (stars === 5) {
-      // Anchor the bursts to the toast so they erupt around it,
-      // tracking the content area rather than the raw viewport.
-      fireCelebrationConfetti(toastRef.current)
+    if (stars === 5 && !firedRef.current) {
+      firedRef.current = true
+      // Wait one frame so the toast is actually laid out before we
+      // read its bounding rect. Without this, on the initial render
+      // the ref can be attached but rect.width can still be 0.
+      requestAnimationFrame(() => {
+        fireCelebrationConfetti(toastRef.current)
+      })
     }
   }, [stars])
 

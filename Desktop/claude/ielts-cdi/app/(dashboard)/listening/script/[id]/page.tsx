@@ -335,14 +335,19 @@ function ResultScreen({
   const stars = getStars(result.accuracy)
   const passed = isPassed(result.accuracy)
   const resultRef = useRef<HTMLDivElement>(null)
+  // Guard so a rerender of the same 5-star result doesn't re-fire.
+  const firedRef = useRef(false)
 
-  // Confetti + inline celebration only on a perfect run. Fires once
-  // when this screen first mounts (or when stars flips to 5 after a
-  // retry), not on every re-render. Anchor is the result view itself
-  // so bursts center over the actual content column, not the viewport.
+  // Confetti + inline celebration only on a perfect run. Anchor is the
+  // result view so bursts center over the actual content column, not
+  // the viewport. rAF gives the DOM one frame to attach the ref +
+  // finish layout before we measure its bounding rect.
   useEffect(() => {
-    if (stars === 5) {
-      fireCelebrationConfetti(resultRef.current)
+    if (stars === 5 && !firedRef.current) {
+      firedRef.current = true
+      requestAnimationFrame(() => {
+        fireCelebrationConfetti(resultRef.current)
+      })
     }
   }, [stars])
 
