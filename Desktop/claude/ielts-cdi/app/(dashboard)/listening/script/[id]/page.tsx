@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { fireCenteredConfetti } from '@/lib/confetti'
+import { fireCelebrationConfetti } from '@/lib/confetti'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatTime } from '@/lib/utils/formatters'
@@ -334,18 +334,20 @@ function ResultScreen({
 }) {
   const stars = getStars(result.accuracy)
   const passed = isPassed(result.accuracy)
+  const resultRef = useRef<HTMLDivElement>(null)
 
   // Confetti + inline celebration only on a perfect run. Fires once
   // when this screen first mounts (or when stars flips to 5 after a
-  // retry), not on every re-render.
+  // retry), not on every re-render. Anchor is the result view itself
+  // so bursts center over the actual content column, not the viewport.
   useEffect(() => {
     if (stars === 5) {
-      fireCenteredConfetti()
+      fireCelebrationConfetti(resultRef.current)
     }
   }, [stars])
 
   return (
-    <div>
+    <div ref={resultRef}>
       {stars === 5 && (
         <div
           className="text-center mb-4"

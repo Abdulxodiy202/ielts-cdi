@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Star, X } from 'lucide-react'
-import { fireCenteredConfetti } from '@/lib/confetti'
+import { fireCelebrationConfetti } from '@/lib/confetti'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
 // Reads the `?justEarned=N` query param dropped by the test-taking
@@ -17,6 +17,7 @@ export function CelebrationToast() {
   const searchParams = useSearchParams()
   const { t } = useLanguage()
   const [stars, setStars] = useState<number | null>(null)
+  const toastRef = useRef<HTMLDivElement>(null)
 
   // Pluck the param exactly once. We consume it right away and clean the
   // URL so a subsequent reload doesn't fire the celebration again.
@@ -37,7 +38,9 @@ export function CelebrationToast() {
 
   useEffect(() => {
     if (stars === 5) {
-      fireCenteredConfetti()
+      // Anchor the bursts to the toast so they erupt around it,
+      // tracking the content area rather than the raw viewport.
+      fireCelebrationConfetti(toastRef.current)
     }
   }, [stars])
 
@@ -54,6 +57,7 @@ export function CelebrationToast() {
   return (
     <div
       role="status"
+      ref={toastRef}
       style={{
         position: 'fixed',
         top: 24,
