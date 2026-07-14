@@ -16,7 +16,7 @@ export async function GET(
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('articles')
-    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, created_at')
+    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, difficulty, created_at')
     .eq('id', id)
     .eq('is_published', true)
     .single()

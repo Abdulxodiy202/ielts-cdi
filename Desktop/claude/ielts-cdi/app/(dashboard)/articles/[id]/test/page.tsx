@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Star, ArrowLeft, RotateCcw, ClipboardCheck }
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
+import { difficultyColor, difficultyLabelKey } from '@/lib/utils/articleDifficulty'
 
 // Per-article 30-question multiple-choice test. Flow: quiz (one question
 // at a time, no timer, no auto-submit) -> result. No intro screen -- the
@@ -35,6 +36,11 @@ interface BestResult {
   best_stars: number
 }
 
+// Article difficulty is fetched alongside the questions so we can show
+// the pill on every question of the quiz. NULL becomes 'easy' via the
+// difficultyColor helper.
+type Difficulty = 'easy' | 'medium' | 'hard' | null
+
 export default function ArticleTestPage() {
   const params = useParams()
   const articleId = params?.id as string
@@ -49,6 +55,7 @@ export default function ArticleTestPage() {
   const [finalScore, setFinalScore] = useState(0)
   const [finalStars, setFinalStars] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [difficulty, setDifficulty] = useState<Difficulty>(null)
 
   useEffect(() => {
     if (!articleId) return
@@ -57,7 +64,7 @@ export default function ArticleTestPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const [questionsRes, bestRes] = await Promise.all([
+      const [questionsRes, bestRes, articleRes] = await Promise.all([
         supabase
           .from('article_tests')
           .select('question_number, question_text, option_a, option_b, option_c, option_d, correct_option')
@@ -69,9 +76,19 @@ export default function ArticleTestPage() {
           .eq('user_id', user.id)
           .eq('article_id', articleId)
           .maybeSingle(),
+        // Fetched via the /api endpoint so the admin client applies the
+        // published filter identically to the hub -- avoids hitting a
+        // draft article's row directly with the browser client.
+        fetch(`/api/articles/${articleId}`).then(r => r.ok ? r.json() : null).catch(() => null),
       ])
 
       setPreviousBest((bestRes.data as BestResult | null) ?? null)
+      const rawDifficulty = (articleRes as { difficulty?: unknown } | null)?.difficulty
+      setDifficulty(
+        rawDifficulty === 'easy' || rawDifficulty === 'medium' || rawDifficulty === 'hard'
+          ? rawDifficulty
+          : null,
+      )
 
       const qs = (questionsRes.data ?? []) as Question[]
       // Test needs exactly 30 rows; anything less means admin hasn't
@@ -196,6 +213,8 @@ export default function ArticleTestPage() {
       { key: 'D', text: currentQuestion.option_d },
     ]
 
+    const dColors = difficultyColor(difficulty)
+
     return (
       <div className="p-4 md:p-6 max-w-2xl mx-auto">
         <Link
@@ -205,6 +224,24 @@ export default function ArticleTestPage() {
         >
           <ChevronLeft size={14} /> {t('articleTest.backToArticles')}
         </Link>
+
+        {/* Difficulty pill -- rendered on every question so the tier is
+            always visible while the user is working. Color matches the
+            hub-card treatment; NULL defaults to easy/green. */}
+        <div className="mb-3 flex justify-end">
+          <span
+            className="inline-block text-xs font-semibold"
+            style={{
+              padding: '4px 12px',
+              borderRadius: 999,
+              background: dColors.accentBg,
+              color: dColors.accent,
+              border: `1px solid ${dColors.accentBorder}`,
+            }}
+          >
+            {t(difficultyLabelKey(difficulty))}
+          </span>
+        </div>
 
         <div className="mb-4 flex items-center justify-between text-sm" style={{ color: 'var(--text-muted)' }}>
           <span>{t('articleTest.questionCounter', { current: currentIdx + 1, total: TOTAL_QUESTIONS })}</span>

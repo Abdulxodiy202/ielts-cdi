@@ -509,7 +509,12 @@
     "lockedDesc": "Barcha premium maqolalarni o'qish uchun Premium tarifga o'ting",
     "upgradeBtn": "👑 Premiumga o'tish — 50,000 so'm/oy",
     "backToList": "← Maqolalarga qaytish",
-    "takeTest": "Test ishlash"
+    "takeTest": "Test ishlash",
+    "difficulty": {
+      "easy": "Oson",
+      "medium": "O'rtacha",
+      "hard": "Qiyin"
+    }
   },
   "articleTest": {
     "articleTest": "Article Test",

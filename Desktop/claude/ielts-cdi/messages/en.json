@@ -509,7 +509,12 @@
     "lockedDesc": "Premium subscription required to read all premium articles",
     "upgradeBtn": "👑 Upgrade to Premium — 50,000 UZS/month",
     "backToList": "← Back to Articles",
-    "takeTest": "Take Test"
+    "takeTest": "Take Test",
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    }
   },
   "articleTest": {
     "articleTest": "Article Test",

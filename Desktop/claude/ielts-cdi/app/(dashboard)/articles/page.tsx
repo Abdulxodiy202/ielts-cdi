@@ -8,6 +8,7 @@ import { isActivePremium } from '@/lib/utils/premium'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { StarsBadge } from '@/components/ui/StarsBadge'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
+import { difficultyColor } from '@/lib/utils/articleDifficulty'
 
 interface Article {
   id: string
@@ -16,6 +17,7 @@ interface Article {
   cover_image_url: string | null
   is_premium: boolean
   is_published: boolean
+  difficulty: 'easy' | 'medium' | 'hard' | null
   created_at: string
 }
 
@@ -105,25 +107,28 @@ export default function ArticlesPage() {
             const locked = article.is_premium && !isPremium
             const canRead = !locked && !!article.file_url
             const bestStars = stars[article.id] ?? 0
+            const difficultyColors = difficultyColor(article.difficulty)
 
             return (
               <div
                 key={article.id}
-                className="rounded-2xl flex flex-col transition-all duration-200"
+                className="rounded-2xl flex flex-col transition-all duration-200 overflow-hidden"
                 style={{
                   background: 'var(--bg-card)',
                   border: '1px solid var(--border)',
+                  // Difficulty stripe -- color-only cue per spec (no text
+                  // label on the card). NULL difficulty defaults to easy/
+                  // green via the helper.
+                  borderTop: `3px solid ${difficultyColors.accent}`,
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'translateY(-3px)'
                   e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.14)'
-                  e.currentTarget.style.borderColor = 'rgba(99,102,241,0.35)'
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = 'none'
                   e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'
-                  e.currentTarget.style.borderColor = 'var(--border)'
                 }}
               >
                 {/* ── TOP: Title + Badge ── */}
@@ -190,7 +195,7 @@ export default function ArticlesPage() {
                         <button
                           onClick={() => router.push(`/articles/${article.id}`)}
                           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
-                          style={{ background: 'var(--accent)', color: 'white' }}
+                          style={{ background: difficultyColors.accent, color: 'white' }}
                           onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
                           onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                         >
@@ -205,8 +210,12 @@ export default function ArticlesPage() {
                       <button
                         onClick={() => router.push(`/articles/${article.id}/test`)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity"
-                        style={{ background: '#10b981', color: 'white' }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+                        style={{
+                          background: difficultyColors.accentBg,
+                          color: difficultyColors.accent,
+                          border: `1px solid ${difficultyColors.accentBorder}`,
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.8')}
                         onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                       >
                         <ClipboardCheck size={14} /> {t('articles.takeTest')}
