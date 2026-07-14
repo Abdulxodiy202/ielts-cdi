@@ -4,14 +4,17 @@ import confetti from 'canvas-confetti'
 // passed AND we're on a desktop viewport.
 const SIDEBAR_WIDTH_FALLBACK = 260
 
-// Centered celebration burst. Two overlapping bursts feel more balanced
-// than one -- a single burst reads as lopsided even at x=0.5 because
-// the spread angle isn't perfectly symmetric.
+// Celebration burst. Origin is placed BELOW the anchor (rect.bottom +
+// gap) rather than centered on it, so the header block being
+// celebrated stays visually clear -- confetti erupts around/under it
+// and falls, instead of raining down on top of the "5 stars!" text.
 //
-// This function NEVER returns early: if the anchor is null / unmounted
-// / zero-size, it uses a sidebar-adjusted fallback for x. That way a
-// missed ref just misplaces the burst slightly instead of silently
-// swallowing the whole celebration.
+// If no anchor is passed, falls back to a sidebar-adjusted x on
+// desktop and a low y (0.75) so the top ~30% of the viewport stays
+// clean.
+//
+// Two overlapping bursts (x ± 0.1) still balance across the viewport
+// better than a single origin.
 //
 // Call discipline: 5-star wins only. Keep confetti a "you nailed it"
 // signal, not a generic "you finished" one.
@@ -19,7 +22,7 @@ export function fireCelebrationConfetti(anchor?: HTMLElement | null): void {
   console.log('[confetti] fire called, anchor:', anchor)
 
   let originX = 0.5
-  const originY = 0.55
+  let originY = 0.75
 
   if (typeof window !== 'undefined') {
     let usedAnchor = false
@@ -27,6 +30,9 @@ export function fireCelebrationConfetti(anchor?: HTMLElement | null): void {
       const rect = anchor.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) {
         originX = (rect.left + rect.width / 2) / window.innerWidth
+        // Fire from a small gap below the anchor's bottom edge, capped
+        // at 0.85 so particles still have room to travel outward.
+        originY = Math.min(0.85, (rect.bottom + 60) / window.innerHeight)
         console.log('[confetti] using anchor origin:', originX, originY, rect)
         usedAnchor = true
       }
@@ -44,8 +50,10 @@ export function fireCelebrationConfetti(anchor?: HTMLElement | null): void {
 
   const base = {
     particleCount: 100,
-    spread: 90,
-    startVelocity: 45,
+    spread: 100,
+    startVelocity: 55,
+    gravity: 1.0,
+    ticks: 200,
   } as const
 
   try {

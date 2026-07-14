@@ -334,57 +334,65 @@ function ResultScreen({
 }) {
   const stars = getStars(result.accuracy)
   const passed = isPassed(result.accuracy)
-  const resultRef = useRef<HTMLDivElement>(null)
+  // Anchor confetti to the celebrated header (banner + % + stars) so
+  // bursts fire from just below it and don't rain on the readable text.
+  const celebrationRef = useRef<HTMLDivElement>(null)
   // Guard so a rerender of the same 5-star result doesn't re-fire.
   const firedRef = useRef(false)
 
-  // Confetti + inline celebration only on a perfect run. Anchor is the
-  // result view so bursts center over the actual content column, not
-  // the viewport. rAF gives the DOM one frame to attach the ref +
-  // finish layout before we measure its bounding rect.
   useEffect(() => {
     if (stars === 5 && !firedRef.current) {
       firedRef.current = true
+      // rAF gives the DOM one frame to attach the ref + finish layout
+      // before we measure its bounding rect.
       requestAnimationFrame(() => {
-        fireCelebrationConfetti(resultRef.current)
+        fireCelebrationConfetti(celebrationRef.current)
       })
     }
   }, [stars])
 
   return (
-    <div ref={resultRef}>
-      {stars === 5 && (
-        <div
-          className="text-center mb-4"
-          style={{
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#fbbf24',
-            filter: 'drop-shadow(0 0 12px rgba(251, 191, 36, 0.5))',
-            animation: 'script-celebration-in 0.4s ease-out',
-          }}
-        >
-          🎉 {t('script.result.celebration5')}
-          <style>{`
-            @keyframes script-celebration-in {
-              from { transform: translateY(-8px); opacity: 0; }
-              to   { transform: translateY(0); opacity: 1; }
-            }
-          `}</style>
-        </div>
-      )}
+    <div>
+      {/* Header block: banner (5-star only) + accuracy % + stars row.
+          z-index sits above canvas-confetti's default 999 so stray
+          particles never obscure the celebrated text. */}
+      <div
+        ref={celebrationRef}
+        style={{ position: 'relative', zIndex: 1000 }}
+      >
+        {stars === 5 && (
+          <div
+            className="text-center mb-4"
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: '#fbbf24',
+              filter: 'drop-shadow(0 0 12px rgba(251, 191, 36, 0.5))',
+              animation: 'script-celebration-in 0.4s ease-out',
+            }}
+          >
+            🎉 {t('script.result.celebration5')}
+            <style>{`
+              @keyframes script-celebration-in {
+                from { transform: translateY(-8px); opacity: 0; }
+                to   { transform: translateY(0); opacity: 1; }
+              }
+            `}</style>
+          </div>
+        )}
 
-      {/* Accuracy + stars */}
-      <div className="text-center mb-6">
-        <div className="text-5xl font-black mb-2" style={{ color: passed ? 'var(--success)' : 'var(--error)' }}>
-          {result.accuracy}%
+        {/* Accuracy + stars */}
+        <div className="text-center mb-6">
+          <div className="text-5xl font-black mb-2" style={{ color: passed ? 'var(--success)' : 'var(--error)' }}>
+            {result.accuracy}%
+          </div>
+          <div className="flex items-center justify-center gap-1 mb-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Star key={i} size={24} fill={i < stars ? '#f59e0b' : 'none'} style={{ color: i < stars ? '#f59e0b' : 'var(--border)' }} />
+            ))}
+          </div>
+          <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{t(STAR_MESSAGE_KEYS[stars])}</p>
         </div>
-        <div className="flex items-center justify-center gap-1 mb-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star key={i} size={24} fill={i < stars ? '#f59e0b' : 'none'} style={{ color: i < stars ? '#f59e0b' : 'var(--border)' }} />
-          ))}
-        </div>
-        <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{t(STAR_MESSAGE_KEYS[stars])}</p>
       </div>
 
       {/* Stats box */}

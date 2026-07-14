@@ -69,7 +69,9 @@ export function CelebrationToast() {
         top: 24,
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 100,
+        // Above canvas-confetti's default 999 so stray particles never
+        // obscure the toast text.
+        zIndex: 1000,
         padding: '20px 32px',
         background:
           'linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(99, 102, 241, 0.15))',
