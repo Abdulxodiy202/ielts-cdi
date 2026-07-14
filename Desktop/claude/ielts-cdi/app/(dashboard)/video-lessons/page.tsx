@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { Lock, Play } from 'lucide-react'
+import Link from 'next/link'
+import { Lock, Play, ClipboardCheck } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StarsBadge } from '@/components/ui/StarsBadge'
+import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 
 interface VideoLesson {
   id: string
@@ -15,35 +17,63 @@ interface VideoLesson {
   is_premium: boolean
 }
 
+interface VideoResult {
+  video_id: string
+  best_stars: number
+  best_score: number
+}
+
 function getYouTubeId(url: string) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
   return m ? m[1] : null
 }
 
 export default function VideoLessonsPage() {
-  const router = useRouter()
   const { t } = useLanguage()
   const [videos,      setVideos]      = useState<VideoLesson[]>([])
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
+  const [resultsByVideoId, setResultsByVideoId] = useState<Record<string, VideoResult>>({})
 
   useEffect(() => {
     fetch('/api/video-lessons')
-      .then(r => r.ok ? r.json() : { videos: [], userPremium: false })
-      .then(d => { setVideos(Array.isArray(d.videos) ? d.videos : []); setUserPremium(d.userPremium ?? false); setLoading(false) })
+      .then(r => r.ok ? r.json() : { videos: [], userPremium: false, results: [] })
+      .then(d => {
+        setVideos(Array.isArray(d.videos) ? d.videos : [])
+        setUserPremium(d.userPremium ?? false)
+        const rmap: Record<string, VideoResult> = {}
+        for (const r of (d.results ?? []) as VideoResult[]) {
+          if (r?.video_id) rmap[r.video_id] = r
+        }
+        setResultsByVideoId(rmap)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
+
+  const sectionTotal = videos.reduce(
+    (sum, v) => sum + (resultsByVideoId[v.id]?.best_stars ?? 0),
+    0,
+  )
+  const maxStars = videos.length * 5
 
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto">
 
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('videoLessons.title')}</h1>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.subtitle')}</p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('videoLessons.title')}</h1>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.subtitle')}</p>
+          {!loading && videos.length > 0 && (
+            <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+              {t('videoLessons.totalLabel', { count: videos.length })}
+            </p>
+          )}
+        </div>
         {!loading && videos.length > 0 && (
-          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-            {t('videoLessons.totalLabel', { count: videos.length })}
-          </p>
+          <div className="shrink-0">
+            <SectionStarsChip total={sectionTotal} max={maxStars} />
+          </div>
         )}
       </div>
 
@@ -71,17 +101,20 @@ export default function VideoLessonsPage() {
             const ytId     = getYouTubeId(v.video_url)
             const thumbSrc = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
             const locked   = v.is_premium && !userPremium
+            const bestStars = resultsByVideoId[v.id]?.best_stars ?? 0
 
             return (
+              // Card no longer a link. Watch + Test are the only nav
+              // affordances so a stray click doesn't misfire into either.
               <div key={v.id}
-                className="group rounded-2xl overflow-hidden cursor-pointer transition-all hover:shadow-lg"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-                onClick={() => router.push(`/video-lessons/${v.id}`)}>
+                className="rounded-2xl overflow-hidden transition-all hover:shadow-lg"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                 <div className="flex gap-0">
                   {/* Thumbnail */}
                   <div style={{ position: 'relative', width: 180, flexShrink: 0 }}>
                     <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
                       {thumbSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img src={thumbSrc} alt={v.title}
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
                             filter: locked ? 'blur(3px) brightness(0.5)' : undefined }} />
@@ -96,15 +129,8 @@ export default function VideoLessonsPage() {
                           <Lock size={18} style={{ color: '#f59e0b' }} />
                         </div>
                       )}
-                      {!locked && (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          opacity: 0, transition: 'opacity .2s' }}
-                          className="group-hover:!opacity-100">
-                          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.9)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Play size={14} style={{ color: '#1a1a2e', marginLeft: 2 }} />
-                          </div>
-                        </div>
+                      {bestStars > 0 && !locked && (
+                        <StarsBadge stars={bestStars} variant="poster" size={16} />
                       )}
                     </div>
                   </div>
@@ -128,10 +154,33 @@ export default function VideoLessonsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="mt-3">
-                      <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>
-                        {t('videoLessons.watchBtn')}
-                      </span>
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      {locked ? (
+                        <Link
+                          href={`/video-lessons/${v.id}`}
+                          className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                          style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                        >
+                          <Lock size={12} /> {t('videoLessons.unlockBtn')}
+                        </Link>
+                      ) : (
+                        <>
+                          <Link
+                            href={`/video-lessons/${v.id}`}
+                            className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                            style={{ background: 'var(--accent)', color: 'white' }}
+                          >
+                            <Play size={12} /> {t('videoLessons.watchBtn')}
+                          </Link>
+                          <Link
+                            href={`/video-lessons/${v.id}/test`}
+                            className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                            style={{ background: '#10b981', color: 'white' }}
+                          >
+                            <ClipboardCheck size={12} /> {t('videoLessons.takeTest')}
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>

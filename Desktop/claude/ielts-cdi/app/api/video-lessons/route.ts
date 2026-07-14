@@ -11,7 +11,9 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  const [videosRes, profileRes] = await Promise.all([
+  // video_test_results is user-scoped, so hit it via the RLS'd client;
+  // videos + profile via admin (public read / self-only).
+  const [videosRes, profileRes, resultsRes] = await Promise.all([
     admin
       .from('video_lessons')
       .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium')
@@ -22,6 +24,10 @@ export async function GET() {
       .select('is_premium, premium_until')
       .eq('id', user.id)
       .single(),
+    supabase
+      .from('video_test_results')
+      .select('video_id, best_stars, best_score')
+      .eq('user_id', user.id),
   ])
 
   if (videosRes.error) console.error('[video-lessons] error:', videosRes.error.message)
@@ -29,5 +35,7 @@ export async function GET() {
   return Response.json({
     videos: videosRes.data ?? [],
     userPremium: isActivePremium(profileRes.data),
+    // Shape kept flat -- client builds a Map by video_id.
+    results: resultsRes.data ?? [],
   })
 }
