@@ -92,7 +92,7 @@ interface Props {
   promoDbMissing?: boolean
 }
 
-/* в”Ђв”Ђ Badges в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Badges ──────────────────────────────────────────────────────────── */
 function StatusBadge({ status }: { status: string }) {
   const cfg = {
     pending:  { label: 'Kutilmoqda', icon: <Clock size={12} />,       bg: 'rgba(245,158,11,0.15)',  color: 'var(--warning)', border: 'rgba(245,158,11,0.3)' },
@@ -121,7 +121,7 @@ function TypeBadge({ type }: { type: string }) {
   )
 }
 
-/* в”Ђв”Ђ Payments tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Payments tab ────────────────────────────────────────────────────── */
 function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] }) {
   const [payments, setPayments] = useState(initialPayments)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -242,13 +242,13 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
                                 <span style={{ color: 'var(--text-secondary)' }}>
-                                  {pr.meta.booking_date} В· {pr.meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
+                                  {pr.meta.booking_date} · {pr.meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
                                 </span>
                               </div>
                             )}
                             {pr.admin_note && (
                               <div className="text-xs mt-2 p-2 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                                рџ“ќ {pr.admin_note}
+                                📝 {pr.admin_note}
                               </div>
                             )}
                           </div>
@@ -299,7 +299,7 @@ function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] })
   )
 }
 
-/* в”Ђв”Ђ Results tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Results tab ─────────────────────────────────────────────────────── */
 function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   const [results, setResults] = useState(initialResults)
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
@@ -357,7 +357,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
   return (
     <div className="space-y-5">
-      {/* в”Ђв”Ђ Filters row 1: type в”Ђв”Ђ */}
+      {/* ── Filters row 1: type ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div
           className="flex gap-1 p-1 rounded-xl"
@@ -374,31 +374,31 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
               }}
             >
               {t === 'reading' ? <BookOpen size={14} /> : <Headphones size={14} />}
-              {t === 'reading' ? 'рџ“– Reading' : 'рџЋ§ Listening'}
+              {t === 'reading' ? 'Reading' : 'Listening'}
             </button>
           ))}
         </div>
 
-        {/* в”Ђв”Ђ Filters row 2: premium в”Ђв”Ђ */}
+        {/* ── Filters row 2: premium ── */}
         <div
           className="flex gap-1 p-1 rounded-xl"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
         >
           {([
-            { key: 'all',     label: 'Barchasi' },
-            { key: 'premium', label: 'рџ‘‘ Premium' },
-            { key: 'free',    label: 'рџ‘¤ Oddiy' },
-          ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+            { key: 'all',     label: 'Barchasi', icon: null },
+            { key: 'premium', label: 'Premium',  icon: <Crown size={14} /> },
+            { key: 'free',    label: 'Oddiy',    icon: <User size={14} /> },
+          ] as { key: 'all' | 'premium' | 'free'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
               onClick={() => { setPremiumFilter(key); setExpandedUserId(null) }}
-              className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
               style={{
                 background: premiumFilter === key ? 'var(--accent)' : 'transparent',
                 color: premiumFilter === key ? 'white' : 'var(--text-secondary)',
               }}
             >
-              {label}
+              {icon} {label}
             </button>
           ))}
         </div>
@@ -412,10 +412,10 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
       {/* Summary line */}
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-        {grouped.length} ta foydalanuvchi В· {filtered.length} ta natija
+        {grouped.length} ta foydalanuvchi · {filtered.length} ta natija
       </p>
 
-      {/* в”Ђв”Ђ Table в”Ђв”Ђ */}
+      {/* ── Table ── */}
       {grouped.length === 0 ? (
         <div className="card p-12 text-center">
           <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
@@ -498,7 +498,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
 
                       {/* Last date */}
                       <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                        {lastTest ? formatDate(lastTest.completed_at) : 'вЂ”'}
+                        {lastTest ? formatDate(lastTest.completed_at) : '—'}
                       </div>
 
                       {/* Chevron */}
@@ -584,7 +584,7 @@ function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
   )
 }
 
-/* в”Ђв”Ђ Users tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Users tab ───────────────────────────────────────────────────────── */
 function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   const [users, setUsers] = useState(initialUsers)
   const [subTab, setSubTab] = useState<'all' | 'premium' | 'free'>('all')
@@ -621,7 +621,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
       const json = await res.json().catch(() => ({}))
       if (res.ok) {
         const label = broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Oddiy' : ''
-        setBroadcastResult(`вњ… ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
+        setBroadcastResult(`✅ ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
         setBroadcastText('')
         setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null) }, 2500)
       } else {
@@ -789,21 +789,25 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
           className="flex gap-1 p-1 rounded-xl"
           style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
         >
+          {/* Lucide icons instead of emoji so the labels render
+              consistently across systems / editor round-trips (a prior
+              copy-paste through the wrong codec turned these into
+              mojibake). */}
           {([
-            { key: 'all',     label: 'Barchasi' },
-            { key: 'premium', label: 'рџ‘‘ Premium' },
-            { key: 'free',    label: 'рџ‘¤ Oddiy' },
-          ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+            { key: 'all',     label: 'Barchasi',  icon: null },
+            { key: 'premium', label: 'Premium',   icon: <Crown size={14} /> },
+            { key: 'free',    label: 'Oddiy',     icon: <User size={14} /> },
+          ] as { key: 'all' | 'premium' | 'free'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
             <button
               key={key}
               onClick={() => setSubTab(key)}
-              className="px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
               style={{
                 background: subTab === key ? 'var(--accent)' : 'transparent',
                 color: subTab === key ? 'white' : 'var(--text-secondary)',
               }}
             >
-              {label}
+              {icon} {label}
             </button>
           ))}
         </div>
@@ -896,7 +900,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                          {u.full_name ?? 'вЂ”'}
+                          {u.full_name ?? '—'}
                         </span>
                         {u.active_premium ? (
                           <span
@@ -935,17 +939,17 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                       {u.payment_count > 0 ? (
                         <button
                           onClick={() => setExpandedPaymentId(paymentsExpanded ? null : u.id)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
                           style={{
                             background: paymentsExpanded ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
                             color: 'var(--accent)',
                             border: '1px solid rgba(99,102,241,0.2)',
                           }}
                         >
-                          рџ’і {u.payment_count} ta
+                          <CreditCard size={12} /> {u.payment_count} ta
                         </button>
                       ) : (
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>вЂ”</span>
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
                       )}
                     </div>
 
@@ -956,7 +960,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
 
                     {/* Last seen */}
                     <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
-                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : 'вЂ”'}
+                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
                     </div>
 
                     {/* Toggle premium + reset password. Button state is
@@ -987,7 +991,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80"
                         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
                       >
-                        рџ”‘
+                        🔑
                       </button>
                       <button
                         onClick={() => openMsgModal(u.id, u.full_name ?? u.email)}
@@ -1020,12 +1024,14 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
                                 <div className="flex items-center gap-2">
                                   <span style={{ color: 'var(--text-muted)' }}>{formatDate(p.created_at)}</span>
-                                  <span className="px-1.5 py-0.5 rounded text-xs"
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
                                     style={{
                                       background: p.type === 'premium' ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
                                       color: p.type === 'premium' ? 'var(--warning)' : 'var(--accent)',
                                     }}>
-                                    {p.type === 'premium' ? 'рџ‘‘ Premium' : 'рџ“… Mock Test'}
+                                    {p.type === 'premium'
+                                      ? <><Crown size={11} /> Premium</>
+                                      : <><Calendar size={11} /> Mock Test</>}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1037,7 +1043,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                                       background: p.status === 'approved' ? 'rgba(34,197,94,0.12)' : p.status === 'rejected' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
                                       color: p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--error)' : 'var(--warning)',
                                     }}>
-                                    {p.status === 'approved' ? 'вњ“ Tasdiqlandi' : p.status === 'rejected' ? 'вњ— Rad etildi' : 'вЏі Kutilmoqda'}
+                                    {p.status === 'approved' ? '✓ Tasdiqlandi' : p.status === 'rejected' ? '✗ Rad etildi' : '⏳ Kutilmoqda'}
                                   </span>
                                 </div>
                               </div>
@@ -1080,7 +1086,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                 <XCircle size={18} />
               </button>
 
-              <div className="text-2xl mb-3">рџ”‘</div>
+              <div className="text-2xl mb-3">🔑</div>
               <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
                 Parol o&apos;rnatish
               </h2>
@@ -1109,7 +1115,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   disabled={savingPass || newPassword.length < 6}
                   className="btn-primary w-full font-semibold disabled:opacity-50"
                 >
-                  {passSaved ? 'вњ… Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
+                  {passSaved ? '✅ Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
                 </button>
               </div>
             </motion.div>
@@ -1186,7 +1192,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   disabled={sendingMsg || !msgText.trim()}
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {msgSent ? 'вњ… Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                  {msgSent ? '✅ Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>
@@ -1228,22 +1234,22 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Kimga yuborilsin:</p>
                   <div className="flex gap-2">
                     {([
-                      { key: 'all',     label: 'Hammaga' },
-                      { key: 'premium', label: 'рџ‘‘ Premium' },
-                      { key: 'free',    label: 'рџ‘¤ Oddiy' },
-                    ] as { key: 'all' | 'premium' | 'free'; label: string }[]).map(({ key, label }) => (
+                      { key: 'all',     label: 'Hammaga', icon: null },
+                      { key: 'premium', label: 'Premium', icon: <Crown size={12} /> },
+                      { key: 'free',    label: 'Oddiy',   icon: <User size={12} /> },
+                    ] as { key: 'all' | 'premium' | 'free'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
                       <button
                         key={key}
                         type="button"
                         onClick={() => setBroadcastTarget(key)}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
                         style={{
                           background: broadcastTarget === key ? 'rgba(99,102,241,0.15)' : 'var(--bg-secondary)',
                           color: broadcastTarget === key ? 'var(--accent)' : 'var(--text-muted)',
                           border: broadcastTarget === key ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
                         }}
                       >
-                        {label}
+                        {icon} {label}
                       </button>
                     ))}
                   </div>
@@ -1257,7 +1263,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                   autoFocus
                 />
                 {broadcastResult && (
-                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('вњ…') ? 'var(--success)' : 'var(--error)' }}>
+                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('✅') ? 'var(--success)' : 'var(--error)' }}>
                     {broadcastResult}
                   </p>
                 )}
@@ -1278,7 +1284,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   )
 }
 
-/* в”Ђв”Ђ Promo Codes tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Promo Codes tab ─────────────────────────────────────────────────── */
 interface PromoUsage {
   id: string
   user_name: string | null
@@ -1306,7 +1312,7 @@ interface PromoCode {
   usage?: PromoUsage[]
 }
 
-const SETUP_SQL = `-- Run in Supabase SQL Editor в†’ New query в†’ Run
+const SETUP_SQL = `-- Run in Supabase SQL Editor → New query → Run
 create table if not exists public.promo_codes (
   id uuid default gen_random_uuid() primary key,
   code text not null unique,
@@ -1457,7 +1463,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       {dbMissing && (
         <div className="card p-5" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
           <div className="flex items-start gap-3 mb-4">
-            <div className="text-2xl">вљ пёЏ</div>
+            <div className="text-2xl">⚠️</div>
             <div>
               <p className="font-bold text-sm mb-1" style={{ color: 'var(--warning)' }}>Jadval topilmadi</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -1470,7 +1476,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                 className="text-xs underline mt-1 inline-block"
                 style={{ color: 'var(--accent)' }}
               >
-                Supabase SQL Editor в†’
+                Supabase SQL Editor →
               </a>
             </div>
           </div>
@@ -1478,7 +1484,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
             {SETUP_SQL}
           </pre>
           <button onClick={copySQL} className="btn-outline text-sm mt-3 flex items-center gap-2">
-            {copied ? 'вњ… Nusxalandi!' : 'рџ“‹ SQL ni nusxalash'}
+            {copied ? '✅ Nusxalandi!' : '📋 SQL ni nusxalash'}
           </button>
         </div>
       )}
@@ -1486,7 +1492,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
       {/* Create / Edit form */}
       <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
         <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
-          {editingId ? 'вњЏпёЏ Promokodni tahrirlash' : 'вћ• Yangi promokod'}
+          {editingId ? '✏️ Promokodni tahrirlash' : '➕ Yangi promokod'}
         </h3>
         <div className="grid sm:grid-cols-2 gap-3 mb-3">
           <div>
@@ -1571,16 +1577,16 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                 </button>
               </div>
               {emailLookupState === 'found' && (
-                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>вњ“ Foydalanuvchi topildi</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>✓ Foydalanuvchi topildi</p>
               )}
               {emailLookupState === 'notfound' && (
-                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>вњ— Bunday email ro&apos;yxatdan o&apos;tmagan</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>✗ Bunday email ro&apos;yxatdan o&apos;tmagan</p>
               )}
             </div>
           )}
         </div>
         {formError && (
-          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>вќЊ {formError}</p>
+          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>
         )}
         <div className="flex gap-2">
           <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
@@ -1618,10 +1624,10 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                     <div>
                       <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
                       {isOneTime && c.assigned_user_email && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>в†’ {c.assigned_user_email}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>→ {c.assigned_user_email}</div>
                       )}
                       {isUsed && c.used_by_email && (
-                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>вњ“ {c.used_by_email}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>✓ {c.used_by_email}</div>
                       )}
                     </div>
                     <span className="text-xs px-1.5 py-0.5 rounded-full font-medium text-center"
@@ -1630,7 +1636,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                         color: isOneTime ? 'var(--warning)' : 'var(--success)',
                         border: `1px solid ${isOneTime ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
                       }}>
-                      {isOneTime ? '1x' : 'в€ћ'}
+                      {isOneTime ? '1x' : '∞'}
                     </span>
                     <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
                     <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
@@ -1690,7 +1696,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
                               <div className="flex items-center gap-4 flex-wrap text-right">
                               {u.original_amount != null && (
                                 <span style={{ color: 'var(--text-muted)' }}>
-                                  <s>{formatPrice(u.original_amount)}</s> в†’ <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
+                                  <s>{formatPrice(u.original_amount)}</s> → <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
                                 </span>
                               )}
                                 <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
@@ -1711,7 +1717,7 @@ function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: Pr
   )
 }
 
-/* в”Ђв”Ђ Referrals tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Referrals tab ───────────────────────────────────────────────────── */
 interface ReferrerStat {
   id: string
   full_name: string | null
@@ -1770,7 +1776,7 @@ function ReferralsTab() {
       <div className="card p-6 space-y-4" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
         <div className="flex items-center gap-2">
           <Users size={18} style={{ color: 'var(--warning)' }} />
-          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi вЂ” Referral tizimi</h3>
+          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
         </div>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Supabase SQL Editor da migration faylini ishga tushiring.</p>
         <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
@@ -1815,10 +1821,10 @@ function ReferralsTab() {
           ) : stats.map(u => (
             <div key={u.id} className="grid items-center px-4 py-3 text-sm"
               style={{ gridTemplateColumns: '1fr 1fr 160px 100px', gap: 8 }}>
-              <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.full_name ?? 'вЂ”'}</span>
+              <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.full_name ?? '—'}</span>
               <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</span>
               <span className="font-mono font-bold" style={{ color: u.referral_code ? 'var(--accent)' : 'var(--text-muted)', letterSpacing: '0.05em' }}>
-                {u.referral_code ?? 'вЂ”'}
+                {u.referral_code ?? '—'}
               </span>
               <span className="text-center font-bold" style={{ color: u.converted_count > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
                 {u.converted_count}
@@ -1831,7 +1837,7 @@ function ReferralsTab() {
   )
 }
 
-/* в”Ђв”Ђ Feedback tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Feedback tab ────────────────────────────────────────────────────── */
 interface FeedbackItem {
   id: string
   user_id: string
@@ -1842,7 +1848,7 @@ interface FeedbackItem {
   created_at: string
 }
 
-/* в”Ђв”Ђ Articles Tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Articles Tab ────────────────────────────────────────────────────── */
 interface ArticleItem {
   id: string
   title: string
@@ -2063,7 +2069,7 @@ function ArticlesTab() {
       <div className="card p-4">
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Maqola tanlang</label>
         <select value={selectedId} onChange={e => handleArticleChange(e.target.value)} className="input-field">
-          <option value="">вЂ” Maqola tanlang вЂ”</option>
+          <option value="">— Maqola tanlang —</option>
           {articles.map(a => (
             <option key={a.id} value={a.id}>{a.title}{!a.is_published ? ' (Draft)' : ''}</option>
           ))}
@@ -2184,7 +2190,7 @@ function ArticlesTab() {
                   <button onClick={handleSaveCover} disabled={savingCover}
                     className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
                     style={{ opacity: savingCover ? 0.6 : 1 }}>
-                    {savingCover ? <><Loader2 size={14} className="animate-spin" /> YuklanmoqdaвЂ¦</> : <><Upload size={14} /> Rasmni saqlash</>}
+                    {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
                   </button>
                 )}
               </div>
@@ -2229,7 +2235,7 @@ function ArticlesTab() {
                       className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
                       style={{ background: 'var(--error)', color: '#fff', opacity: deleting ? 0.7 : 1 }}>
                       {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                      {deleting ? "O'chirilmoqdaвЂ¦" : "Ha, o'chirish"}
+                      {deleting ? "O'chirilmoqda…" : "Ha, o'chirish"}
                     </button>
                   </div>
                 </div>
@@ -2287,7 +2293,7 @@ function ArticlesTab() {
                 color: message.ok ? 'var(--success)' : 'var(--error)',
                 border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
               }}>
-              {message.ok ? 'вњ…' : 'вќЊ'} {message.text}
+              {message.ok ? '✅' : '❌'} {message.text}
             </div>
           )}
 
@@ -2299,7 +2305,7 @@ function ArticlesTab() {
               opacity: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 0.5 : 1,
               cursor: saving || (!selectedFile && (!editTitle.trim() || editTitle.trim() === selectedArticle?.title)) ? 'not-allowed' : 'pointer',
             }}>
-            {saving ? <><Loader2 size={16} className="animate-spin" /> SaqlanmoqdaвЂ¦</> : <><Upload size={16} /> Saqlash</>}
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Saqlanmoqda…</> : <><Upload size={16} /> Saqlash</>}
           </button>
         </div>
       )}
@@ -2353,7 +2359,7 @@ function ArticlesTab() {
   )
 }
 
-/* в”Ђв”Ђ Books Tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Books Tab ───────────────────────────────────────────────────────── */
 interface BookItem {
   id: string
   title: string
@@ -2575,7 +2581,7 @@ function BooksTab() {
         <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
         <div className="flex items-center gap-2">
           <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field flex-1">
-            <option value="">вЂ” Kitob tanlang вЂ”</option>
+            <option value="">— Kitob tanlang —</option>
             {books.map(b => (
               <option key={b.id} value={b.id}>
                 {b.title} - {BOOK_CATEGORY_LABELS[b.category ?? DEFAULT_BOOK_CATEGORY]}{!b.is_published ? ' (Draft)' : ''}
@@ -2712,7 +2718,7 @@ function BooksTab() {
               <button onClick={handleSaveCover} disabled={savingCover}
                 className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
                 style={{ opacity: savingCover ? 0.6 : 1 }}>
-                {savingCover ? <><Loader2 size={14} className="animate-spin" /> YuklanmoqdaвЂ¦</> : <><Upload size={14} /> Rasmni saqlash</>}
+                {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
               </button>
             )}
           </div>
@@ -2724,7 +2730,7 @@ function BooksTab() {
                 color: message.ok ? 'var(--success)' : 'var(--error)',
                 border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
               }}>
-              {message.ok ? 'вњ…' : 'вќЊ'} {message.text}
+              {message.ok ? '✅' : '❌'} {message.text}
             </div>
           )}
 
@@ -2733,7 +2739,7 @@ function BooksTab() {
             <button onClick={handleSave} disabled={saving}
               className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
               style={{ opacity: saving ? 0.6 : 1 }}>
-              {saving ? <><Loader2 size={15} className="animate-spin" /> SaqlanmoqdaвЂ¦</> : 'Saqlash'}
+              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
             </button>
             <button onClick={() => setShowDeleteBook(true)}
               className="px-3 py-2 rounded-xl text-sm font-medium"
@@ -2915,7 +2921,7 @@ function FeedbackTab() {
   if (dbMissing) {
     return (
       <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
-        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>вљ пёЏ feedback jadvali topilmadi</p>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ feedback jadvali topilmadi</p>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
           Supabase SQL Editor da migration ni ishga tushiring, keyin sahifani yangilang.
         </p>
@@ -2939,7 +2945,7 @@ function FeedbackTab() {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {items.length} ta feedback В· {items.filter(f => f.status === 'new').length} ta yangi
+          {items.length} ta feedback · {items.filter(f => f.status === 'new').length} ta yangi
         </p>
         <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
@@ -2978,7 +2984,7 @@ function FeedbackTab() {
               >
                 <div className="min-w-0">
                   <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                    {item.user_name ?? 'вЂ”'}
+                    {item.user_name ?? '—'}
                   </div>
                   <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
                     {item.user_email}
@@ -2997,7 +3003,7 @@ function FeedbackTab() {
                       ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' }
                       : { background: 'rgba(245,158,11,0.12)', color: 'var(--warning)' }}
                   >
-                    {item.status === 'replied' ? 'вњ“ Javob berilgan' : 'в—Џ Yangi'}
+                    {item.status === 'replied' ? '✓ Javob berilgan' : '● Yangi'}
                   </span>
                 </div>
                 <div className="shrink-0">
@@ -3074,7 +3080,7 @@ function FeedbackTab() {
                   disabled={sending || !replyText.trim()}
                   className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {replySent ? 'вњ… Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                  {replySent ? '✅ Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
                 </button>
               </div>
             </motion.div>
@@ -3085,7 +3091,7 @@ function FeedbackTab() {
   )
 }
 
-/* в”Ђв”Ђ Music tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Music tab ───────────────────────────────────────────────────────── */
 interface MusicTrack {
   id: string
   title: string
@@ -3202,7 +3208,7 @@ function MusicTab() {
 
   if (dbMissing) return (
     <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
-      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>вљ пёЏ background_music jadvali topilmadi</p>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ background_music jadvali topilmadi</p>
       <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
       <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
 {`CREATE TABLE IF NOT EXISTS background_music (
@@ -3275,7 +3281,7 @@ CREATE POLICY "Music readable by authenticated" ON background_music
               </label>
             </div>
           </div>
-          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>вќЊ {formError}</p>}
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
           <div className="flex gap-2">
             <button onClick={handleSubmit} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
               {editingId ? <Edit3 size={14} /> : <Plus size={14} />}
@@ -3828,7 +3834,7 @@ function VideoLessonsTab() {
   )
 }
 
-/* в”Ђв”Ђ Typing Essays tab в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Typing Essays tab ────────────────────────────────────────────────── */
 interface TypingEssay {
   id: number
   title: string
@@ -3930,7 +3936,7 @@ function TypingEssaysTab() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                    {e.task_type === 'task1' ? 'Task 1' : 'Task 2'} В· {e.word_count} so&apos;z
+                    {e.task_type === 'task1' ? 'Task 1' : 'Task 2'} · {e.word_count} so&apos;z
                   </p>
                 </div>
                 <span
@@ -4649,7 +4655,7 @@ const TABS = [
 ] as const
 type TabId = typeof TABS[number]['id']
 
-/* в”Ђв”Ђ Main AdminClient в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Main AdminClient ────────────────────────────────────────────────── */
 export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
