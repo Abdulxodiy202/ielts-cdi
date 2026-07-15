@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 import { isAdmin } from '@/lib/admin-config'
+import { isActivePremium } from '@/lib/utils/premium'
 
 export async function GET() {
   const supabase = await createClient()
@@ -32,16 +33,21 @@ export async function GET() {
     emailMap[u.id] = u.email ?? u.id
   }
 
-  // Batch fetch profiles for full_name and is_premium
+  // Batch fetch profiles for full_name + premium check. Pull
+  // premium_until too so we can compute the same active_premium the
+  // user's own dashboard sees (see isActivePremium).
   const userIds = [...new Set(results.map(r => r.user_id))]
   const { data: profiles } = await admin
     .from('profiles')
-    .select('id, full_name, is_premium')
+    .select('id, full_name, is_premium, premium_until')
     .in('id', userIds)
 
   const profileMap: Record<string, { full_name: string | null; is_premium: boolean }> = {}
   for (const p of profiles ?? []) {
-    profileMap[p.id] = { full_name: p.full_name, is_premium: p.is_premium ?? false }
+    profileMap[p.id] = {
+      full_name: p.full_name,
+      is_premium: isActivePremium({ is_premium: p.is_premium ?? false, premium_until: p.premium_until ?? null }),
+    }
   }
 
   const enriched = results.map((r) => ({

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 import { isAdmin } from '@/lib/admin-config'
+import { isActivePremium } from '@/lib/utils/premium'
 
 interface PaymentItem {
   id: string
@@ -87,13 +88,24 @@ export async function GET(request: Request) {
     const full_name = profileName || meta.full_name || meta.name || null
 
     const pm = paymentMap[u.id]
+    const rawIsPremium = profileMap[u.id]?.is_premium ?? false
+    const rawPremiumUntil = profileMap[u.id]?.premium_until ?? null
+    // Authoritative "is this user premium RIGHT NOW" -- shares the exact
+    // rule the user-facing sidebar/gates use so admin and dashboard agree.
+    const active_premium = isActivePremium({ is_premium: rawIsPremium, premium_until: rawPremiumUntil })
+    // Legacy row where is_premium=true but the date is null/past. Admin
+    // UI can render a distinct "Premium (expired)" pill for these; for
+    // the user themselves they're already treated as free.
+    const premium_expired = rawIsPremium && !active_premium
 
     return {
       id: u.id,
       email: u.email ?? '',
       full_name,
-      is_premium: profileMap[u.id]?.is_premium ?? false,
-      premium_until: profileMap[u.id]?.premium_until ?? null,
+      is_premium: rawIsPremium,
+      premium_until: rawPremiumUntil,
+      active_premium,
+      premium_expired,
       payment_count: pm?.count ?? 0,
       last_payment_date: pm?.last_payment_date ?? null,
       payments: pm?.items ?? [],

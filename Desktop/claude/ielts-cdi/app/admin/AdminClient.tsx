@@ -69,6 +69,12 @@ interface AdminUser {
   full_name: string | null
   is_premium: boolean
   premium_until: string | null
+  // Server-computed via isActivePremium so admin agrees with the user's
+  // own dashboard. Trust this for badges / filters / counts. The raw
+  // is_premium / premium_until fields are retained only so we can show
+  // a distinct "Premium (expired)" pill for legacy rows.
+  active_premium: boolean
+  premium_expired: boolean
   payment_count: number
   last_payment_date: string | null
   payments: AdminPaymentItem[]
@@ -706,8 +712,24 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
         alert('Xatolik: ' + result.error)
         return
       }
+      // Server-side toggleUserPremium mirrors this: grant sets is_premium
+      // + premium_until = +1 month; revoke nulls premium_until. Keep the
+      // client optimistic state consistent with that so the badge/filter
+      // update immediately without a refetch.
+      const now = new Date()
+      const oneMonthLater = new Date(now)
+      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1)
+      const nextPremiumUntil = !currentPremium ? oneMonthLater.toISOString() : null
       setUsers(prev => prev.map(u =>
-        u.id === userId ? { ...u, is_premium: !currentPremium } : u
+        u.id === userId
+          ? {
+              ...u,
+              is_premium: !currentPremium,
+              premium_until: nextPremiumUntil,
+              active_premium: !currentPremium,
+              premium_expired: false,
+            }
+          : u
       ))
     } catch (e) {
       alert('Kutilmagan xatolik: ' + (e instanceof Error ? e.message : String(e)))
@@ -726,10 +748,12 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
   }
 
   const filtered = users.filter(u => {
+    // Filter by the SAME rule the user's own dashboard uses. Legacy rows
+    // with is_premium=true but null/past premium_until land in "free".
     const matchSub =
       subTab === 'all' ? true :
-      subTab === 'premium' ? u.is_premium :
-      !u.is_premium
+      subTab === 'premium' ? u.active_premium :
+      !u.active_premium
     const q = search.toLowerCase()
     const matchSearch = !q ||
       (u.full_name ?? '').toLowerCase().includes(q) ||
@@ -737,8 +761,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
     return matchSub && matchSearch
   })
 
-  const premiumCount = users.filter(u => u.is_premium).length
-  const freeCount = users.filter(u => !u.is_premium).length
+  const premiumCount = users.filter(u => u.active_premium).length
+  const freeCount = users.filter(u => !u.active_premium).length
 
   return (
     <div className="space-y-6">
@@ -861,8 +885,8 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                       style={{
-                        background: u.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
-                        color: u.is_premium ? 'var(--warning)' : 'var(--accent)',
+                        background: u.active_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                        color: u.active_premium ? 'var(--warning)' : 'var(--accent)',
                       }}
                     >
                       {initials(u.full_name, u.email)}
@@ -874,12 +898,23 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                         <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                           {u.full_name ?? 'вЂ”'}
                         </span>
-                        {u.is_premium ? (
+                        {u.active_premium ? (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
                             style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
                           >
                             <Crown size={10} /> Premium
+                          </span>
+                        ) : u.premium_expired ? (
+                          // Legacy row: is_premium=true but the date is
+                          // null / past. User sees themselves as free, so
+                          // admin should too -- shown here in gray so it's
+                          // visible-but-clearly-not-active.
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', border: '1px solid rgba(148,163,184,0.25)' }}
+                          >
+                            <Crown size={10} /> Premium (expired)
                           </span>
                         ) : (
                           <span
@@ -924,13 +959,17 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                       {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : 'вЂ”'}
                     </div>
 
-                    {/* Toggle premium + reset password */}
+                    {/* Toggle premium + reset password. Button state is
+                        driven by active_premium so a legacy expired row
+                        shows "Premiumga o'tkazish" -- clicking will call
+                        toggleUserPremium with is_premium=true, which
+                        writes a fresh premium_until = now + 1 month. */}
                     <div className="shrink-0 flex items-center gap-2 justify-end">
                       <button
-                        onClick={() => togglePremium(u.id, u.is_premium)}
+                        onClick={() => togglePremium(u.id, u.active_premium)}
                         disabled={isToggling}
                         className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
-                        style={u.is_premium ? {
+                        style={u.active_premium ? {
                           background: 'rgba(239,68,68,0.1)',
                           color: 'var(--error)',
                           border: '1px solid rgba(239,68,68,0.25)',
@@ -940,7 +979,7 @@ function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
                           border: '1px solid rgba(245,158,11,0.25)',
                         }}
                       >
-                        {isToggling ? '...' : u.is_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
+                        {isToggling ? '...' : u.active_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
                       </button>
                       <button
                         onClick={() => { setSetPassModal({ userId: u.id, email: u.email }); setNewPassword(''); setPassSaved(false) }}
