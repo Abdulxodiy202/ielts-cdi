@@ -219,38 +219,30 @@ export default async function LandingPage() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
                 What&apos;s included
               </p>
-              {/* Two-column flow so the 13-item list stays scannable.
-                  Items with a `sub` render a bold main label + muted
-                  parenthetical -- used for the bundled Vocabulary line
-                  so we don't spam the list with every sub-feature. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mb-6">
+              {/* Grouped 8-line list -- each item is a bold main label
+                  with a muted subtitle describing the bundle. Single
+                  column: the sub-lines carry the detail so we don't
+                  need a second column to fit everything. */}
+              <div className="mb-6">
                 {([
-                  { label: '5 Reading Tests' },
-                  { label: '5 Listening Tests' },
-                  { label: 'Section Training (Listening)' },
-                  { label: 'Script Practice (BBC-style)' },
-                  { label: '10 Articles + Tests' },
-                  { label: 'Free Video Lessons + Tests' },
-                  { label: 'Free Books Library' },
-                  {
-                    label: 'Full Vocabulary Access',
-                    sub: 'Games, Verbs, Collocations, Linking Words, 3000+ words',
-                  },
-                  { label: 'Typing Practice (all 4 modes)' },
-                  { label: 'Star Progress System' },
-                  { label: 'Band Score Calculation' },
-                  { label: 'Mock Test Booking' },
-                  { label: 'Result History' },
-                ] as Array<{ label: string; sub?: string }>).map(f => (
-                  <div key={f.label} className="flex items-start gap-2 text-sm">
-                    <CheckCircle size={14} style={{ color: '#10b981', flexShrink: 0, marginTop: 3 }} />
+                  { label: 'Practice Tests', sub: '5 Reading + 5 Listening + Section Training' },
+                  { label: '10 Free Articles + Tests', sub: 'Read, take quizzes, earn stars' },
+                  { label: 'Free Video Lessons + Tests', sub: 'Watch and test yourself' },
+                  { label: 'Full Vocabulary Access', sub: 'Games (100 levels), Verbs, Collocations, 3000+ words' },
+                  { label: 'Typing Practice', sub: 'Common English, IELTS, Task 1 & 2 essays' },
+                  { label: 'Script Practice (BBC-style)', sub: 'Listen and transcribe with smart grading' },
+                  { label: 'Free Books Library', sub: 'Grammar, IELTS, Vocabulary, Fun Reads' },
+                  { label: 'Progress Tools', sub: 'Star system, band score, mock booking, result history' },
+                ]).map(f => (
+                  <div key={f.label} className="flex items-start gap-2.5" style={{ marginBottom: 14 }}>
+                    <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0, marginTop: 3 }} />
                     <div className="min-w-0">
-                      <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
-                      {f.sub && (
-                        <div className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
-                          {f.sub}
-                        </div>
-                      )}
+                      <div className="font-semibold text-[15px]" style={{ color: 'var(--text-primary)' }}>
+                        {f.label}
+                      </div>
+                      <div className="text-[13px] leading-snug" style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                        {f.sub}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -261,18 +253,23 @@ export default async function LandingPage() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
                 Not included
               </p>
-              <div className="space-y-2 mb-2">
-                {[
-                  '30 Premium Reading Tests',
-                  '30 Premium Listening Tests',
-                  '20 Premium Articles',
-                  'Premium Video Lessons',
-                  'Premium Books',
-                  'Priority Support',
-                ].map(f => (
-                  <div key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                    <XCircle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: 3 }} />
-                    <span style={{ textDecoration: 'line-through' }}>{f}</span>
+              <div className="mb-2">
+                {([
+                  { label: 'Premium Content', sub: '30 Reading + 30 Listening + 20 Articles + Videos + Books' },
+                  { label: 'Priority Support' },
+                ] as Array<{ label: string; sub?: string }>).map(f => (
+                  <div key={f.label} className="flex items-start gap-2.5" style={{ marginBottom: 14 }}>
+                    <XCircle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: 3 }} />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[15px]" style={{ color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                        {f.label}
+                      </div>
+                      {f.sub && (
+                        <div className="text-[13px] leading-snug" style={{ color: 'rgba(148,163,184,0.7)', marginTop: 2 }}>
+                          {f.sub}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
