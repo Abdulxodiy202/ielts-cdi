@@ -219,33 +219,45 @@ export default async function LandingPage() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
                 What&apos;s included
               </p>
+              {/* Two-column flow so the 13-item list stays scannable.
+                  Items with a `sub` render a bold main label + muted
+                  parenthetical -- used for the bundled Vocabulary line
+                  so we don't spam the list with every sub-feature. */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 mb-6">
-                {[
-                  '5 Reading Tests',
-                  '5 Listening Tests',
-                  'Section Training (Listening)',
-                  'Script Practice (BBC-style)',
-                  'Vocabulary Games — all 100 levels',
-                  'Irregular Verbs (150+)',
-                  'Reading Vocabulary (3000+ words)',
-                  'Writing Collocations',
-                  'Linking Words',
-                  'Typing Practice (all 4 modes)',
-                  'All Articles + Article Tests',
-                  'Free Video Lessons + Tests',
-                  'Books Library',
-                  'Star Progress System',
-                  'Band Score Calculation',
-                  'Mock Test Schedule & Booking',
-                  'Result History',
-                ].map(f => (
-                  <div key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    <CheckCircle size={14} style={{ color: '#22c55e', flexShrink: 0, marginTop: 3 }} />
-                    <span>{f}</span>
+                {([
+                  { label: '5 Reading Tests' },
+                  { label: '5 Listening Tests' },
+                  { label: 'Section Training (Listening)' },
+                  { label: 'Script Practice (BBC-style)' },
+                  { label: '10 Articles + Tests' },
+                  { label: 'Free Video Lessons + Tests' },
+                  { label: 'Free Books Library' },
+                  {
+                    label: 'Full Vocabulary Access',
+                    sub: 'Games, Verbs, Collocations, Linking Words, 3000+ words',
+                  },
+                  { label: 'Typing Practice (all 4 modes)' },
+                  { label: 'Star Progress System' },
+                  { label: 'Band Score Calculation' },
+                  { label: 'Mock Test Booking' },
+                  { label: 'Result History' },
+                ] as Array<{ label: string; sub?: string }>).map(f => (
+                  <div key={f.label} className="flex items-start gap-2 text-sm">
+                    <CheckCircle size={14} style={{ color: '#10b981', flexShrink: 0, marginTop: 3 }} />
+                    <div className="min-w-0">
+                      <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>{f.label}</div>
+                      {f.sub && (
+                        <div className="text-xs mt-0.5 leading-snug" style={{ color: 'var(--text-muted)' }}>
+                          {f.sub}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
 
+              {/* 24px gap before Not Included per spec */}
+              <div style={{ height: 24 }} />
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
                 Not included
               </p>
@@ -253,12 +265,14 @@ export default async function LandingPage() {
                 {[
                   '30 Premium Reading Tests',
                   '30 Premium Listening Tests',
+                  '20 Premium Articles',
                   'Premium Video Lessons',
+                  'Premium Books',
                   'Priority Support',
                 ].map(f => (
                   <div key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
                     <XCircle size={14} style={{ color: '#ef4444', flexShrink: 0, marginTop: 3 }} />
-                    <span>{f}</span>
+                    <span style={{ textDecoration: 'line-through' }}>{f}</span>
                   </div>
                 ))}
               </div>
@@ -269,7 +283,8 @@ export default async function LandingPage() {
             </Link>
           </div>
 
-          {/* Premium card */}
+          {/* Premium card. Deliberately shorter than Free -- the
+              "everything above, plus" framing carries the weight. */}
           <div className="card p-8 flex flex-col relative" style={{ border: '2px solid var(--accent)', borderRadius: 16 }}>
             <div
               className="absolute top-0 right-0 px-3 py-1 text-xs font-bold"
@@ -299,12 +314,12 @@ export default async function LandingPage() {
                   'Everything in Free',
                   'All 35 Reading Tests',
                   'All 35 Listening Tests',
-                  'All Premium Video Lessons',
-                  'Section Training + Full Test modes',
-                  'Detailed Answer Analytics',
+                  'All 30 Articles + Tests',
+                  'All Video Lessons + Tests',
+                  'Full Books Library',
                   'Priority Support',
                 ].map(f => (
-                  <div key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <div key={f} className="flex items-start gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                     <CheckCircle size={14} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: 3 }} />
                     <span>{f}</span>
                   </div>
