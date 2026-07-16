@@ -67,7 +67,21 @@ export default function ArticlesPage() {
         })
     })
     fetch('/api/articles')
-      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setArticles(d) })
+      .then(async r => {
+        const d = await r.json().catch(() => [])
+        if (!Array.isArray(d)) return
+        // Sort by difficulty tier first (easy -> medium -> hard,
+        // NULL treated as easy), then by created_at ascending within
+        // each tier so users progress naturally from easy to hard.
+        const tier: Record<string, number> = { easy: 0, medium: 1, hard: 2 }
+        const sorted = [...(d as Article[])].sort((a, b) => {
+          const at = tier[a.difficulty ?? 'easy'] ?? 0
+          const bt = tier[b.difficulty ?? 'easy'] ?? 0
+          if (at !== bt) return at - bt
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        })
+        setArticles(sorted)
+      })
       .finally(() => setLoading(false))
   }, [])
 
