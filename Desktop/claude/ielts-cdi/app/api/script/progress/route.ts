@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -50,6 +51,9 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) return Response.json({ error: error.message }, { status: 500 })
+
+    // Leaderboard: first attempt on this script -- whole stars count.
+    await grantLeaderboardStars(supabase, user.id, 'script', stars ?? 0)
     return Response.json(data, { status: 201 })
   }
 
@@ -68,5 +72,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
+
+  // Leaderboard: delta over previous best only, so retakes don't inflate.
+  await grantLeaderboardStars(supabase, user.id, 'script', (stars ?? 0) - (existing.best_stars ?? 0))
   return Response.json(data)
 }

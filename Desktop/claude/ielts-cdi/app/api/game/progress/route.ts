@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recordLevelUnlock } from '@/lib/utils/gameUnlock'
+import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
   if (nowCompleted && !wasCompleted) {
     await recordLevelUnlock(admin, user.id, user.email)
   }
+
+  // Leaderboard: delta over previous best stars for this level so
+  // replays don't inflate totals.
+  await grantLeaderboardStars(admin, user.id, 'game', (stars ?? 0) - (existing?.stars ?? 0))
 
   return Response.json(data)
 }

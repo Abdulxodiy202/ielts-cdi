@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { calculateBandScore } from '@/lib/utils/bandScore'
 import { calcStarsFromBand } from '@/lib/stars'
 import { isFullTest } from '@/lib/utils/testCategory'
+import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -59,6 +60,15 @@ export async function POST(req: NextRequest) {
   // session is still marked completed so the card status pill updates.
   let result: unknown = null
   if (fullTest) {
+    // Previous best for this test BEFORE inserting the new attempt --
+    // the leaderboard grant is delta-based so retakes don't inflate.
+    const { data: prevRows } = await supabase
+      .from('test_results')
+      .select('stars')
+      .eq('user_id', user.id)
+      .eq('test_id', testId)
+    const prevBest = (prevRows ?? []).reduce((m, r) => Math.max(m, (r.stars as number | null) ?? 0), 0)
+
     const { data, error } = await supabase
       .from('test_results')
       .insert({
@@ -75,6 +85,9 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     result = data
+
+    const category = testRes.data?.type === 'listening' ? 'listening' as const : 'reading' as const
+    await grantLeaderboardStars(supabase, user.id, category, stars - prevBest)
   }
 
   await supabase

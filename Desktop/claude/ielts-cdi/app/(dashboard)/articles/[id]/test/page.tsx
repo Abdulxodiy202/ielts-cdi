@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
 import { difficultyColor, difficultyLabelKey } from '@/lib/utils/articleDifficulty'
+import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 
 // Per-article 30-question multiple-choice test. Flow: quiz (one question
 // at a time, no timer, no auto-submit) -> result. No intro screen -- the
@@ -142,6 +143,9 @@ export default function ArticleTestPage() {
           updated_at: new Date().toISOString(),
         }).eq('id', existing.id)
       }
+
+      // Leaderboard: delta-only so retakes never inflate totals.
+      await grantLeaderboardStars(supabase, user.id, 'article', stars - (existing?.best_stars ?? 0))
     } finally {
       setSaving(false)
     }

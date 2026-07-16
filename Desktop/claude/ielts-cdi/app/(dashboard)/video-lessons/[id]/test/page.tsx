@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
 import { fireCelebrationConfetti } from '@/lib/confetti'
+import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 
 // Per-video 30-question multiple-choice test. Flow mirrors
 // /articles/[id]/test: no intro screen, straight into Q1, no timer,
@@ -139,6 +140,9 @@ export default function VideoTestPage() {
           updated_at: new Date().toISOString(),
         }).eq('id', existing.id)
       }
+
+      // Leaderboard: delta-only so retakes never inflate totals.
+      await grantLeaderboardStars(supabase, user.id, 'video', stars - (existing?.best_stars ?? 0))
     } finally {
       setSaving(false)
     }

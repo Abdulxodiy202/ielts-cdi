@@ -35,7 +35,15 @@
     "referralText": "5 do'stingizni taklif qiling — ular kodingiz bilan Premium olsa, siz 100% chegirma yutib olasiz!",
     "copied": "Nusxalandi!",
     "referralSetupTitle": "Jadval topilmadi — Referral tizimi",
-    "retryReferral": "Qayta urinish"
+    "retryReferral": "Qayta urinish",
+    "totalPoints": "Jami ball",
+    "rankOf": "#{rank}-o'rin ({total} tadan)",
+    "notRanked": "Mashq qilishni boshlang — reytingga qo'shiling!",
+    "resumeTest": "Davom ettirish",
+    "completedOf": "{done}/{total} bajarilgan",
+    "typingModes": "4 rejim",
+    "videosCount": "{count} ta video",
+    "thisWeekSuffix": "bu hafta"
   },
   "stats": {
     "testsTaken": "Yechilgan testlar",

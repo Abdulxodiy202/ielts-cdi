@@ -35,7 +35,15 @@
     "referralText": "Invite 5 friends — when they go Premium with your code, you get 100% discount!",
     "copied": "Copied!",
     "referralSetupTitle": "Table missing — Referral system",
-    "retryReferral": "Retry"
+    "retryReferral": "Retry",
+    "totalPoints": "Total points",
+    "rankOf": "Rank #{rank} of {total}",
+    "notRanked": "Start practicing to rank!",
+    "resumeTest": "Resume",
+    "completedOf": "{done}/{total} done",
+    "typingModes": "4 modes",
+    "videosCount": "{count} videos",
+    "thisWeekSuffix": "this week"
   },
   "stats": {
     "testsTaken": "Tests Taken",
