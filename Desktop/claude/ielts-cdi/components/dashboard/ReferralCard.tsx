@@ -62,7 +62,7 @@ export function ReferralCard() {
 
   if (dbMissing) {
     return (
-      <div className="card p-5 mb-8" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+      <div className="card p-5 h-full" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
         <div className="flex items-center gap-2 mb-3">
           <Gift size={18} style={{ color: 'var(--warning)' }} />
           <h3 className="font-bold text-sm" style={{ color: 'var(--warning)' }}>{t('dashboard.referralSetupTitle')}</h3>
@@ -75,20 +75,33 @@ export function ReferralCard() {
     )
   }
 
-  if (loading) return <div className="card mb-8 animate-pulse" style={{ height: 80 }} />
+  if (loading) return <div className="card animate-pulse h-full" style={{ minHeight: 200 }} />
 
+  // Taller centered card so it can sit beside the Recent Tests list in
+  // the bento grid and match its height. Same data + logic as before --
+  // only the presentation changed.
   return (
-    <div className="card p-4 mb-8 flex flex-col gap-3">
-      <p className="text-xs leading-relaxed" style={{ color: 'var(--accent)', opacity: 0.85 }}>
+    <div
+      className="card p-6 h-full flex flex-col items-center justify-center text-center gap-3"
+      style={{
+        background: 'linear-gradient(160deg, rgba(16,185,129,0.1), rgba(245,158,11,0.07) 60%, var(--bg-card))',
+        border: '1px solid rgba(16,185,129,0.25)',
+      }}
+    >
+      <div
+        className="w-14 h-14 rounded-2xl flex items-center justify-center"
+        style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}
+      >
+        <Gift size={28} style={{ color: '#10b981' }} />
+      </div>
+
+      <p className="text-sm leading-relaxed max-w-xs" style={{ color: 'var(--text-secondary)' }}>
         🎁 {t('dashboard.referralText')}
       </p>
 
-      <div className="flex items-center gap-4 flex-wrap">
-      <Gift size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-
       <div className="flex items-center gap-2">
         <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('dashboard.myReferralCode')}</span>
-        <span className="font-mono font-bold text-base tracking-widest" style={{ color: 'var(--accent)' }}>
+        <span className="font-mono font-bold text-lg tracking-widest" style={{ color: 'var(--accent)' }}>
           {referralCode ?? '...'}
         </span>
         <button
@@ -101,10 +114,9 @@ export function ReferralCard() {
         {copied && <span className="text-xs" style={{ color: 'var(--success)' }}>{t('dashboard.copied')}</span>}
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5 text-sm">
+      <div className="flex items-center gap-1.5 text-sm">
         <span style={{ color: 'var(--text-muted)' }}>{t('dashboard.premiumConverted')}</span>
         <span className="font-bold" style={{ color: 'var(--warning)' }}>{convertedCount}</span>
-      </div>
       </div>
     </div>
   )

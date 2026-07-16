@@ -43,7 +43,9 @@
     "completedOf": "{done}/{total} done",
     "typingModes": "4 modes",
     "videosCount": "{count} videos",
-    "thisWeekSuffix": "this week"
+    "thisWeekSuffix": "this week",
+    "viewAll": "View all",
+    "viewResults": "View results"
   },
   "stats": {
     "testsTaken": "Tests Taken",

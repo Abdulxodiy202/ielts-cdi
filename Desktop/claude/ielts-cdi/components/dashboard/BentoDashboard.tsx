@@ -9,7 +9,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { getBandColor } from '@/lib/utils/bandScore'
 import { LeaderboardWidget } from '@/components/dashboard/LeaderboardWidget'
 import { ReferralCard } from '@/components/dashboard/ReferralCard'
-import { TestHistory } from '@/components/dashboard/TestHistory'
+import { RecentTestsCompact } from '@/components/dashboard/RecentTestsCompact'
 
 // Bento-grid dashboard body. Pure presentation -- every number arrives
 // as a prop from the server page so this stays one render pass. The
@@ -217,15 +217,14 @@ export function BentoDashboard({
         )
       })}
 
-      {/* ── Referral (existing component, logic untouched) ── */}
-      <div className="lg:col-span-12">
-        <ReferralCard />
-      </div>
-
-      {/* ── Recent tests (existing table, content unchanged) ── */}
-      <div className="lg:col-span-12">
+      {/* ── Recent tests (compact expandable list) + referral card
+          side by side on desktop; stacked tests-first on mobile ── */}
+      <div className="lg:col-span-7 p-5 md:p-6 transition-colors" style={tileStyle}>
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <TestHistory results={results as any} showTitle />
+        <RecentTestsCompact results={results as any} />
+      </div>
+      <div className="lg:col-span-5">
+        <ReferralCard />
       </div>
     </div>
   )

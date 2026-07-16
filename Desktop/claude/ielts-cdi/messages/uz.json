@@ -43,7 +43,9 @@
     "completedOf": "{done}/{total} bajarilgan",
     "typingModes": "4 rejim",
     "videosCount": "{count} ta video",
-    "thisWeekSuffix": "bu hafta"
+    "thisWeekSuffix": "bu hafta",
+    "viewAll": "Barchasini ko'rish",
+    "viewResults": "Natijalarni ko'rish"
   },
   "stats": {
     "testsTaken": "Yechilgan testlar",
