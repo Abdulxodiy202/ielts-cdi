@@ -11,13 +11,24 @@ import { createClient } from '@/lib/supabase/client'
 
 const MAX_LEN = 20
 
-export function DisplayNameModal() {
+interface DisplayNameModalProps {
+  /** Controlled mode: parent decides visibility (used by the dashboard
+      modal orchestrator so onboarding can queue behind this). When
+      omitted, the component self-checks the profile as before. */
+  open?: boolean
+  /** Fired after a successful save/skip so the orchestrator can advance
+      to the next queued modal. */
+  onComplete?: () => void
+}
+
+export function DisplayNameModal({ open, onComplete }: DisplayNameModalProps = {}) {
   const [show, setShow] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (open !== undefined) { setShow(open); return }
     const check = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -32,7 +43,7 @@ export function DisplayNameModal() {
       if (!dn || dn === emailPrefix) setShow(true)
     }
     check()
-  }, [])
+  }, [open])
 
   async function persist(value: string) {
     setSaving(true)
@@ -47,6 +58,7 @@ export function DisplayNameModal() {
         .eq('id', user.id)
       if (upErr) { setError(upErr.message); return }
       setShow(false)
+      onComplete?.()
     } finally {
       setSaving(false)
     }

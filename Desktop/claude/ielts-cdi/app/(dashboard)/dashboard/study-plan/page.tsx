@@ -1,0 +1,593 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import {
+  ChevronLeft, ChevronRight, ChevronDown, ClipboardList, Check,
+  BookOpen, Headphones, Mic, Gamepad2, FileText, Video, Keyboard,
+  Flame, Gift, Settings, RotateCcw,
+} from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { isActivePremium } from '@/lib/utils/premium'
+import { fetchActivePlan, type StudyPlan } from '@/lib/utils/studyPlan'
+
+// Full Study Plan page: weekly plan breakdown per category, streak +
+// bonus history, and settings. Uzbek copy matches the platform default.
+
+interface PlanSettings {
+  mode: 'weekly' | 'daily'
+  include_typing: boolean
+  mode_locked_until: string | null
+}
+
+interface StreakRow {
+  current_streak: number
+  longest_streak: number
+}
+
+interface BonusRow {
+  id: string
+  milestone: number | null
+  points_awarded: number
+  streak_type: string
+  awarded_at: string
+}
+
+interface TestInfo {
+  id: string
+  title: string
+}
+
+const UZ_MONTHS = ['yanvar', 'fevral', 'mart', 'aprel', 'may', 'iyun', 'iyul', 'avgust', 'sentyabr', 'oktyabr', 'noyabr', 'dekabr']
+
+function fmtUz(dateStr: string, withYear = false): string {
+  const d = new Date(dateStr)
+  return `${d.getDate()} ${UZ_MONTHS[d.getMonth()]}${withYear ? ' ' + d.getFullYear() : ''}`
+}
+
+// Manual regenerate rate limit: 3 per ISO week, tracked client-side.
+function resetCountKey(): string {
+  const now = new Date()
+  const jan1 = new Date(now.getFullYear(), 0, 1)
+  const week = Math.ceil(((now.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7)
+  return `plan_resets_${now.getFullYear()}_w${week}`
+}
+
+export default function StudyPlanPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [plan, setPlan] = useState<StudyPlan | null>(null)
+  const [settings, setSettings] = useState<PlanSettings | null>(null)
+  const [streak, setStreak] = useState<StreakRow | null>(null)
+  const [bonuses, setBonuses] = useState<BonusRow[]>([])
+  const [testTitles, setTestTitles] = useState<Record<string, string>>({})
+  const [doneTests, setDoneTests] = useState<Set<string>>(new Set())
+  const [bestBands, setBestBands] = useState<Record<string, number>>({})
+  const [isPremium, setIsPremium] = useState(false)
+  const [weekPoints, setWeekPoints] = useState(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    const [p, settingsRes, streakRes, bonusesRes, profileRes] = await Promise.all([
+      fetchActivePlan(supabase, user.id),
+      supabase.from('user_plan_settings').select('mode, include_typing, mode_locked_until').eq('user_id', user.id).maybeSingle(),
+      supabase.from('user_login_streak').select('current_streak, longest_streak').eq('user_id', user.id).maybeSingle(),
+      supabase.from('user_streak_bonuses').select('id, milestone, points_awarded, streak_type, awarded_at').eq('user_id', user.id).order('awarded_at', { ascending: false }).limit(10),
+      supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
+    ])
+
+    setPlan(p)
+    setSettings((settingsRes.data as PlanSettings | null) ?? null)
+    setStreak((streakRes.data as StreakRow | null) ?? null)
+    const allBonuses = (bonusesRes.data as BonusRow[] | null) ?? []
+    setBonuses(allBonuses.slice(0, 3))
+    setIsPremium(isActivePremium(profileRes.data))
+
+    if (p) {
+      setWeekPoints(
+        allBonuses
+          .filter(b => new Date(b.awarded_at) >= new Date(p.period_start))
+          .reduce((s, b) => s + (b.points_awarded ?? 0), 0),
+      )
+      const ids = [
+        ...(p.reading_test_ids ?? []), ...(p.reading_retry_ids ?? []),
+        ...(p.listening_test_ids ?? []), ...(p.listening_retry_ids ?? []),
+      ]
+      if (ids.length > 0) {
+        const [testsRes, resultsRes] = await Promise.all([
+          supabase.from('tests').select('id, title').in('id', ids),
+          supabase.from('test_results').select('test_id, band_score, completed_at').eq('user_id', user.id).in('test_id', ids),
+        ])
+        const titles: Record<string, string> = {}
+        for (const t of (testsRes.data as TestInfo[] | null) ?? []) titles[t.id] = t.title
+        setTestTitles(titles)
+
+        const done = new Set<string>()
+        const bands: Record<string, number> = {}
+        for (const r of resultsRes.data ?? []) {
+          const tid = r.test_id as string
+          bands[tid] = Math.max(bands[tid] ?? 0, (r.band_score as number | null) ?? 0)
+          // "Done" for the plan = attempted within this plan's period.
+          if (new Date(r.completed_at) >= new Date(p.period_start)) done.add(tid)
+        }
+        setDoneTests(done)
+        setBestBands(bands)
+      }
+    }
+    setLoading(false)
+  }, [router])
+
+  useEffect(() => { load() }, [load])
+
+  async function toggleTyping() {
+    if (!settings || busy) return
+    setBusy(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const next = !settings.include_typing
+      await supabase.from('user_plan_settings').update({ include_typing: next }).eq('user_id', user.id)
+      setSettings({ ...settings, include_typing: next })
+    } finally { setBusy(false) }
+  }
+
+  async function changeMode(next: 'weekly' | 'daily') {
+    if (!settings || busy || settings.mode === next) return
+    setBusy(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('user_plan_settings').update({
+        mode: next,
+        mode_locked_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }).eq('user_id', user.id)
+      await load()
+    } finally { setBusy(false) }
+  }
+
+  async function regeneratePlan() {
+    if (busy) return
+    const key = resetCountKey()
+    const count = Number(localStorage.getItem(key) ?? '0')
+    if (count >= 3) {
+      alert("Haftasiga ko'pi bilan 3 marta yangi reja tuzish mumkin.")
+      return
+    }
+    if (!confirm("Joriy reja o'chib, yangi reja tuziladi. Davom etamizmi?")) return
+    setBusy(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.rpc('generate_weekly_plan', { p_user_id: user.id })
+      localStorage.setItem(key, String(count + 1))
+      await load()
+    } finally { setBusy(false) }
+  }
+
+  async function stopPlan() {
+    if (!plan || busy) return
+    if (!confirm("Study Plan to'xtatiladi va joriy reja o'chiriladi. Davom etamizmi?")) return
+    setBusy(true)
+    try {
+      const supabase = createClient()
+      await supabase.from('user_study_plans').delete().eq('id', plan.id)
+      await load()
+    } finally { setBusy(false) }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-24 rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
+      </div>
+    )
+  }
+
+  const modeLocked = !!settings?.mode_locked_until && new Date(settings.mode_locked_until) > new Date()
+
+  // ── No active plan ──
+  if (!plan) {
+    return (
+      <div className="p-6 md:p-8 max-w-5xl mx-auto">
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm mb-6 hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+          <ChevronLeft size={14} /> Bosh sahifaga qaytish
+        </Link>
+        <div className="py-20 text-center rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+          <div className="text-4xl mb-3">📋</div>
+          <p className="font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Faol reja yo&apos;q</p>
+          <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Yangi haftalik reja tuzing</p>
+          <button
+            onClick={regeneratePlan}
+            disabled={busy}
+            className="px-6 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}
+          >
+            {busy ? 'Tuzilmoqda…' : 'Reja tuzish'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const readingAll = [...(plan.reading_test_ids ?? [])]
+  const readingRetry = [...(plan.reading_retry_ids ?? [])]
+  const listeningAll = [...(plan.listening_test_ids ?? [])]
+  const listeningRetry = [...(plan.listening_retry_ids ?? [])]
+
+  const catTotals = [
+    { done: plan.reading_completed, total: readingAll.length + readingRetry.length },
+    { done: plan.listening_completed, total: listeningAll.length + listeningRetry.length },
+    { done: plan.script_completed, total: plan.script_target },
+    { done: plan.vocab_completed, total: plan.vocab_target },
+    { done: plan.article_completed, total: plan.article_target },
+    { done: plan.video_completed, total: plan.video_target },
+    { done: plan.typing_minutes_completed, total: plan.typing_minutes_target },
+  ].filter(c => c.total > 0)
+  const totalTarget = catTotals.reduce((s, c) => s + c.total, 0)
+  const totalDone = catTotals.reduce((s, c) => s + Math.min(c.done, c.total), 0)
+  const percent = totalTarget > 0 ? Math.min(100, Math.round((totalDone / totalTarget) * 100)) : 0
+
+  const nextMilestone = streak ? (Math.floor((streak.current_streak) / 10) + 1) * 10 : 10
+  const daysToMilestone = nextMilestone - (streak?.current_streak ?? 0)
+
+  const cardStyle: React.CSSProperties = { background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16 }
+  const completedCardStyle: React.CSSProperties = { ...cardStyle, border: '1px solid rgba(16,185,129,0.4)' }
+
+  function TestRow({ testId, retry, type }: { testId: string; retry?: boolean; type: 'reading' | 'listening' }) {
+    const done = doneTests.has(testId)
+    const band = bestBands[testId]
+    return (
+      <div className="flex items-center gap-2 py-1.5 text-sm">
+        <span className="flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+          {testTitles[testId] ?? '…'}
+          {retry && band != null && band > 0 && (
+            <span className="ml-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>(band {band})</span>
+          )}
+        </span>
+        {done ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold shrink-0" style={{ color: '#10b981' }}>
+            <Check size={12} /> Bajarilgan
+          </span>
+        ) : (
+          <Link
+            href={`/${type}/${testId}`}
+            className="inline-flex items-center gap-1 text-xs font-semibold shrink-0 hover:opacity-80"
+            style={{ color: 'var(--accent)' }}
+          >
+            {retry ? 'Qayta ishlash' : 'Boshlash'} <ChevronRight size={12} />
+          </Link>
+        )}
+      </div>
+    )
+  }
+
+  function SimpleCard({ icon: Icon, color, title, done, total, body, href, linkLabel, unit }: {
+    icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>
+    color: string
+    title: string
+    done: number
+    total: number
+    body: string
+    href: string
+    linkLabel: string
+    unit?: string
+  }) {
+    if (total <= 0) return null
+    const complete = done >= total
+    return (
+      <div className="p-5 transition-transform hover:-translate-y-0.5" style={complete ? completedCardStyle : cardStyle}>
+        <div className="flex items-center gap-2.5 mb-2">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color}20` }}>
+            <Icon size={18} style={{ color }} />
+          </div>
+          <h3 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+          <span className="ml-auto text-sm font-bold" style={{ color: complete ? '#10b981' : 'var(--text-secondary)' }}>
+            {Math.min(done, total)}/{total}{unit ?? ''}
+          </span>
+        </div>
+        <div className="h-2 rounded-full overflow-hidden mb-3" style={{ background: 'var(--bg-secondary)' }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(100, (done / total) * 100)}%`, background: complete ? '#10b981' : color }} />
+        </div>
+        <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>{body}</p>
+        <Link href={href} className="inline-flex items-center gap-1 text-sm font-medium hover:opacity-80" style={{ color: 'var(--accent)' }}>
+          {linkLabel} <ChevronRight size={13} />
+        </Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm mb-4 hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+        <ChevronLeft size={14} /> Bosh sahifaga qaytish
+      </Link>
+
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <ClipboardList size={28} style={{ color: 'var(--accent)' }} /> Bu haftalik reja
+          </h1>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+            {fmtUz(plan.period_start)} — {fmtUz(plan.period_end, true)}
+          </p>
+        </div>
+        <span
+          className="ml-auto text-xs font-bold px-3 py-1.5 rounded-full"
+          style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
+        >
+          {plan.mode === 'daily' ? 'Kunlik rejim' : 'Haftalik rejim'}
+        </span>
+      </div>
+
+      {/* Summary bar */}
+      <div className="p-5 md:p-6 mb-6" style={plan.is_completed ? completedCardStyle : cardStyle}>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <span className="text-2xl md:text-3xl font-bold" style={{ color: percent >= 100 ? '#10b981' : 'var(--text-primary)' }}>
+            {percent}% bajarildi
+          </span>
+          {plan.is_completed && <span className="text-2xl">🎉</span>}
+          <span className="ml-auto text-sm font-semibold" style={{ color: '#f59e0b' }}>
+            🔥 {streak?.current_streak ?? 0} kun streak
+          </span>
+          {weekPoints > 0 && (
+            <span className="text-sm font-semibold" style={{ color: '#fbbf24' }}>+{weekPoints} ⭐</span>
+          )}
+        </div>
+        <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${percent}%`, background: percent >= 100 ? '#10b981' : 'var(--accent)' }} />
+        </div>
+      </div>
+
+      {/* Category cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+        {/* Reading */}
+        {(readingAll.length + readingRetry.length) > 0 && (
+          <div className="p-5 transition-transform hover:-translate-y-0.5"
+            style={plan.reading_completed >= readingAll.length + readingRetry.length ? completedCardStyle : cardStyle}>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
+                <BookOpen size={18} style={{ color: '#6366f1' }} />
+              </div>
+              <h3 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>Reading</h3>
+              <span className="ml-auto text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>
+                {plan.reading_completed}/{readingAll.length + readingRetry.length} bajarildi
+              </span>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden mb-3" style={{ background: 'var(--bg-secondary)' }}>
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (plan.reading_completed / (readingAll.length + readingRetry.length)) * 100)}%`,
+                  background: '#6366f1',
+                }} />
+            </div>
+            {readingAll.length > 0 && (
+              <>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Yangi testlar:</p>
+                {readingAll.map(id => <TestRow key={id} testId={id} type="reading" />)}
+              </>
+            )}
+            {readingRetry.length > 0 && (
+              <div className="mt-2 rounded-xl p-2.5" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: '#f59e0b' }}>🔄 Qayta ishlash tavsiya etilgan:</p>
+                {readingRetry.map(id => <TestRow key={id} testId={id} retry type="reading" />)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Listening */}
+        {(listeningAll.length + listeningRetry.length) > 0 && (
+          <div className="p-5 transition-transform hover:-translate-y-0.5"
+            style={plan.listening_completed >= listeningAll.length + listeningRetry.length ? completedCardStyle : cardStyle}>
+            <div className="flex items-center gap-2.5 mb-2">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)' }}>
+                <Headphones size={18} style={{ color: '#10b981' }} />
+              </div>
+              <h3 className="font-semibold text-lg" style={{ color: 'var(--text-primary)' }}>Listening</h3>
+              <span className="ml-auto text-sm font-bold" style={{ color: 'var(--text-secondary)' }}>
+                {plan.listening_completed}/{listeningAll.length + listeningRetry.length} bajarildi
+              </span>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden mb-3" style={{ background: 'var(--bg-secondary)' }}>
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (plan.listening_completed / (listeningAll.length + listeningRetry.length)) * 100)}%`,
+                  background: '#10b981',
+                }} />
+            </div>
+            {listeningAll.length > 0 && (
+              <>
+                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Yangi testlar:</p>
+                {listeningAll.map(id => <TestRow key={id} testId={id} type="listening" />)}
+              </>
+            )}
+            {listeningRetry.length > 0 && (
+              <div className="mt-2 rounded-xl p-2.5" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <p className="text-xs font-semibold mb-1" style={{ color: '#f59e0b' }}>🔄 Qayta ishlash tavsiya etilgan:</p>
+                {listeningRetry.map(id => <TestRow key={id} testId={id} retry type="listening" />)}
+              </div>
+            )}
+          </div>
+        )}
+
+        <SimpleCard icon={Mic} color="#f59e0b" title="Script Practice"
+          done={plan.script_completed} total={plan.script_target}
+          body={`${plan.script_target} ta script'ni kamida 3⭐ ga topshiring`}
+          href="/listening/script" linkLabel="Script Practice sahifasiga" />
+        <SimpleCard icon={Gamepad2} color="#a855f7" title="Vocabulary Games"
+          done={plan.vocab_completed} total={plan.vocab_target}
+          body={`${plan.vocab_target} ta level'ni kamida 3⭐ ga tugating`}
+          href="/vocabulary" linkLabel="Games sahifasiga" />
+        <SimpleCard icon={FileText} color="#0ea5e9" title="Articles"
+          done={plan.article_completed} total={plan.article_target}
+          body={`${plan.article_target} ta article quiz'ni kamida 3⭐ ga topshiring`}
+          href="/articles" linkLabel="Articles sahifasiga" />
+        <SimpleCard icon={Video} color="#ec4899" title="Video Lessons"
+          done={plan.video_completed} total={plan.video_target}
+          body={`${plan.video_target} ta video quiz'ni kamida 3⭐ ga topshiring`}
+          href="/video-lessons" linkLabel="Video Lessons sahifasiga" />
+        <SimpleCard icon={Keyboard} color="#94a3b8" title="Typing Practice"
+          done={plan.typing_minutes_completed} total={plan.typing_minutes_target}
+          body={`${plan.typing_minutes_target} daqiqa typing mashqi qiling`}
+          href="/typing" linkLabel="Typing Practice sahifasiga" unit=" daqiqa" />
+      </div>
+
+      {/* Streak + bonuses */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6">
+        <div className="p-5" style={cardStyle}>
+          <div className="flex items-center gap-2 mb-2">
+            <Flame size={20} style={{ color: '#f59e0b' }} />
+            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Login Streak: {streak?.current_streak ?? 0} kun
+            </h3>
+          </div>
+          <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+            Longest: {streak?.longest_streak ?? 0} kun
+          </p>
+          <p className="text-sm mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+            {nextMilestone} kunga {daysToMilestone} kun qoldi
+          </p>
+          <div className="h-2 rounded-full overflow-hidden mb-2" style={{ background: 'var(--bg-secondary)' }}>
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, ((streak?.current_streak ?? 0) % 10) * 10)}%`, background: '#f59e0b' }} />
+          </div>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Keyingi mukofot: 🎁 +50 ball</p>
+        </div>
+
+        <div className="p-5" style={cardStyle}>
+          <div className="flex items-center gap-2 mb-3">
+            <Gift size={20} style={{ color: '#10b981' }} />
+            <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Yaqinda olingan bonuslar</h3>
+          </div>
+          {bonuses.length === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Hali bonuslar yo&apos;q — rejani bajaring va streak yig&apos;ing! 🎯
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {bonuses.map(b => (
+                <div key={b.id} className="flex items-center gap-2 text-sm">
+                  <span className="font-bold shrink-0" style={{ color: '#fbbf24' }}>+{b.points_awarded} ball</span>
+                  <span className="flex-1 truncate" style={{ color: 'var(--text-secondary)' }}>
+                    {b.streak_type === 'plan'
+                      ? 'Plan bajarilgan'
+                      : `${b.milestone ?? ''} kun streak`}
+                  </span>
+                  <span className="text-xs shrink-0" style={{ color: 'var(--text-muted)' }}>{fmtUz(b.awarded_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div style={cardStyle}>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(o => !o)}
+          className="w-full flex items-center gap-2 p-5 text-left"
+        >
+          <Settings size={18} style={{ color: 'var(--text-muted)' }} />
+          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Sozlamalar</span>
+          <ChevronDown
+            size={16}
+            className="ml-auto transition-transform"
+            style={{ color: 'var(--text-muted)', transform: settingsOpen ? 'rotate(180deg)' : 'none' }}
+          />
+        </button>
+        {settingsOpen && (
+          <div className="px-5 pb-5 space-y-4" style={{ borderTop: '1px solid var(--border)' }}>
+            {/* Typing toggle */}
+            <div className="flex items-center justify-between pt-4">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Typing&apos;ni rejaga qo&apos;sh</span>
+              <button
+                type="button"
+                onClick={toggleTyping}
+                disabled={busy || !settings}
+                className="w-11 h-6 rounded-full relative transition-colors disabled:opacity-50"
+                style={{ background: settings?.include_typing ? 'var(--accent)' : 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+              >
+                <span
+                  className="absolute top-0.5 w-4.5 h-4.5 rounded-full bg-white transition-all"
+                  style={{ width: 18, height: 18, left: settings?.include_typing ? 22 : 2 }}
+                />
+              </button>
+            </div>
+
+            {/* Mode (premium only) */}
+            {isPremium && settings && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Rejim</span>
+                  {modeLocked && settings.mode_locked_until && (
+                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Rejimni {fmtUz(settings.mode_locked_until, true)}ga qadar o&apos;zgartira olmaysiz
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {(['weekly', 'daily'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={modeLocked || busy}
+                      onClick={() => changeMode(m)}
+                      className="flex-1 py-2 rounded-xl text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={settings.mode === m
+                        ? { background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.4)' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                    >
+                      {m === 'weekly' ? '📅 Haftalik' : '📆 Kunlik'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Manual reset (premium only) */}
+            {isPremium && (
+              <button
+                type="button"
+                onClick={regeneratePlan}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-xl disabled:opacity-50"
+                style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+              >
+                <RotateCcw size={14} /> Yangi reja tuzish
+              </button>
+            )}
+
+            {/* Stop */}
+            <div>
+              <button
+                type="button"
+                onClick={stopPlan}
+                disabled={busy}
+                className="text-xs hover:opacity-80 disabled:opacity-50"
+                style={{ color: 'var(--error)' }}
+              >
+                Study Plan&apos;ni to&apos;xtatish
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

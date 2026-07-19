@@ -6,6 +6,7 @@ import { calculateBandScore } from '@/lib/utils/bandScore'
 import { calcStarsFromBand } from '@/lib/stars'
 import { isFullTest } from '@/lib/utils/testCategory'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgress } from '@/lib/utils/studyPlan'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -58,6 +59,8 @@ export async function POST(req: NextRequest) {
 
     const category = testMeta?.type === 'listening' ? 'listening' as const : 'reading' as const
     await grantLeaderboardStars(supabase, user.id, category, stars - prevBest)
+    // Study plan: the RPC decides whether this test is part of the plan.
+    await bumpPlanProgress(supabase, user.id, category)
   }
 
   // Mark session completed via admin client (bypasses RLS; unique constraint fixed by migration 015)

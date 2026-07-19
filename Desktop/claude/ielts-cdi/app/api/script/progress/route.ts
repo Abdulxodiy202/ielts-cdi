@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgress } from '@/lib/utils/studyPlan'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
 
     // Leaderboard: first attempt on this script -- whole stars count.
     await grantLeaderboardStars(supabase, user.id, 'script', stars ?? 0)
+    // Study plan counts scripts done at >= 3 stars; this is the first
+    // attempt, so any >= 3 result is a fresh threshold crossing.
+    if ((stars ?? 0) >= 3) await bumpPlanProgress(supabase, user.id, 'script')
     return Response.json(data, { status: 201 })
   }
 
@@ -75,5 +79,10 @@ export async function POST(request: NextRequest) {
 
   // Leaderboard: delta over previous best only, so retakes don't inflate.
   await grantLeaderboardStars(supabase, user.id, 'script', (stars ?? 0) - (existing.best_stars ?? 0))
+  // Study plan: only when this attempt CROSSES the 3-star threshold for
+  // this script (was < 3 before), so replays never double-count.
+  if ((stars ?? 0) >= 3 && (existing.best_stars ?? 0) < 3) {
+    await bumpPlanProgress(supabase, user.id, 'script')
+  }
   return Response.json(data)
 }

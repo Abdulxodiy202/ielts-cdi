@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recordLevelUnlock } from '@/lib/utils/gameUnlock'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgress } from '@/lib/utils/studyPlan'
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
@@ -58,6 +59,12 @@ export async function POST(request: NextRequest) {
   // Leaderboard: delta over previous best stars for this level so
   // replays don't inflate totals.
   await grantLeaderboardStars(admin, user.id, 'game', (stars ?? 0) - (existing?.stars ?? 0))
+
+  // Study plan: only when this run CROSSES the 3-star threshold for the
+  // level (was < 3 before), so replays never double-count.
+  if ((stars ?? 0) >= 3 && (existing?.stars ?? 0) < 3) {
+    await bumpPlanProgress(admin, user.id, 'vocab')
+  }
 
   return Response.json(data)
 }

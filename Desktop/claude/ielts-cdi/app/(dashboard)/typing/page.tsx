@@ -4,6 +4,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, 
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { recordTypingMinutes } from '@/lib/utils/studyPlan'
 import { Keyboard, RotateCcw, Settings } from 'lucide-react'
 
 /* ── Config types ─────────────────────────────────────────────────── */
@@ -543,10 +544,21 @@ export default function TypingPage() {
   useEffect(() => {
     const finished = isEssaySet ? essayState.finished : typingState.finished
     if (finished && endedAt === null) {
-      setEndedAt(Date.now())
+      const now = Date.now()
+      setEndedAt(now)
       setStatus('result')
+      // Study plan: log the session's minutes toward the weekly typing
+      // target + the login streak. Fire-and-forget so the result screen
+      // never waits on it.
+      if (startedAt) {
+        const minutes = (now - startedAt) / 60000
+        const supabase = createClient()
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) recordTypingMinutes(supabase, user.id, minutes)
+        })
+      }
     }
-  }, [isEssaySet, essayState.finished, typingState.finished, endedAt])
+  }, [isEssaySet, essayState.finished, typingState.finished, endedAt, startedAt])
 
   /* ── Group words into visual lines by measuring where the browser actually
      wrapped them (flex-wrap handles the wrapping; we just read it back).

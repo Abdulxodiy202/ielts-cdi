@@ -8,6 +8,7 @@ import {
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { getBandColor } from '@/lib/utils/bandScore'
 import { LeaderboardWidget } from '@/components/dashboard/LeaderboardWidget'
+import { StudyPlanWidget } from '@/components/dashboard/StudyPlanWidget'
 import { ReferralCard } from '@/components/dashboard/ReferralCard'
 import { RecentTestsCompact } from '@/components/dashboard/RecentTestsCompact'
 
@@ -154,7 +155,7 @@ export function BentoDashboard({
       </div>
 
       {/* ── Reading ── */}
-      <Link href="/reading" className="lg:col-span-4 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
+      <Link href="/reading" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
             <BookOpen size={22} style={{ color: 'var(--accent)' }} />
@@ -174,7 +175,7 @@ export function BentoDashboard({
       </Link>
 
       {/* ── Listening ── */}
-      <Link href="/listening" className="lg:col-span-4 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
+      <Link href="/listening" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
         <div className="flex items-center gap-3 mb-2">
           <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(236,72,153,0.15)' }}>
             <Headphones size={22} style={{ color: '#ec4899' }} />
@@ -193,8 +194,11 @@ export function BentoDashboard({
         <ProgressBar done={listeningDone} total={counts.listeningTotal} />
       </Link>
 
-      {/* ── Leaderboard (spans two rows on desktop) ── */}
-      <div className="lg:col-span-4 lg:row-span-2 p-5 md:p-6 transition-colors" style={tileStyle}>
+      {/* ── Study plan + leaderboard, side by side ── */}
+      <div className="lg:col-span-6 p-5 md:p-6 transition-colors" style={tileStyle}>
+        <StudyPlanWidget />
+      </div>
+      <div className="lg:col-span-6 p-5 md:p-6 transition-colors" style={tileStyle}>
         <LeaderboardWidget />
       </div>
 
@@ -205,7 +209,7 @@ export function BentoDashboard({
           <Link
             key={tile.href}
             href={tile.href}
-            className="lg:col-span-2 p-5 group transition-colors hover:border-[var(--accent)]"
+            className="lg:col-span-3 p-5 group transition-colors hover:border-[var(--accent)]"
             style={tileStyle}
           >
             <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background: `${tile.color}20` }}>

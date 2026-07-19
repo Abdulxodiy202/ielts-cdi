@@ -9,6 +9,8 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
 import { fireCelebrationConfetti } from '@/lib/confetti'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgressAndCheck } from '@/lib/utils/studyPlan'
+import { PlanCompletedToast } from '@/components/PlanCompletedToast'
 
 // Per-video 30-question multiple-choice test. Flow mirrors
 // /articles/[id]/test: no intro screen, straight into Q1, no timer,
@@ -50,6 +52,7 @@ export default function VideoTestPage() {
   const [finalScore, setFinalScore] = useState(0)
   const [finalStars, setFinalStars] = useState(0)
   const [saving, setSaving] = useState(false)
+  const [planCompleted, setPlanCompleted] = useState(false)
   const resultRef = useRef<HTMLDivElement>(null)
   const firedRef = useRef(false)
 
@@ -143,6 +146,15 @@ export default function VideoTestPage() {
 
       // Leaderboard: delta-only so retakes never inflate totals.
       await grantLeaderboardStars(supabase, user.id, 'video', stars - (existing?.best_stars ?? 0))
+
+      // Study plan: 3-star threshold crossing only (see article test).
+      if (stars >= 3 && (existing?.best_stars ?? 0) < 3) {
+        const { justCompleted } = await bumpPlanProgressAndCheck(supabase, user.id, 'video')
+        if (justCompleted) {
+          setPlanCompleted(true)
+          fireCelebrationConfetti(resultRef.current)
+        }
+      }
     } finally {
       setSaving(false)
     }
@@ -321,6 +333,7 @@ export default function VideoTestPage() {
 
     return (
       <div className="p-6 md:p-10 max-w-xl mx-auto">
+        <PlanCompletedToast show={planCompleted} />
         <div
           ref={resultRef}
           className="rounded-2xl p-6 md:p-8 text-center"

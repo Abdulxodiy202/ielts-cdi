@@ -9,6 +9,9 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { calcStarsFromScore } from '@/lib/stars'
 import { difficultyColor, difficultyLabelKey } from '@/lib/utils/articleDifficulty'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgressAndCheck } from '@/lib/utils/studyPlan'
+import { fireCelebrationConfetti } from '@/lib/confetti'
+import { PlanCompletedToast } from '@/components/PlanCompletedToast'
 
 // Per-article 30-question multiple-choice test. Flow: quiz (one question
 // at a time, no timer, no auto-submit) -> result. No intro screen -- the
@@ -57,6 +60,7 @@ export default function ArticleTestPage() {
   const [finalStars, setFinalStars] = useState(0)
   const [saving, setSaving] = useState(false)
   const [difficulty, setDifficulty] = useState<Difficulty>(null)
+  const [planCompleted, setPlanCompleted] = useState(false)
 
   useEffect(() => {
     if (!articleId) return
@@ -146,6 +150,17 @@ export default function ArticleTestPage() {
 
       // Leaderboard: delta-only so retakes never inflate totals.
       await grantLeaderboardStars(supabase, user.id, 'article', stars - (existing?.best_stars ?? 0))
+
+      // Study plan counts articles first reaching >= 3 stars. Threshold
+      // crossing only, so retakes never double-count. If this bump just
+      // finished the whole plan, celebrate right here.
+      if (stars >= 3 && (existing?.best_stars ?? 0) < 3) {
+        const { justCompleted } = await bumpPlanProgressAndCheck(supabase, user.id, 'article')
+        if (justCompleted) {
+          setPlanCompleted(true)
+          fireCelebrationConfetti()
+        }
+      }
     } finally {
       setSaving(false)
     }
@@ -344,6 +359,7 @@ export default function ArticleTestPage() {
 
     return (
       <div className="p-6 md:p-10 max-w-xl mx-auto">
+        <PlanCompletedToast show={planCompleted} />
         <div
           className="rounded-2xl p-6 md:p-8 text-center"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}

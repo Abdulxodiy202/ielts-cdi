@@ -4,6 +4,7 @@ import { calculateBandScore } from '@/lib/utils/bandScore'
 import { calcStarsFromBand } from '@/lib/stars'
 import { isFullTest } from '@/lib/utils/testCategory'
 import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
+import { bumpPlanProgress } from '@/lib/utils/studyPlan'
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -88,6 +89,9 @@ export async function POST(req: NextRequest) {
 
     const category = testRes.data?.type === 'listening' ? 'listening' as const : 'reading' as const
     await grantLeaderboardStars(supabase, user.id, category, stars - prevBest)
+    // Study plan: the RPC itself decides whether this test belongs to
+    // the active plan, so the call is unconditional for full tests.
+    await bumpPlanProgress(supabase, user.id, category)
   }
 
   await supabase

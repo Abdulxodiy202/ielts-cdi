@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { BentoDashboard, type RankInfo } from '@/components/dashboard/BentoDashboard'
-import { DisplayNameModal } from '@/components/DisplayNameModal'
+import { DashboardModals } from '@/components/DashboardModals'
 import { DashboardPaymentOpener } from '@/components/dashboard/DashboardPaymentOpener'
 import { isActivePremium } from '@/lib/utils/premium'
 import { isFullTest } from '@/lib/utils/testCategory'
@@ -145,7 +145,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           initialPhone={(profile as { phone?: string } | null)?.phone ?? ''}
         />
       )}
-      <DisplayNameModal />
+      <DashboardModals isPremium={isPremium} />
       <BentoDashboard
         firstName={firstName}
         isPremium={isPremium}
