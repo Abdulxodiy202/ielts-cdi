@@ -3,16 +3,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Settings as SettingsIcon, Check } from 'lucide-react'
+import { ChevronLeft, Settings as SettingsIcon, Check, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { isActivePremium } from '@/lib/utils/premium'
 
-// Dashboard settings. Currently hosts the daily-plan toggle; extend
-// here as more per-user preferences arrive. Uzbek copy, formal tone.
+// Dashboard settings. Currently hosts the daily-plan toggle + (for
+// premium users) the weekly/daily mode selector. Free users never see
+// the mode selector -- they're locked to 'daily_free' by tier.
+
+type Mode = 'weekly' | 'daily'
 
 export default function SettingsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [enabled, setEnabled] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
+  const [mode, setMode] = useState<Mode>('weekly')
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -21,12 +27,14 @@ export default function SettingsPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
-    const { data } = await supabase
-      .from('profiles')
-      .select('daily_plan_enabled')
-      .eq('id', user.id)
-      .single()
-    setEnabled(Boolean((data as { daily_plan_enabled?: boolean } | null)?.daily_plan_enabled))
+    const [profileRes, settingsRes] = await Promise.all([
+      supabase.from('profiles').select('daily_plan_enabled, is_premium, premium_until').eq('id', user.id).single(),
+      supabase.from('user_plan_settings').select('mode').eq('user_id', user.id).maybeSingle(),
+    ])
+    setEnabled(Boolean((profileRes.data as { daily_plan_enabled?: boolean } | null)?.daily_plan_enabled))
+    setIsPremium(isActivePremium(profileRes.data))
+    const m = (settingsRes.data as { mode?: string } | null)?.mode
+    setMode(m === 'daily' ? 'daily' : 'weekly')
     setLoading(false)
   }, [router])
 
@@ -57,6 +65,31 @@ export default function SettingsPage() {
         setToast("Bugungi rejangiz tayyor")
         setTimeout(() => setToast(null), 4000)
       }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Premium-only: switch between weekly and AI-daily plan modes. Also
+  // triggers a fresh plan generation so the /dashboard/study-plan view
+  // reflects the new mode immediately.
+  async function changeMode(next: Mode) {
+    if (busy || !isPremium || mode === next) return
+    setBusy(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { error: upErr } = await supabase
+        .from('user_plan_settings')
+        .upsert({ user_id: user.id, mode: next }, { onConflict: 'user_id' })
+      if (upErr) { setError(upErr.message); return }
+      setMode(next)
+      const { error: genErr } = await supabase.rpc('generate_plan_for_user', { p_user_id: user.id })
+      if (genErr) console.error('[settings] generate_plan_for_user failed:', genErr.message)
+      setToast('Rejim yangilandi')
+      setTimeout(() => setToast(null), 4000)
     } finally {
       setBusy(false)
     }
@@ -141,7 +174,63 @@ export default function SettingsPage() {
             individual reja.
           </p>
         )}
+
+        {/* Free-tier info: no mode selector, just an explanation of what
+            the upgrade unlocks. Premium gets the actual selector below. */}
+        {!isPremium && (
+          <p
+            className="mt-4 pt-4 text-xs leading-relaxed inline-flex items-start gap-2"
+            style={{ color: 'var(--text-muted)', borderTop: '1px solid var(--border)' }}
+          >
+            <Lock size={12} className="mt-0.5 shrink-0" style={{ color: '#F59E0B' }} />
+            <span>
+              Bepul foydalanuvchilar 7 kunlik bepul reja oladi. Individual haftalik yoki AI kunlik
+              reja Premium&apos;da mavjud.
+            </span>
+          </p>
+        )}
       </div>
+
+      {/* Premium-only mode selector. Hidden entirely for free users --
+          they have no mode choice, they're on daily_free by tier. */}
+      {isPremium && (
+        <div
+          className="mt-4 p-5 md:p-6"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 16 }}
+        >
+          <h2 className="font-semibold text-lg mb-1" style={{ color: 'var(--text-primary)' }}>
+            Reja rejimi
+          </h2>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+            Haftalik reja bir hafta uchun, AI kunlik reja har kuni yangilanadi
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {([
+              { key: 'weekly' as const, title: 'Haftalik', desc: 'Bir hafta uchun bir reja' },
+              { key: 'daily' as const,  title: 'AI kunlik', desc: 'Har kuni yangilanadi' },
+            ]).map(o => {
+              const active = mode === o.key
+              return (
+                <button
+                  key={o.key}
+                  type="button"
+                  onClick={() => changeMode(o.key)}
+                  disabled={busy}
+                  className="p-4 rounded-xl text-left disabled:opacity-50 transition-colors"
+                  style={active
+                    ? { background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.55)' }
+                    : { background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+                >
+                  <div className="font-bold text-sm mb-1" style={{ color: active ? 'var(--accent)' : 'var(--text-primary)' }}>
+                    {o.title}
+                  </div>
+                  <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{o.desc}</div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,7 +22,7 @@ function fmtTodayUz(dateStr: string): string {
   const d = new Date(dateStr)
   const wd = UZ_WEEKDAYS[d.getDay()]
   const wdCap = wd.charAt(0).toUpperCase() + wd.slice(1)
-  return `Bugun, ${d.getDate()}-${UZ_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${wdCap}`
+  return `${d.getDate()}-${UZ_MONTHS[d.getMonth()]} ${d.getFullYear()}, ${wdCap}`
 }
 
 interface TestInfo { id: string; title: string }
@@ -119,13 +119,13 @@ export function DailyFreePlanView({ plan }: Props) {
           borderRadius: 16,
         }}
       >
-        <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
-          {fmtTodayUz(plan.period_start)}
-        </p>
+        <h1 className="text-2xl md:text-3xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+          Bugungi rejangiz — {fmtTodayUz(plan.period_start)}
+        </h1>
         <div className="flex flex-wrap items-baseline gap-3 mb-3">
-          <h1 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
             {totalDone}/{totalTarget} vazifa bajarildi
-          </h1>
+          </p>
           {complete && <span className="text-2xl">🎉</span>}
         </div>
         <div className="h-2.5 rounded-full overflow-hidden mb-2" style={{ background: 'var(--bg-secondary)' }}>
