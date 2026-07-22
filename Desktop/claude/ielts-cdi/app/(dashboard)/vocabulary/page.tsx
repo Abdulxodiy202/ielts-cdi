@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 
 export default function VocabularyPage() {
   const { t } = useLanguage()
@@ -97,6 +98,7 @@ export default function VocabularyPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <StudyPlanBackButton />
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
           📚 {t('vocabulary.title')}

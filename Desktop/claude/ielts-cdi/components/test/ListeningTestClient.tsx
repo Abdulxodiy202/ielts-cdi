@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2, LogOut } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { TestTimer } from './TestTimer'
 import { QuestionPanel } from './QuestionPanel'
 import { useTest } from '@/lib/hooks/useTest'
@@ -46,6 +46,8 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
   const [cdiEarnedStars, setCdiEarnedStars] = useState<number | null>(null)
   const cdiEarnedStarsRef = useRef<number | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromPlan = searchParams.get('fromPlan') === 'true'
   const [iframeSrc, setIframeSrc] = useState<string | null>(null)
   const blobUrlRef = useRef<string | null>(null)
   const submittedRef = useRef(false)
@@ -235,6 +237,15 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             <Link href={exitWithCelebration} className="btn-outline text-sm flex items-center gap-1.5 shrink-0">
               <ArrowLeft size={14} /> <span>{t('testTaking.exit')}</span>
             </Link>
+            {fromPlan && (
+              <Link
+                href="/dashboard/study-plan"
+                className="text-xs font-semibold flex items-center gap-1 shrink-0 hover:opacity-80"
+                style={{ color: '#a855f7' }}
+              >
+                <ArrowLeft size={12} /> Study Plan&apos;ga qaytish
+              </Link>
+            )}
             <h1 className="font-bold text-sm sm:text-base truncate" style={{ color: 'var(--text-primary)' }}>
               {test.title}
             </h1>

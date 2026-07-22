@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { isAdmin } from '@/lib/admin-config'
 import { formatTime } from '@/lib/utils/formatters'
-import { Headphones, Lock, Star, ChevronLeft, ListChecks } from 'lucide-react'
+import { Headphones, Lock, Star, ChevronLeft, ListChecks, ArrowLeft } from 'lucide-react'
 import { ScriptAttemptsModal } from '@/components/test/ScriptAttemptsModal'
 
 interface ScriptProgress {
@@ -34,6 +34,8 @@ const PASS_THRESHOLD = 70
 
 export default function ScriptListPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromPlan = searchParams.get('fromPlan') === 'true'
   const { t } = useLanguage()
   const [authChecked, setAuthChecked] = useState(false)
   const [userIsAdmin, setUserIsAdmin] = useState(false)
@@ -80,9 +82,19 @@ export default function ScriptListPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
-      <Link href="/listening" className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity" style={{ color: 'var(--text-muted)' }}>
-        <ChevronLeft size={16} /> {t('test.backToModes')}
-      </Link>
+      {fromPlan ? (
+        <Link
+          href="/dashboard/study-plan"
+          className="inline-flex items-center gap-1.5 text-sm mb-6 hover:opacity-80 transition-opacity"
+          style={{ color: '#a855f7' }}
+        >
+          <ArrowLeft size={14} /> Study Plan&apos;ga qaytish
+        </Link>
+      ) : (
+        <Link href="/listening" className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity" style={{ color: 'var(--text-muted)' }}>
+          <ChevronLeft size={16} /> {t('test.backToModes')}
+        </Link>
+      )}
 
       <div className="flex items-start justify-between gap-4 mb-8 flex-wrap">
         <div>

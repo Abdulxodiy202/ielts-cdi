@@ -9,6 +9,7 @@ import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { StarsBadge } from '@/components/ui/StarsBadge'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { difficultyColor } from '@/lib/utils/articleDifficulty'
+import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 
 interface Article {
   id: string
@@ -100,6 +101,7 @@ export default function ArticlesPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
+      <StudyPlanBackButton />
       <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('articles.title')}</h1>

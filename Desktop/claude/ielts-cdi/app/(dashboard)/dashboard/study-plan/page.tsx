@@ -606,7 +606,7 @@ export default function StudyPlanPage() {
             title={`Reading Test ${i + 1}`}
             subtitle={testTitles[id]}
             done={plan.reading_completed >= i + 1}
-            href={`/reading/${id}`}
+            href={`/reading/${id}?fromPlan=true`}
             delay={0.2 + i * 0.05}
           />
         ))}
@@ -618,7 +618,7 @@ export default function StudyPlanPage() {
             title={`Listening Test ${i + 1}`}
             subtitle={testTitles[id]}
             done={plan.listening_completed >= i + 1}
-            href={`/listening/${id}`}
+            href={`/listening/${id}?fromPlan=true`}
             delay={0.25 + i * 0.05}
           />
         ))}
@@ -629,7 +629,7 @@ export default function StudyPlanPage() {
             title={`Script Practice — ${plan.script_target} mashq`}
             progressText={`${Math.min(plan.script_completed, plan.script_target)}/${plan.script_target}`}
             done={plan.script_completed >= plan.script_target}
-            href="/listening/script"
+            href="/listening/script?fromPlan=true"
             delay={0.35}
           />
         )}
@@ -640,7 +640,7 @@ export default function StudyPlanPage() {
             title={`Article — ${plan.article_target} maqola`}
             progressText={`${Math.min(plan.article_completed, plan.article_target)}/${plan.article_target}`}
             done={plan.article_completed >= plan.article_target}
-            href="/articles"
+            href="/articles?fromPlan=true"
             delay={0.4}
           />
         )}
@@ -651,7 +651,7 @@ export default function StudyPlanPage() {
             title={`Video Darsi — ${plan.video_target} dars`}
             progressText={`${Math.min(plan.video_completed, plan.video_target)}/${plan.video_target}`}
             done={plan.video_completed >= plan.video_target}
-            href="/video-lessons"
+            href="/video-lessons?fromPlan=true"
             delay={0.45}
           />
         )}
@@ -662,7 +662,7 @@ export default function StudyPlanPage() {
             title={`Vocabulary — ${plan.vocab_target} level`}
             progressText={`${Math.min(plan.vocab_completed, plan.vocab_target)}/${plan.vocab_target}`}
             done={plan.vocab_completed >= plan.vocab_target}
-            href="/vocabulary"
+            href="/vocabulary?fromPlan=true"
             delay={0.5}
           />
         )}
