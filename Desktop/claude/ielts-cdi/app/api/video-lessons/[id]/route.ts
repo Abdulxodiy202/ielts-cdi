@@ -29,8 +29,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   if (videoRes.error) return Response.json({ error: 'Not found' }, { status: 404 })
 
-  return Response.json({
-    video: videoRes.data,
-    userPremium: isActivePremium(profileRes.data),
-  })
+  // Strip the video URL for free users hitting premium content -- the
+  // lock overlay renders from the remaining metadata (title, thumb,
+  // recommendation), but the actual video source is never exposed.
+  const userPremium = isActivePremium(profileRes.data)
+  const video = videoRes.data
+  const safeVideo = (video.is_premium && !userPremium)
+    ? { ...video, video_url: '' }
+    : video
+
+  return Response.json({ video: safeVideo, userPremium })
 }

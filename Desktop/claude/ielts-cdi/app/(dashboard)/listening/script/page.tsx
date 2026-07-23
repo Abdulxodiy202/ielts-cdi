@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { isAdmin } from '@/lib/admin-config'
+import { isActivePremium } from '@/lib/utils/premium'
 import { formatTime } from '@/lib/utils/formatters'
 import { Headphones, Lock, Star, ChevronLeft, ListChecks, ArrowLeft } from 'lucide-react'
 import { ScriptAttemptsModal } from '@/components/test/ScriptAttemptsModal'
@@ -39,6 +40,7 @@ export default function ScriptListPage() {
   const { t } = useLanguage()
   const [authChecked, setAuthChecked] = useState(false)
   const [userIsAdmin, setUserIsAdmin] = useState(false)
+  const [userIsPremium, setUserIsPremium] = useState(false)
   const [scripts, setScripts] = useState<Script[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,9 +48,16 @@ export default function ScriptListPage() {
 
   useEffect(() => {
     const sb = createClient()
-    sb.auth.getUser().then(({ data: { user } }) => {
+    sb.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push('/login'); return }
       setUserIsAdmin(isAdmin(user.email))
+      // Profile bilan bir joyda -- premium kartalarni lock qilish uchun.
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('is_premium, premium_until')
+        .eq('id', user.id)
+        .single()
+      setUserIsPremium(isActivePremium(profile))
       setAuthChecked(true)
     })
   }, [router])
@@ -124,24 +133,31 @@ export default function ScriptListPage() {
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {scripts.map((script, i) => {
             const unlocked = isUnlocked(i)
+            const premiumLocked = script.is_premium && !userIsPremium && !userIsAdmin
             const progress = script.progress
             const content = (
               <>
                 <div className="relative w-full aspect-video rounded-t-2xl overflow-hidden shrink-0">
                   {script.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={script.thumbnail_url} alt={script.title} className="w-full h-full object-cover" />
+                    <img src={script.thumbnail_url} alt={script.title} className="w-full h-full object-cover" style={premiumLocked ? { filter: 'grayscale(0.7) brightness(0.6)' } : undefined} />
                   ) : (
                     <div
                       className="w-full h-full flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))' }}
+                      style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))', filter: premiumLocked ? 'grayscale(0.7) brightness(0.6)' : undefined }}
                     >
                       <Headphones size={40} style={{ color: 'rgba(16,185,129,0.6)' }} />
                     </div>
                   )}
-                  {!unlocked && (
+                  {!unlocked && !premiumLocked && (
                     <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }}>
                       <Lock size={28} style={{ color: '#fff' }} />
+                    </div>
+                  )}
+                  {premiumLocked && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2" style={{ background: 'linear-gradient(160deg, rgba(0,0,0,0.55), rgba(245,158,11,0.35))', backdropFilter: 'blur(2px)' }}>
+                      <Lock size={26} style={{ color: '#fbbf24' }} />
+                      <span className="text-xs font-bold" style={{ color: '#fff' }}>Premium — bosib upgrade qiling</span>
                     </div>
                   )}
                 </div>
@@ -215,6 +231,19 @@ export default function ScriptListPage() {
               </>
             )
 
+            if (premiumLocked) {
+              return (
+                <Link
+                  key={script.id}
+                  href="/premium"
+                  className="card overflow-hidden flex flex-col hover:opacity-90 transition-opacity"
+                  style={{ padding: 0 }}
+                  title="Premium kontent -- bosib upgrade qiling"
+                >
+                  {content}
+                </Link>
+              )
+            }
             return unlocked ? (
               <Link
                 key={script.id}

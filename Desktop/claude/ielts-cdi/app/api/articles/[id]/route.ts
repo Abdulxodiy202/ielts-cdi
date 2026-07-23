@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isActivePremium } from '@/lib/utils/premium'
 
 import { isAdmin } from '@/lib/admin-config'
 
@@ -14,15 +15,26 @@ export async function GET(
 
   const { id } = await params
   const admin = createAdminClient()
-  const { data, error } = await admin
-    .from('articles')
-    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, difficulty, created_at')
-    .eq('id', id)
-    .eq('is_published', true)
-    .single()
+  const [articleRes, profileRes] = await Promise.all([
+    admin
+      .from('articles')
+      .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, difficulty, created_at')
+      .eq('id', id)
+      .eq('is_published', true)
+      .single(),
+    supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
+  ])
 
-  if (error) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(data)
+  if (articleRes.error) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Free user asking for premium content -> strip file_url so DevTools
+  // can't just read the PDF URL from the response. Metadata (title,
+  // cover) still returns so the lock screen can render nicely.
+  const article = articleRes.data
+  if (article.is_premium && !isActivePremium(profileRes.data)) {
+    return NextResponse.json({ ...article, file_url: null })
+  }
+  return NextResponse.json(article)
 }
 
 export async function PATCH(

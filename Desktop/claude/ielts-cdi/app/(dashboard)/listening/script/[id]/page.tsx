@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { formatTime } from '@/lib/utils/formatters'
 import { computeAlignment, getStars, isPassed, type AlignmentResult } from '@/lib/utils/scriptGrading'
+import { PremiumGuard } from '@/components/PremiumGuard'
 import {
   ChevronLeft, Play, Pause, RotateCcw, Volume2,
   SkipForward, SkipBack, Star,
@@ -24,7 +25,7 @@ interface Script {
   is_premium: boolean
 }
 
-type PageStatus = 'loading' | 'error' | 'exercise' | 'result'
+type PageStatus = 'loading' | 'error' | 'locked' | 'exercise' | 'result'
 const SPEEDS = [0.75, 1, 1.25, 1.5] as const
 const MIN_WORDS = 3
 
@@ -69,10 +70,15 @@ export default function ScriptExercisePage() {
     setStatus('loading')
     setResult(null)
     fetch(`/api/script/${scriptId}`).then(async res => {
+      if (res.status === 403) {
+        // Server-side premium gate said no. Render the lock screen
+        // instead of a generic error -- gives users a clear upgrade path.
+        setStatus('locked')
+        return
+      }
       if (!res.ok) { setStatus('error'); return }
       const data: Script = await res.json()
       setScript(data)
-      // Restore draft from localStorage if it exists
       const draft = localStorage.getItem(`script_${scriptId}_draft`)
       setAnswer(draft ?? '')
       setStatus('exercise')
@@ -185,6 +191,14 @@ export default function ScriptExercisePage() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
         <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
       </div>
+    )
+  }
+
+  if (status === 'locked') {
+    return (
+      <PremiumGuard isPremiumContent contentType="Script Practice">
+        {null}
+      </PremiumGuard>
     )
   }
 
