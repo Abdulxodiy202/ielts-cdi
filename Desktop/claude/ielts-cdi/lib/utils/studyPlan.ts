@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { getTashkentToday } from '@/lib/utils/date'
 
 // Study Plan client/server helpers. Backend tables + RPCs already exist
 // (user_plan_settings, user_study_plans, user_login_streak,
@@ -71,7 +72,7 @@ function totalDone(plan: StudyPlan): number {
 /** Latest plan whose period hasn't ended (completed plans included so
     the UI can show the finished state + celebration). */
 export async function fetchActivePlan(client: SupabaseClient, userId: string): Promise<StudyPlan | null> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTashkentToday()
   const { data } = await client
     .from('user_study_plans')
     .select('*')
@@ -90,7 +91,7 @@ export async function fetchTodayDailyFreePlan(
   client: SupabaseClient,
   userId: string,
 ): Promise<StudyPlan | null> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTashkentToday()
   const { data } = await client
     .from('user_study_plans')
     .select('*')

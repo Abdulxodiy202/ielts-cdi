@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
+import { getTashkentToday } from '@/lib/utils/date'
 
 // Study Plan sahifasi -- gradient bento grid, per-test kartalar,
 // framer-motion animatsiyalari. Free/premium tier boyicha ajratilgan:
@@ -83,7 +84,7 @@ async function fetchTodayPlan(
   userId: string,
   isFree: boolean,
 ): Promise<StudyPlan | null> {
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTashkentToday()
   const modes = isFree
     ? ['daily_free', 'daily_free_locked']
     : ['daily', 'weekly', 'daily_free', 'daily_free_locked']
