@@ -8,10 +8,12 @@ import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
   PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { useSidebar } from '@/contexts/SidebarContext'
 import { createClient } from '@/lib/supabase/client'
 import { PaymentModal } from '@/components/PaymentModal'
 import { ToastContainer, type ToastData } from '@/components/ui/Toast'
@@ -50,6 +52,15 @@ export function Sidebar() {
   const { user, signOut } = useAuth()
   const { theme, setTheme } = useTheme()
   const { t, lang, setLang } = useLanguage()
+  const { collapsed, toggle } = useSidebar()
+
+  // Main-content margin'i CSS var(--sidebar-width) orqali harakat qiladi
+  // (globals.css'da transition tayyor). Collapsed holatini shu joyda
+  // sinxronlaymiz -- boshqa fayllarni tegishga hojat qolmaydi.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    document.documentElement.style.setProperty('--sidebar-width', collapsed ? '72px' : '260px')
+  }, [collapsed])
 
   const [mobileOpen,      setMobileOpen]      = useState(false)
   const [upgradeOpen,     setUpgradeOpen]      = useState(false)
@@ -270,49 +281,59 @@ export function Sidebar() {
   const unreadCount  = messages.filter(m => !m.is_read).length
 
   /* ── Sidebar markup ────────────────────────────────────────────── */
-  const sidebarContent = (
+  // `mini` -- collapsed uslubi (72px, matnlar yashirin, ikon markazda).
+  // Mobile drawer doim `mini=false` bilan chaqiriladi -- drawer to'liq
+  // matn bilan ochilishi kerak.
+  const renderSidebar = (mini: boolean) => (
     <div style={{ background: 'var(--bg-secondary)', borderRight: '1px solid var(--border)' }}
-      className="flex flex-col h-full w-[260px]">
+      className={`flex flex-col h-full ${mini ? 'w-[72px]' : 'w-[260px]'} transition-[width] duration-300 ease-in-out`}>
 
       {/* Logo */}
-      <div className="px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 0' }}>
-          <svg width="36" height="40" viewBox="0 0 36 40" fill="none">
+      <div className={`${mini ? 'px-3' : 'px-6'} py-4 border-b`} style={{ borderColor: 'var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: mini ? 'center' : 'flex-start', gap: '10px', padding: '4px 0' }}>
+          <svg width="36" height="40" viewBox="0 0 36 40" fill="none" style={{ flexShrink: 0 }}>
             <path d="M18 0L0 7V20C0 30 8 38 18 40C28 38 36 30 36 20V7L18 0Z" fill="#1e40af"/>
             <path d="M18 4L4 10V20C4 28 10 35 18 37C26 35 32 28 32 20V10L18 4Z" fill="#2563eb"/>
             <path d="M13 20L16.5 23.5L23 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-              <span style={{ color: 'white', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
-              <span style={{ color: '#60a5fa', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+          {!mini && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                <span style={{ color: 'white', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
+                <span style={{ color: '#60a5fa', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+              </div>
+              <div style={{ color: '#93c5fd', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
             </div>
-            <div style={{ color: '#93c5fd', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-4 overflow-y-auto" style={{ paddingTop: '8px' }}>
+      <nav className={`flex-1 ${mini ? 'p-2' : 'p-4'} overflow-y-auto overflow-x-hidden`} style={{ paddingTop: '8px' }}>
         {navGroups.map(group => (
           <div key={group.label || '_top'} className="mb-4">
             {group.label && (
-              <div className="px-3 mb-1" style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                {group.label}
-              </div>
+              mini
+                ? <div className="mx-2 my-3" style={{ borderTop: '1px solid var(--border)' }} />
+                : (
+                  <div className="px-3 mb-1" style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                    {group.label}
+                  </div>
+                )
             )}
             <div className="space-y-0.5">
               {group.items.map(({ href, label, icon: Icon, badge }) => {
                 const active = pathname === href || (href !== '/coming-soon' && pathname.startsWith(href + '/'))
                 return (
                   <Link key={label} href={href} onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                    title={mini ? label : undefined}
+                    className={`flex items-center ${mini ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg text-sm font-medium transition-all`}
                     style={{ background: active ? 'var(--accent)' : 'transparent', color: active ? 'white' : 'var(--text-secondary)' }}>
-                    <Icon size={16} style={{ flexShrink: 0 }} />
-                    <span className="flex-1">{label}</span>
-                    {badge === 'ai' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>}
-                    {badge === 'book' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>}
-                    {badge === 'pro' && !isPremium && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)', lineHeight: '16px' }}>Pro</span>}
+                    <Icon size={mini ? 18 : 16} style={{ flexShrink: 0 }} />
+                    {!mini && <span className="flex-1">{label}</span>}
+                    {!mini && badge === 'ai' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>}
+                    {!mini && badge === 'book' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>}
+                    {!mini && badge === 'pro' && !isPremium && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)', lineHeight: '16px' }}>Pro</span>}
                   </Link>
                 )
               })}
@@ -518,13 +539,15 @@ export function Sidebar() {
             <button
               type="button"
               onClick={() => { setDropdownOpen(o => !o); setEditingName(false) }}
-              className="flex items-center gap-3 w-full rounded-xl px-2 py-2 -mx-2 transition-colors hover:opacity-80"
+              title={mini ? displayName : undefined}
+              className={`flex items-center ${mini ? 'justify-center px-0' : 'gap-3 px-2'} w-full rounded-xl py-2 -mx-2 transition-colors hover:opacity-80`}
               style={{ background: dropdownOpen ? 'rgba(99,102,241,0.08)' : 'transparent' }}
             >
               <div className="relative shrink-0">
                 <div className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center text-sm font-bold text-white"
                   style={{ background: 'var(--accent)' }}>
                   {avatarUrl
+                    // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
                     : avatarLetter}
                 </div>
@@ -550,32 +573,43 @@ export function Sidebar() {
                   </span>
                 )}
               </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{displayName}</div>
-                <div className="text-xs mt-0.5">
-                  {isPremium ? (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold"
-                      style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
-                      <CheckCircle size={9} /> {t('nav.premiumBadge')}
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
-                      <Zap size={9} /> {t('nav.freePlan')}
-                    </span>
-                  )}
+              {!mini && (
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{displayName}</div>
+                  <div className="text-xs mt-0.5">
+                    {isPremium ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold"
+                        style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
+                        <CheckCircle size={9} /> {t('nav.premiumBadge')}
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+                        <Zap size={9} /> {t('nav.freePlan')}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </button>
           </div>
         )}
 
         {/* Upgrade button — free users only */}
         {!isPremium && (
-          <button type="button" onClick={() => setUpgradeOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mt-3 transition-all hover:opacity-90 active:scale-95"
-            style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}>
-            <Crown size={15} /> {t('common.upgradeToPremium')}
-          </button>
+          mini ? (
+            <button type="button" onClick={() => setUpgradeOpen(true)}
+              title={t('common.upgradeToPremium')}
+              className="mx-auto w-10 h-10 rounded-full flex items-center justify-center mt-3 transition-transform hover:scale-105 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}>
+              <Crown size={16} className="text-white" />
+            </button>
+          ) : (
+            <button type="button" onClick={() => setUpgradeOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white mt-3 transition-all hover:opacity-90 active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 0 16px rgba(245,158,11,0.35)' }}>
+              <Crown size={15} /> {t('common.upgradeToPremium')}
+            </button>
+          )
         )}
       </div>
     </div>
@@ -583,9 +617,28 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar (collapsed holatiga hurmat qiladi) */}
       <div className="hidden md:block fixed top-0 left-0 h-full z-40">
-        {sidebarContent}
+        {renderSidebar(collapsed)}
+        {/* Chevron toggle -- sidebarning o'ng chetida chiqib turadi */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={collapsed ? 'Yoyish' : 'Yopish'}
+          title={collapsed ? 'Yoyish' : 'Yopish'}
+          className="absolute w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          style={{
+            top: 100,
+            right: -12,
+            background: 'var(--bg-card)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+            zIndex: 50,
+          }}
+        >
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
       </div>
 
       {/* Mobile hamburger */}
@@ -595,7 +648,8 @@ export function Sidebar() {
         {mobileOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer -- doim to'liq matn bilan ochiladi
+          (mobile'da collapse rejimidan foyda yo'q) */}
       <AnimatePresence>
         {mobileOpen && (
           <>
@@ -605,7 +659,7 @@ export function Sidebar() {
             <motion.div className="fixed top-0 left-0 h-full z-50 md:hidden"
               initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}>
-              {sidebarContent}
+              {renderSidebar(false)}
             </motion.div>
           </>
         )}
