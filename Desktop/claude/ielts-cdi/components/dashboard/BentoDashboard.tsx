@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import {
   BookOpen, Headphones, Crown, Star, TrendingUp, ArrowRight,
-  Gamepad2, Keyboard, Mic, Video,
+  Gamepad2, Keyboard, Mic, Video, Sparkles, Lock,
 } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { getBandColor } from '@/lib/utils/bandScore'
@@ -194,9 +194,59 @@ export function BentoDashboard({
         <ProgressBar done={listeningDone} total={counts.listeningTotal} />
       </Link>
 
-      {/* ── Study plan + leaderboard, side by side ── */}
-      <div className="lg:col-span-6 p-5 md:p-6 transition-colors" style={tileStyle}>
-        <StudyPlanWidget />
+      {/* ── Study plan (premium) yoki promo (free) + leaderboard ── */}
+      <div
+        className="lg:col-span-6 p-5 md:p-6 transition-colors"
+        style={{
+          ...tileStyle,
+          background: isPremium
+            ? tileStyle.background
+            : 'linear-gradient(135deg, rgba(168,85,247,0.10), rgba(236,72,153,0.06) 60%, var(--bg-card))',
+          borderColor: isPremium ? undefined : 'rgba(168,85,247,0.30)',
+        }}
+      >
+        {isPremium ? (
+          <StudyPlanWidget />
+        ) : (
+          <div className="flex flex-col h-full">
+            <div className="flex items-start gap-3 mb-4">
+              <div
+                className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.30)' }}
+              >
+                <Sparkles size={22} style={{ color: '#c084fc' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Shaxsiy Study Plan
+                  </h2>
+                  <Lock size={13} style={{ color: 'var(--text-muted)' }} />
+                </div>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Premium&apos;da har kuni sizga moslashtirilgan reja
+                </p>
+              </div>
+            </div>
+
+            <ul className="flex-1 space-y-2 text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+              {['Har kuni yangilanadigan AI reja', 'Zaif tomonlarga qaratilgan mashqlar', 'Streak va bonuslar tizimi'].map(item => (
+                <li key={item} className="flex items-center gap-2">
+                  <span style={{ color: '#22c55e' }}>✓</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Link
+              href="/premium"
+              className="inline-flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
+            >
+              <Crown size={15} /> Premium&apos;ga o&apos;tish
+            </Link>
+          </div>
+        )}
       </div>
       <div className="lg:col-span-6 p-5 md:p-6 transition-colors" style={tileStyle}>
         <LeaderboardWidget />
