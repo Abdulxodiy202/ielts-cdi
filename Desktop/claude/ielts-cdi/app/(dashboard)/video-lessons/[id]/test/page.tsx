@@ -12,13 +12,15 @@ import { grantLeaderboardStars } from '@/lib/utils/leaderboard'
 import { bumpPlanProgressAndCheck } from '@/lib/utils/studyPlan'
 import { PlanCompletedToast } from '@/components/PlanCompletedToast'
 
-// Per-video 30-question multiple-choice test. Flow mirrors
+// Per-video 10-question multiple-choice test. Flow mirrors
 // /articles/[id]/test: no intro screen, straight into Q1, no timer,
 // no auto-submit. Result upsert keeps best_score/best_stars monotonic;
 // last_score/last_stars/attempts always refresh. RLS on
 // video_test_results restricts writes to auth.uid() = user_id.
+// Star mapping via calcStarsFromScore(correct, 10): 10->5, 9->4, 8->3,
+// 7->2, 6->1, <6->0.
 
-const TOTAL_QUESTIONS = 30
+const TOTAL_QUESTIONS = 10
 type Option = 'A' | 'B' | 'C' | 'D'
 
 interface Question {
@@ -80,7 +82,7 @@ export default function VideoTestPage() {
       setPreviousBest((bestRes.data as BestResult | null) ?? null)
 
       const qs = (questionsRes.data ?? []) as Question[]
-      // Test needs 30 rows; anything less means admin hasn't finished
+      // Test needs 10 rows; anything less means admin hasn't finished
       // seeding, so show a "coming soon" fallback.
       if (qs.length < TOTAL_QUESTIONS) {
         setPhase('unavailable')

@@ -13,14 +13,16 @@ import { bumpPlanProgressAndCheck } from '@/lib/utils/studyPlan'
 import { fireCelebrationConfetti } from '@/lib/confetti'
 import { PlanCompletedToast } from '@/components/PlanCompletedToast'
 
-// Per-article 30-question multiple-choice test. Flow: quiz (one question
+// Per-article 10-question multiple-choice test. Flow: quiz (one question
 // at a time, no timer, no auto-submit) -> result. No intro screen -- the
 // hub's "Test ishlash" button lands the user directly on Q1. Result
 // upsert keeps best_score/best_stars monotonic while
 // last_score/last_stars/attempts always refresh. RLS on
 // article_test_results already restricts writes to auth.uid() = user_id.
+// Star mapping via calcStarsFromScore(correct, 10): 10->5, 9->4, 8->3,
+// 7->2, 6->1, <6->0.
 
-const TOTAL_QUESTIONS = 30
+const TOTAL_QUESTIONS = 10
 type Option = 'A' | 'B' | 'C' | 'D'
 
 interface Question {
@@ -96,7 +98,7 @@ export default function ArticleTestPage() {
       )
 
       const qs = (questionsRes.data ?? []) as Question[]
-      // Test needs exactly 30 rows; anything less means admin hasn't
+      // Test needs exactly 10 rows; anything less means admin hasn't
       // finished seeding, so show a friendly "coming soon" fallback.
       if (qs.length < TOTAL_QUESTIONS) {
         setPhase('unavailable')
