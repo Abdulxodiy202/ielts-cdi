@@ -1,0 +1,206 @@
+﻿D:\claude\ielts-cdi\app\(dashboard)\articles\[id]\test\page.tsx:440: tugagach fade-in bilan chiqadi (showResultTail). Tail
+D:\claude\ielts-cdi\app\(dashboard)\articles\[id]\page.tsx:205: chunki Tailwind typography plugin qo'shilmagan va
+D:\claude\ielts-cdi\app\(dashboard)\articles\[id]\page.tsx:206: dark-only palette bilan matn kontrasti barqaror kerak. */}
+D:\claude\ielts-cdi\app\(dashboard)\articles\[id]\page.tsx:310: mavjud bo'lsa ko'rinadi. Kichik italik matn, yangi tabda
+D:\claude\ielts-cdi\app\(dashboard)\articles\page.tsx:190: Topilgan articlelar: {filteredArticles.length}
+D:\claude\ielts-cdi\app\(dashboard)\articles\page.tsx:198: Bu filter bo&apos;yicha article topilmadi
+D:\claude\ielts-cdi\app\(dashboard)\books\[id]\page.tsx:93: o'zining flip-book UI'sida. Eski qatorlar source_type
+D:\claude\ielts-cdi\app\(dashboard)\books\[id]\page.tsx:94: NULL bo'lishi mumkin -- default 'heyzine' fallback. */}
+D:\claude\ielts-cdi\app\(dashboard)\dashboard\study-plan\page.tsx:37: {/* Mock content -- foydali ekan ko'rinishi uchun blur qilingan */}
+D:\claude\ielts-cdi\app\(dashboard)\video-lessons\page.tsx:119: {/* Subcategory tab qatori -- URL query bilan sinxron */}
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:38: const LEVELS     = ['Barchasi', 'Beginner', 'Elementary', 'Intermediate', 'Advanced']
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:39: const CATEGORIES = ['Barchasi', 'Addition', 'Contrast', 'Cause/Effect', 'Sequence', 'Emphasis', 'Example', 'Concession']
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:62: const [levelTab,   setLevelTab]   = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:63: const [catTab,     setCatTab]     = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:132: if (levelTab !== 'Barchasi') list = list.filter(w => w.level.toLowerCase() === levelTab.toLowerCase())
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:133: if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\linking-words\page.tsx:220: const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:46: const LEVELS     = ['Barchasi', 'A2', 'B1', 'B2', 'C1']
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:48: 'Barchasi', 'Science', 'Environment', 'Health', 'Technology',
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:73: const [levelTab, setLevelTab] = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:74: const [catTab,   setCatTab]   = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:152: if (levelTab !== 'Barchasi') list = list.filter(w => w.level === levelTab)
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:153: if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\reading\page.tsx:252: const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:34: const LEVELS     = ['Barchasi', 'Beginner', 'Elementary', 'Intermediate', 'Advanced']
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:35: const CATEGORIES = ['Barchasi', 'Task 1', 'Task 2']
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:58: const [levelTab,   setLevelTab]   = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:59: const [catTab,     setCatTab]     = useState('Barchasi')
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:124: if (levelTab !== 'Barchasi') list = list.filter(w => w.level.toLowerCase() === levelTab.toLowerCase())
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:125: if (catTab   !== 'Barchasi') list = list.filter(w => w.category === catTab)
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:218: const cc     = cat !== 'Barchasi' ? CAT_COLORS[cat] : null
+D:\claude\ielts-cdi\app\(dashboard)\vocabulary\writing\page.tsx:220: const n      = cat === 'Barchasi' ? words.length : (catCounts[cat] ?? 0)
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:9: Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:403: { key: 'all',     label: 'Barchasi', icon: null },
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:436: <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:735: } catch { /* offline yoki muvaqqat xato -- e'tibor bermaymiz */ }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:844: { key: 'all',     label: 'Barchasi',  icon: null },
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:866: placeholder="Ism yoki email qidirish..."
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1300: <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Barcha foydalanuvchilarga bir vaqtda yuboriladi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1450: if (today < c.valid_from) return { label: 'Hali boshlanmagan', color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1478: setFormError("Foydalanuvchi email topilmadi. Avval emailni tekshiring.")
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1490: if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1543: <p className="font-bold text-sm mb-1" style={{ color: 'var(--warning)' }}>Jadval topilmadi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1595: <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Boshlanish sanasi</label>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1651: {emailLookupState === 'loading' ? '...' : 'Tekshir'}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1655: <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>✓ Foydalanuvchi topildi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1686: <span>Kod</span><span>Tur</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Ishlatildi</span><span>Holat</span><span className="text-right">Amal</span>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1854: <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1875: Eski userlar uchun kod generatsiya qilish
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:1894: <p style={{ color: 'var(--text-muted)' }}>Foydalanuvchilar topilmadi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2047: if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Saqlashda xato') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2052: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2113: setMessage({ ok: false, text: e.error ?? 'Yaratishda xato' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2136: <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Maqola tanlang</label>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2138: <option value="">— Maqola tanlang —</option>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2251: {/* Manba bo'limi -- ixtiyoriy attribution.
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2252: Ikkalasi ham to'ldirilishi yoki ikkalasi ham bo'sh
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2253: bo'lishi kerak; validatsiya handleSave'da. */}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2328: Yuqoridan maqola tanlang
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2437: {/* Manba (ixtiyoriy) -- edit form bilan bir xil naqsh */}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2676: setMessage({ ok: false, text: 'PDF fayl tanlanishi shart' }); return
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2710: if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Saqlashda xato') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2717: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2738: if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xato') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2742: if (!upRes.ok) throw new Error(`Storage xatosi ${upRes.status}`)
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2754: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2770: if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2775: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2784: if (!res.ok && res.status !== 204) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2788: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2798: setMessage({ ok: false, text: 'PDF fayl tanlanishi shart' }); return
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2835: setMessage({ ok: false, text: e.error ?? 'Yaratishda xato' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2838: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2860: <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2863: <option value="">— Kitob tanlang —</option>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2898: {/* Kitob manbasi -- toggle + shartli input (Heyzine URL yoki PDF dropzone) */}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2932: {/* Mavjud PDF ma'lumoti -- almashtirish uchun signalka */}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2935: Joriy fayl mavjud. Yangi tanlash yuklab, eskisi o&apos;chiriladi.
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2969: PDF faylni bu yerga tashlang yoki bosing
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:2998: <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun o&apos;qish kerak)</label>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3002: placeholder="Bu kitob IELTS Reading uchun ideal, chunki..."
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3161: Yuqoridan kitob tanlang
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3200: {/* Kitob manbasi toggle -- Heyzine yoki PDF */}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3266: PDF faylni bu yerga tashlang yoki bosing
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3408: <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ feedback jadvali topilmadi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3637: if (!form.title.trim() || form.title.trim().length < 3) { setFormError("Nomi kamida 3 belgidan iborat bo'lishi kerak"); return false }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3639: if (!Number.isInteger(form.order_index) || form.order_index < 0) { setFormError("Tartib raqami musbat butun son bo'lishi kerak"); return false }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3652: if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3667: if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3695: <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ background_music jadvali topilmadi</p>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3884: ielts: 'IELTS darslari',
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3885: self_improvement: "O'z-o'zini rivojlantirish",
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3948: if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:3968: if (isUpload && !videoFile && !modal.data.video_url) { setFormError('Video fayl tanlanishi shart'); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4001: if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4006: setFormError(e instanceof Error ? e.message : 'Xatolik')
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4053: { key: 'all',              label: `Barchasi (${videos.length})` },
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4054: { key: 'ielts',            label: `IELTS darslari (${ieltsCount})` },
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4055: { key: 'self_improvement', label: `O'z-o'zini rivojlantirish (${selfCount})` },
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4111: {isIelts ? 'IELTS' : "O'z-o'zini riv."}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4234: ⚠️ Supabase Storage odatiy holda fayl hajmini cheklaydi. Katta fayllar uchun Supabase Dashboard → Project Settings → Storage → File upload size limit ni 5GB gacha oshiring.
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4270: <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, WebM yoki MOV tanlang</span>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4353: placeholder="Bu dars IELTS Writing uchun foydali, chunki..."
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4442: if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4443: if (wc < 50) { setFormError("Matn kamida 50 so'zdan iborat bo'lishi kerak"); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4455: if (!res.ok) { const e = await res.json().catch(() => ({})); setFormError(e.error ?? 'Xatolik yuz berdi'); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4612: placeholder="Essayning to'liq matnini yozing yoki yopishtiring"
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4740: if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4825: setTranscriptFileMsg("Bu fayl matn emas. Boshqa fayl sinab ko'ring yoki qo'lda yozing.")
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4829: if (!text.trim()) { setTranscriptFileMsg("Fayldan matn olinmadi. Boshqa fayl tanlang yoki qo'lda yozing."); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4832: setTranscriptFileMsg(`Fayl yuklandi (${wc} so'z)`)
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4835: setTranscriptFileMsg("Faylni o'qib bo'lmadi. Boshqa fayl sinab ko'ring.")
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4844: if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4845: if (wordCount < 50) { setFormError("Transkript kamida 50 so'zdan iborat bo'lishi kerak"); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4879: if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4884: setFormError(e instanceof Error ? e.message : 'Xatolik')
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:4928: <span>#</span><span>Rasm</span><span>Sarlavha</span><span>Davomiylik</span><span>Turi</span><span>Holat</span><span className="text-right">Amal</span>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:5088: <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP3, M4A, WAV yoki OGG tanlang</span>
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:5131: : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, PDF)</span>}
+D:\claude\ielts-cdi\app\admin\AdminClient.tsx:5202: { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
+D:\claude\ielts-cdi\app\api\admin\linking-words\route.ts:32: return Response.json({ error: 'Barcha majburiy maydonlarni to\'ldiring' }, { status: 400 })
+D:\claude\ielts-cdi\app\api\admin\payments\[id]\route.ts:40: return Response.json({ error: "To'lov so'rovi topilmadi" }, { status: 404 })
+D:\claude\ielts-cdi\app\api\admin\promo-codes\route.ts:109: return Response.json({ error: "Chegirma 1-100 oralig'ida bo'lishi kerak" }, { status: 400 })
+D:\claude\ielts-cdi\app\api\admin\users\[id]\reset-password\route.ts:26: return NextResponse.json({ error: 'Foydalanuvchi topilmadi' }, { status: 404 })
+D:\claude\ielts-cdi\app\api\admin\writing-collocations\route.ts:32: return Response.json({ error: "Barcha majburiy maydonlarni to'ldiring" }, { status: 400 })
+D:\claude\ielts-cdi\app\api\payment\route.ts:142: `💵 Summa: ${amount} UZS${promoCode ? ` (chegirma bilan, asl: ${originalAmount ?? amount} UZS)` : ''}\n` +
+D:\claude\ielts-cdi\app\api\profile\avatar\route.ts:26: if (!ALLOWED.includes(file.type)) return NextResponse.json({ error: 'Faqat JPEG, PNG, WebP yoki GIF' }, { status: 400 })
+D:\claude\ielts-cdi\app\api\promo\validate\route.ts:25: return Response.json({ valid: false, error: 'Promokod topilmadi' }, { status: 200 })
+D:\claude\ielts-cdi\app\api\promo\validate\route.ts:41: return Response.json({ valid: false, error: 'Bu kod siz uchun emas' }, { status: 200 })
+D:\claude\ielts-cdi\app\api\telegram-webhook\route.ts:69: await answerCallbackQuery(callbackQueryId, 'To\'lov topilmadi')
+D:\claude\ielts-cdi\app\premium\page.tsx:10: BookOpen, Target, Bot, BarChart3,
+D:\claude\ielts-cdi\app\premium\page.tsx:39: "Barcha 10 ta Script Practice mashqlari",
+D:\claude\ielts-cdi\app\premium\page.tsx:40: 'Barcha 100 ta Vocabulary level (Games)',
+D:\claude\ielts-cdi\app\premium\page.tsx:41: 'Barcha 10 ta Video Darslar',
+D:\claude\ielts-cdi\app\premium\page.tsx:42: "Barcha 30+ Article va Quiz",
+D:\claude\ielts-cdi\app\premium\page.tsx:62: 'Kunlik va haftalik rejim tanlash',
+D:\claude\ielts-cdi\app\premium\page.tsx:81: 'Writing uchun AI baholash va band score',
+D:\claude\ielts-cdi\app\premium\page.tsx:82: 'Speaking uchun AI baholash',
+D:\claude\ielts-cdi\app\premium\page.tsx:94: icon: BarChart3,
+D:\claude\ielts-cdi\app\premium\page.tsx:96: title: { uz: "Qo'shimcha", en: 'Extras' },
+D:\claude\ielts-cdi\app\premium\page.tsx:206: {/* Xususiyatlar -- kategoriyalar bo'yicha */}
+D:\claude\ielts-cdi\app\page.tsx:24: to'q (#0a0621) Silk bilan yumshoq aralashadi, WebGL yuklashda
+D:\claude\ielts-cdi\app\page.tsx:25: xato bo'lsa ham qora emas indigo tush. */}
+D:\claude\ielts-cdi\app\page.tsx:34: {/* Barcha content Silk ustida -- relative + z-10 stacking context */}
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:180: throw new Error(err.error ?? 'Xatolik')
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:186: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:197: Listening Test tanlang
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:204: <option value="">— Test tanlang —</option>
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:214: Yuqoridan listening test tanlang
+D:\claude\ielts-cdi\components\admin\ListeningTestEditor.tsx:277: Audio fayl tanlanmagan
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:101: completed: { label: 'Yakunlangan',      bg: 'rgba(100,116,139,0.12)',color: 'var(--text-muted)',border: 'rgba(100,116,139,0.3)' },
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:276: Tanlangan
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:349: : <><Upload size={14} /> Fayl tanlang</>}
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:794: ? '❌ Foydalanuvchi vaqtida kirmadi (test boshlanganidan 5 daqiqa o\'tdi)'
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:830: title="Kattalashtirish uchun bosing"
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1003: setMessage({ ok: false, text: err.error ?? 'Yuklash xatosi' })
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1005: } catch { setMessage({ ok: false, text: 'Tarmoq xatosi' }) }
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1029: if (!res.ok) throw new Error(data.error ?? 'Xatolik')
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1038: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1089: <Calendar size={12} /> Sanani tanlang
+D:\claude\ielts-cdi\components\admin\MockScheduleEditor.tsx:1121: <option value="completed">Yakunlangan</option>
+D:\claude\ielts-cdi\components\admin\ReadingTestEditor.tsx:141: throw new Error(err.error ?? 'Xatolik')
+D:\claude\ielts-cdi\components\admin\ReadingTestEditor.tsx:146: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+D:\claude\ielts-cdi\components\admin\ReadingTestEditor.tsx:157: Reading Test tanlang
+D:\claude\ielts-cdi\components\admin\ReadingTestEditor.tsx:164: <option value="">— Test tanlang —</option>
+D:\claude\ielts-cdi\components\admin\ReadingTestEditor.tsx:174: Yuqoridan reading test tanlang
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:65: throw new Error(err.error ?? 'URL olishda xato')
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:77: throw new Error(`Storage xatosi ${uploadRes.status}${text ? ': ' + text.slice(0, 120) : ''}`)
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:88: throw new Error(err.error ?? 'DB yangilashda xato')
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:95: setMessage({ ok: true, text: 'Fayl muvaffaqiyatli yuklandi!' })
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:97: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:115: throw new Error(err.error ?? "O'chirish xatosi")
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:120: setMessage({ ok: true, text: "Fayl muvaffaqiyatli o'chirildi!" })
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:122: setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:133: {type === 'reading' ? 'Reading' : 'Listening'} Test tanlang
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:140: <option value="">— Test tanlang —</option>
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:226: {currentFileName ? 'Yangi fayl bilan almashtirish:' : 'Fayl yuklash:'}
+D:\claude\ielts-cdi\components\admin\TestFileUploader.tsx:324: Yuqoridan test raqamini tanlang
+D:\claude\ielts-cdi\components\articles\TodaysPicks.tsx:35: {/* Chap: katta karta -- endi tashqi ustun bo'yicha to'liq */}
+D:\claude\ielts-cdi\components\dashboard\BentoDashboard.tsx:198: {/* Premium/free farq vaqtincha olib tashlandi; tayyor bo'lganda
+D:\claude\ielts-cdi\components\dashboard\BentoDashboard.tsx:199: isPremium branchi bilan asl ko'rinishga qaytariladi. */}
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:72: Boshlash <ChevronRight size={13} />
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:231: Bepul haftalik reja yakunlandi
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:235: Siz platformadagi barcha bepul materiallarni bir hafta davomida muvaffaqiyatli
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:244: "30+ qo'shimcha Reading va Listening testlari (bir oyga yetadi)",
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:245: 'Barcha 100 ta Vocabulary levellari',
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:246: "Barcha Script Practice va Article materiallari",
+D:\claude\ielts-cdi\components\dashboard\DailyFreePlanView.tsx:247: 'Writing va Speaking uchun AI baholash',
+D:\claude\ielts-cdi\components\dashboard\StudyPlanWidget.tsx:136: Bu hafta uchun vazifalar hali belgilanmagan.
+D:\claude\ielts-cdi\components\landing\HeroClient.tsx:37: {/* 1. Sarlavha -- SplitText remount qilinishi uchun til bo'yicha key */}
+D:\claude\ielts-cdi\components\landing\HeroClient.tsx:53: Chip fon opacity 100 bilan matn kontrasti aniq. */}
+D:\claude\ielts-cdi\components\layout\Sidebar.tsx:450: {/* Mini rejimda kompakt padding + flex items-center bilan avatar
+D:\claude\ielts-cdi\components\layout\Sidebar.tsx:464: juda tor bo'lib qoladi -- shu bois o'ng tomonga chiqamiz.
+D:\claude\ielts-cdi\components\layout\Sidebar.tsx:845: {/* Mobile drawer -- doim to'liq matn bilan ochiladi
+D:\claude\ielts-cdi\components\mock\MockTestFlow.tsx:296: - Attempts autoplay; if blocked → shows prominent "Audio boshlash" button
+D:\claude\ielts-cdi\components\test\ListeningTestClient.tsx:5: import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2, LogOut } from 'lucide-react'
+D:\claude\ielts-cdi\components\test\ListeningTestClient.tsx:254: <BarChart2 size={14} />
+D:\claude\ielts-cdi\components\test\ReadingTestClient.tsx:5: import { Save, Send, AlertTriangle, ArrowLeft, Trophy, CheckCircle, XCircle, BarChart2, LogOut } from 'lucide-react'
+D:\claude\ielts-cdi\components\test\ReadingTestClient.tsx:300: <BarChart2 size={14} />
+D:\claude\ielts-cdi\components\test\ResultModal.tsx:4: import { Trophy, RotateCcw, BarChart2, CheckCircle, XCircle } from 'lucide-react'
+D:\claude\ielts-cdi\components\test\ResultModal.tsx:99: <BarChart2 size={14} /> My Results
+D:\claude\ielts-cdi\components\test\TestListClient.tsx:136: {/* Stars + Band chip -- faqat completed bo'lsa */}
+D:\claude\ielts-cdi\components\MusicPlayer.tsx:38: /* iframe hali yuklanmagan yoki cross-origin xato -- yutamiz */
+D:\claude\ielts-cdi\components\MusicPlayer.tsx:87: .catch(() => { /* offline -- player render bo'lmaydi */ })
+D:\claude\ielts-cdi\components\PremiumGuard.tsx:109: Bu material Premium foydalanuvchilar uchun.
+D:\claude\ielts-cdi\components\PremiumGuard.tsx:110: Premium&apos;ga o&apos;tib barcha materiallardan cheklovsiz foydalaning.

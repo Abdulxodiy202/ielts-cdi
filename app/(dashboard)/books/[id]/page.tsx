@@ -1,0 +1,109 @@
+export const dynamic = 'force-dynamic'
+
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { redirect, notFound } from 'next/navigation'
+import { isActivePremium } from '@/lib/utils/premium'
+import Link from 'next/link'
+import { BackButton } from '@/components/ui/BackButton'
+import { PremiumLockScreen } from '@/components/ui/PremiumLockScreen'
+import MusicPlayer from '@/components/MusicPlayer'
+import { isBookCategory } from '@/lib/utils/bookCategories'
+import CategoryBooksView from './CategoryBooksView'
+
+interface Props {
+  params: Promise<{ id: string }>
+}
+
+export default async function BookPage({ params }: Props) {
+  const { id } = await params
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  // The [id] segment covers TWO cases: a book UUID (this file's original
+  // purpose -- the reader) OR one of the four category slugs (introduced
+  // by the /books hub redesign). Book IDs are UUIDs; category slugs are
+  // one of a fixed 4-value string set, so there's no overlap. Category
+  // slugs get the client-rendered book grid; everything else falls
+  // through to the reader below (which 404s on unknown UUIDs, unchanged).
+  if (isBookCategory(id)) {
+    return <CategoryBooksView category={id} />
+  }
+
+  const admin = createAdminClient()
+  const [{ data: book }, profileRes] = await Promise.all([
+    admin.from('books')
+      .select('id, title, author, heyzine_url, source_type, pdf_url, is_premium, is_published')
+      .eq('id', id)
+      .eq('is_published', true)
+      .single(),
+    supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
+  ])
+
+  if (!book) notFound()
+
+  const isPremium = isActivePremium(profileRes.data)
+  const locked = book.is_premium && !isPremium
+
+  if (locked) return <PremiumLockScreen descKey="premium.bookDesc" />
+
+  return (
+    <div className="fixed inset-0 z-[100] flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      {/* Slim top bar — 48px, same pattern as ReadingTestClient */}
+      <div
+        className="flex items-center gap-3 px-4 shrink-0"
+        style={{
+          height: 48,
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <BackButton href="/books" />
+        <h1
+          className="font-bold text-sm sm:text-base truncate"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {book.title}
+        </h1>
+        {book.author && (
+          <span
+            className="text-xs hidden sm:block shrink-0"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {book.author}
+          </span>
+        )}
+        {book.is_premium && (
+          <span
+            className="shrink-0 text-xs font-bold px-2.5 py-0.5 rounded-full"
+            style={{
+              background: 'rgba(245,158,11,0.12)',
+              color: '#f59e0b',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}
+          >
+            Premium
+          </span>
+        )}
+      </div>
+
+      {/* Manba turiga qarab iframe -- PDF browser'ning ichki
+          viewer'ida ochiladi (Chrome/Firefox default). Heyzine
+          o'zining flip-book UI'sida. Eski qatorlar source_type
+          NULL bo'lishi mumkin -- default 'heyzine' fallback. */}
+      <iframe
+        src={(book.source_type === 'pdf' ? book.pdf_url : book.heyzine_url) ?? ''}
+        title={book.title}
+        allowFullScreen
+        style={{
+          flex: 1,
+          width: '100%',
+          border: 'none',
+          display: 'block',
+        }}
+      />
+      <MusicPlayer autoPlay defaultMinimized />
+    </div>
+  )
+}

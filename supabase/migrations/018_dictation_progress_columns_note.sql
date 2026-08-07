@@ -1,0 +1,9 @@
+-- NOTE (no-op, documentation only): dictation_progress's real column set was
+-- verified directly against production via the service-role client while
+-- fixing /api/dictation/progress, which had been silently failing on every
+-- save because it wrote to a `completed_at` column that doesn't exist.
+--
+-- Actual existing columns: id, user_id, dictation_id, best_accuracy, stars,
+-- is_completed, attempts, last_answer, accuracy_percent, updated_at.
+-- There is no completed_at or created_at column on this table -- do not
+-- reintroduce them in the API route without adding them here first.

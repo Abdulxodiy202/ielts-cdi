@@ -1,0 +1,97 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isActivePremium } from '@/lib/utils/premium'
+
+import { isAdmin } from '@/lib/admin-config'
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const admin = createAdminClient()
+  const [articleRes, profileRes] = await Promise.all([
+    admin
+      .from('articles')
+      .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, difficulty, category, read_time, description, content, source_text, source_url, has_test, created_at')
+      .eq('id', id)
+      .eq('is_published', true)
+      .single(),
+    supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
+  ])
+
+  if (articleRes.error) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Free user asking for premium content -> strip file_url so DevTools
+  // can't just read the PDF URL from the response. Metadata (title,
+  // cover) still returns so the lock screen can render nicely.
+  const article = articleRes.data
+  if (article.is_premium && !isActivePremium(profileRes.data)) {
+    return NextResponse.json({ ...article, file_url: null })
+  }
+  return NextResponse.json(article)
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAdmin(user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+  const body = await req.json()
+  const updates: Record<string, unknown> = {}
+  if (body.title           !== undefined) updates.title           = String(body.title).trim()
+  if (body.order_index     !== undefined) updates.order_index     = Number(body.order_index)
+  if (body.is_premium      !== undefined) updates.is_premium      = Boolean(body.is_premium)
+  if (body.is_published    !== undefined) updates.is_published    = Boolean(body.is_published)
+  if (body.file_url        !== undefined) updates.file_url        = body.file_url
+  if (body.cover_image_url !== undefined) updates.cover_image_url = body.cover_image_url
+  // Crackd-uslub yangi maydonlar. Bo'sh string -> null (dropdown reset
+  // yoki description clear qilingan holat).
+  if (body.category        !== undefined) updates.category        = body.category || null
+  if (body.difficulty      !== undefined) updates.difficulty      = body.difficulty || null
+  if (body.read_time       !== undefined) updates.read_time       = body.read_time === null || body.read_time === '' ? null : Number(body.read_time)
+  if (body.description     !== undefined) updates.description     = body.description ?? null
+  if (body.content         !== undefined) updates.content         = body.content ?? null
+  if (body.source_text     !== undefined) updates.source_text     = body.source_text ?? null
+  if (body.source_url      !== undefined) updates.source_url      = body.source_url ?? null
+  if (body.has_test        !== undefined) updates.has_test        = Boolean(body.has_test)
+  if (!Object.keys(updates).length) return NextResponse.json({ error: 'No fields' }, { status: 400 })
+  console.log('[articles PATCH]', id, updates)
+
+  const admin = createAdminClient()
+  const { data, error } = await admin
+    .from('articles')
+    .update(updates)
+    .eq('id', id)
+    .select('id, title, file_url, cover_image_url, is_premium, is_published, order_index, difficulty, category, read_time, description, content, source_text, source_url, has_test, created_at')
+    .single()
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data)
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isAdmin(user.email)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { id } = await params
+  const admin = createAdminClient()
+  const { error } = await admin.from('articles').delete().eq('id', id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return new NextResponse(null, { status: 204 })
+}

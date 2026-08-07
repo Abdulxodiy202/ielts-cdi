@@ -1,0 +1,5302 @@
+'use client'
+
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { toggleUserPremium } from '@/app/actions/admin'
+import {
+  CheckCircle, XCircle, Clock, ChevronDown, ChevronUp,
+  ExternalLink, RefreshCw, User, Mail, Phone, Crown,
+  Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
+  Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
+  Loader2, Upload, FileText, X, Music, Play, Keyboard,
+} from 'lucide-react'
+import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
+import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
+import { TestFileUploader } from '@/components/admin/TestFileUploader'
+import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
+import { usePresenceHeartbeat } from '@/lib/hooks/usePresenceHeartbeat'
+
+interface TestResult {
+  id: string
+  user_id: string
+  user_email: string
+  user_name: string
+  is_premium: boolean
+  test_id: string
+  test_title: string
+  test_type: string
+  score: number
+  band: number
+  time_taken: number | null
+  completed_at: string
+}
+
+interface PaymentRequest {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  user_phone: string
+  type: 'premium' | 'mock_booking'
+  amount: number
+  receipt_url: string
+  status: 'pending' | 'approved' | 'rejected'
+  meta: { booking_date?: string; time_slot?: string } | null
+  admin_note: string | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+interface Test {
+  id: string
+  type: string
+  title: string
+  order_number: number
+  file_url: string | null
+}
+
+interface AdminPaymentItem {
+  id: string
+  amount: number
+  status: string
+  type: string
+  created_at: string
+}
+
+interface AdminUser {
+  id: string
+  email: string
+  full_name: string | null
+  username: string | null
+  avatar_url: string | null
+  is_premium: boolean
+  premium_until: string | null
+  // Server-computed via isActivePremium so admin agrees with the user's
+  // own dashboard. Trust this for badges / filters / counts. The raw
+  // is_premium / premium_until fields are retained only so we can show
+  // a distinct "Premium (expired)" pill for legacy rows.
+  active_premium: boolean
+  premium_expired: boolean
+  payment_count: number
+  last_payment_date: string | null
+  payments: AdminPaymentItem[]
+  created_at: string
+  last_sign_in_at: string | null
+  // Presence heartbeat -- oxirgi 2 daqiqa ichida yangilangan bo'lsa
+  // user "online" hisoblanadi. usePresenceHeartbeat har 30s'da
+  // update_last_seen() RPC'ni chaqiradi.
+  last_seen_at: string | null
+}
+
+// Online chegara: 2 daqiqa. Heartbeat 30s'da bo'lgani uchun bir
+// ping o'tkazib yuborilsa ham bemalol quyilib qoladi.
+const ONLINE_WINDOW_MS = 2 * 60 * 1000
+function isOnline(lastSeenAt: string | null): boolean {
+  if (!lastSeenAt) return false
+  return Date.now() - new Date(lastSeenAt).getTime() < ONLINE_WINDOW_MS
+}
+
+interface Props {
+  initialPayments: PaymentRequest[]
+  tests: Test[]
+  initialSchedules: MockSchedule[]
+  initialResults: TestResult[]
+  initialUsers: AdminUser[]
+  initialPromoCodes: PromoCode[]
+  promoDbMissing?: boolean
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────── */
+function StatusBadge({ status }: { status: string }) {
+  const cfg = {
+    pending:  { label: 'Kutilmoqda', icon: <Clock size={12} />,       bg: 'rgba(245,158,11,0.15)',  color: 'var(--warning)', border: 'rgba(245,158,11,0.3)' },
+    approved: { label: 'Tasdiqlandi', icon: <CheckCircle size={12} />, bg: 'rgba(34,197,94,0.15)',   color: 'var(--success)', border: 'rgba(34,197,94,0.3)' },
+    rejected: { label: 'Rad etildi',  icon: <XCircle size={12} />,     bg: 'rgba(239,68,68,0.15)',   color: 'var(--error)',   border: 'rgba(239,68,68,0.3)' },
+  }[status] ?? { label: status, icon: null, bg: 'var(--bg-secondary)', color: 'var(--text-muted)', border: 'var(--border)' }
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
+      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}>
+      {cfg.icon}{cfg.label}
+    </span>
+  )
+}
+
+function TypeBadge({ type }: { type: string }) {
+  return type === 'premium' ? (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+      style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--premium)', border: '1px solid rgba(245,158,11,0.3)' }}>
+      <Crown size={11} /> Premium
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+      style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+      <Calendar size={11} /> Mock Test
+    </span>
+  )
+}
+
+/* ── Payments tab ────────────────────────────────────────────────────── */
+function PaymentsTab({ initialPayments }: { initialPayments: PaymentRequest[] }) {
+  const [payments, setPayments] = useState(initialPayments)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState<Record<string, boolean>>({})
+  const [refreshing, setRefreshing] = useState(false)
+
+  const pendingCount = payments.filter(p => p.status === 'pending').length
+  const today = new Date().toDateString()
+  const approvedToday = payments.filter(
+    p => p.status === 'approved' && p.reviewed_at && new Date(p.reviewed_at).toDateString() === today
+  ).length
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/payments')
+    if (res.ok) setPayments(await res.json())
+    setRefreshing(false)
+  }
+
+  const handleAction = async (id: string, action: 'approve' | 'reject') => {
+    setLoading(prev => ({ ...prev, [id]: true }))
+    const res = await fetch(`/api/admin/payments/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, admin_note: notes[id] || '' }),
+    })
+    if (res.ok) {
+      setPayments(prev => prev.map(p => p.id === id
+        ? { ...p, status: action === 'approve' ? 'approved' : 'rejected', reviewed_at: new Date().toISOString(), admin_note: notes[id] || null }
+        : p
+      ))
+      setExpandedId(null)
+    }
+    setLoading(prev => ({ ...prev, [id]: false }))
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="card p-4" style={{ border: '1px solid rgba(245,158,11,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--warning)' }}>{pendingCount}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Kutilayotgan</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(34,197,94,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--success)' }}>{approvedToday}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Bugun tasdiqlandi</div>
+        </div>
+        <div className="card p-4 hidden md:block">
+          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>{payments.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami so&apos;rovlar</div>
+        </div>
+      </div>
+
+      {/* Refresh */}
+      <div className="flex justify-end">
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      {/* List */}
+      {payments.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Clock size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali so&apos;rovlar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {payments.map(pr => {
+            const isExpanded = expandedId === pr.id
+            const isLoading = loading[pr.id]
+            return (
+              <div key={pr.id} className="card overflow-hidden"
+                style={{ border: pr.status === 'pending' ? '1px solid rgba(245,158,11,0.2)' : '1px solid var(--border)' }}>
+                <button className="w-full p-4 text-left" onClick={() => setExpandedId(isExpanded ? null : pr.id)}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div>
+                        <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{pr.user_name}</div>
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{pr.user_email}</div>
+                      </div>
+                      <TypeBadge type={pr.type} />
+                      <StatusBadge status={pr.status} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="font-bold text-sm" style={{ color: 'var(--accent)' }}>{formatPrice(pr.amount)}</div>
+                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatDate(pr.created_at)}</div>
+                      </div>
+                      {isExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
+                    </div>
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} style={{ overflow: 'hidden' }}>
+                      <div className="px-4 pb-4 pt-0" style={{ borderTop: '1px solid var(--border)' }}>
+                        <div className="grid md:grid-cols-2 gap-4 mt-4">
+                          <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--bg-secondary)' }}>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>
+                              Foydalanuvchi ma&apos;lumotlari
+                            </p>
+                            {[
+                              { Icon: User, val: pr.user_name },
+                              { Icon: Mail, val: pr.user_email },
+                              { Icon: Phone, val: pr.user_phone },
+                            ].map(({ Icon, val }) => (
+                              <div key={val} className="flex items-center gap-2 text-sm">
+                                <Icon size={13} style={{ color: 'var(--text-muted)' }} />
+                                <span style={{ color: 'var(--text-secondary)' }}>{val}</span>
+                              </div>
+                            ))}
+                            {pr.meta?.booking_date && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
+                                <span style={{ color: 'var(--text-secondary)' }}>
+                                  {pr.meta.booking_date} · {pr.meta.time_slot === '09:00' ? '09:00 AM' : '01:00 PM'}
+                                </span>
+                              </div>
+                            )}
+                            {pr.admin_note && (
+                              <div className="text-xs mt-2 p-2 rounded" style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                                📝 {pr.admin_note}
+                              </div>
+                            )}
+                          </div>
+
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'var(--text-muted)' }}>Chek rasmi</p>
+                            <a href={pr.receipt_url} target="_blank" rel="noopener noreferrer" className="block relative group rounded-xl overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={pr.receipt_url} alt="Receipt" className="w-full max-h-56 object-cover rounded-xl" />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all rounded-xl flex items-center justify-center">
+                                <ExternalLink size={20} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </a>
+                          </div>
+                        </div>
+
+                        {pr.status === 'pending' && (
+                          <div className="mt-4 space-y-3">
+                            <textarea className="input-field text-sm resize-none" rows={2} placeholder="Admin izohi (ixtiyoriy)"
+                              value={notes[pr.id] ?? ''} onChange={e => setNotes(prev => ({ ...prev, [pr.id]: e.target.value }))} />
+                            <div className="flex gap-3">
+                              <button onClick={() => handleAction(pr.id, 'approve')} disabled={isLoading}
+                                className="btn-primary flex-1 text-sm" style={{ background: 'var(--success)' }}>
+                                <CheckCircle size={14} />{isLoading ? 'Jarayonda...' : 'Tasdiqlash'}
+                              </button>
+                              <button onClick={() => handleAction(pr.id, 'reject')} disabled={isLoading}
+                                className="btn-outline flex-1 text-sm" style={{ color: 'var(--error)', borderColor: 'var(--error)' }}>
+                                <XCircle size={14} />{isLoading ? 'Jarayonda...' : 'Rad etish'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {pr.status !== 'pending' && pr.reviewed_at && (
+                          <p className="text-xs mt-4" style={{ color: 'var(--text-muted)' }}>
+                            Ko&apos;rib chiqilgan: {formatDate(pr.reviewed_at)}
+                          </p>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Results tab ─────────────────────────────────────────────────────── */
+function ResultsTab({ initialResults }: { initialResults: TestResult[] }) {
+  const [results, setResults] = useState(initialResults)
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'reading' | 'listening'>('reading')
+  const [premiumFilter, setPremiumFilter] = useState<'all' | 'premium' | 'free'>('all')
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/results')
+    if (res.ok) setResults(await res.json())
+    setRefreshing(false)
+  }
+
+  const bandColor = (band: number) => {
+    if (band >= 8) return 'var(--success)'
+    if (band >= 7) return '#3b82f6'
+    if (band >= 6) return 'var(--warning)'
+    if (band >= 5) return '#f97316'
+    return 'var(--error)'
+  }
+
+  // Apply filters
+  const filtered = results.filter(r => {
+    const matchType = r.test_type === typeFilter
+    const matchPremium =
+      premiumFilter === 'all' ? true :
+      premiumFilter === 'premium' ? r.is_premium :
+      !r.is_premium
+    return matchType && matchPremium
+  })
+
+  // Group by user_id
+  const userMap = new Map<string, { user_id: string; user_name: string; user_email: string; is_premium: boolean; tests: TestResult[] }>()
+  for (const r of filtered) {
+    if (!userMap.has(r.user_id)) {
+      userMap.set(r.user_id, {
+        user_id: r.user_id,
+        user_name: r.user_name,
+        user_email: r.user_email,
+        is_premium: r.is_premium,
+        tests: [],
+      })
+    }
+    userMap.get(r.user_id)!.tests.push(r)
+  }
+  const grouped = [...userMap.values()]
+
+  // Avatar initials
+  const initials = (name: string) => {
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+    return name.slice(0, 2).toUpperCase()
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* ── Filters row 1: type ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {(['reading', 'listening'] as const).map(t => (
+            <button
+              key={t}
+              onClick={() => { setTypeFilter(t); setExpandedUserId(null) }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: typeFilter === t ? 'var(--accent)' : 'transparent',
+                color: typeFilter === t ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {t === 'reading' ? <BookOpen size={14} /> : <Headphones size={14} />}
+              {t === 'reading' ? 'Reading' : 'Listening'}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Filters row 2: premium ── */}
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {([
+            { key: 'all',     label: 'Barchasi', icon: null },
+            { key: 'premium', label: 'Premium',  icon: <Crown size={14} /> },
+            { key: 'free',    label: 'Oddiy',    icon: <User size={14} /> },
+          ] as { key: 'all' | 'premium' | 'free'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => { setPremiumFilter(key); setExpandedUserId(null) }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: premiumFilter === key ? 'var(--accent)' : 'transparent',
+                color: premiumFilter === key ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {icon} {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto">
+          <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+          </button>
+        </div>
+      </div>
+
+      {/* Summary line */}
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {grouped.length} ta foydalanuvchi · {filtered.length} ta natija
+      </p>
+
+      {/* ── Table ── */}
+      {grouped.length === 0 ? (
+        <div className="card p-12 text-center">
+          <BarChart2 size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Natijalar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {/* Header */}
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '36px 1fr auto auto auto',
+              gap: '12px',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span />
+            <span>Foydalanuvchi</span>
+            <span className="text-right">Testlar</span>
+            <span className="text-right">So&apos;ngi sana</span>
+            <span />
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {grouped.map(ug => {
+              const isExpanded = expandedUserId === ug.user_id
+              const lastTest = ug.tests[0]
+              return (
+                <div key={ug.user_id}>
+                  {/* User row */}
+                  <button
+                    className="w-full text-left px-4 py-3 transition-colors"
+                    style={{ background: isExpanded ? 'var(--bg-secondary)' : undefined }}
+                    onClick={() => setExpandedUserId(isExpanded ? null : ug.user_id)}
+                  >
+                    <div
+                      className="grid items-center"
+                      style={{ gridTemplateColumns: '36px 1fr auto auto auto', gap: '12px' }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{
+                          background: ug.is_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                          color: ug.is_premium ? 'var(--warning)' : 'var(--accent)',
+                        }}
+                      >
+                        {initials(ug.user_name)}
+                      </div>
+
+                      {/* Name + email */}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                            {ug.user_name}
+                          </span>
+                          {ug.is_premium && (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                              style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
+                            >
+                              <Crown size={10} /> Premium
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {ug.user_email}
+                        </div>
+                      </div>
+
+                      {/* Test count */}
+                      <div
+                        className="text-sm font-bold text-right shrink-0"
+                        style={{ color: 'var(--accent)' }}
+                      >
+                        {ug.tests.length}
+                      </div>
+
+                      {/* Last date */}
+                      <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                        {lastTest ? formatDate(lastTest.completed_at) : '—'}
+                      </div>
+
+                      {/* Chevron */}
+                      <div className="shrink-0 flex justify-end">
+                        {isExpanded
+                          ? <ChevronUp size={14} style={{ color: 'var(--text-muted)' }} />
+                          : <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Expanded: individual tests */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div
+                          className="border-t"
+                          style={{
+                            background: 'var(--bg-secondary)',
+                            borderColor: 'var(--border)',
+                          }}
+                        >
+                          {/* Sub-header */}
+                          <div
+                            className="grid px-6 py-2 text-xs font-semibold uppercase tracking-wide"
+                            style={{
+                              gridTemplateColumns: '1fr auto auto auto',
+                              gap: '12px',
+                              color: 'var(--text-muted)',
+                              borderBottom: '1px solid var(--border)',
+                            }}
+                          >
+                            <span>Test nomi</span>
+                            <span className="text-right">Ball</span>
+                            <span className="text-right">Band</span>
+                            <span className="text-right">Sana</span>
+                          </div>
+
+                          {ug.tests.map(r => (
+                            <div
+                              key={r.id}
+                              className="grid px-6 py-2.5 items-center border-b last:border-b-0"
+                              style={{
+                                gridTemplateColumns: '1fr auto auto auto',
+                                gap: '12px',
+                                borderColor: 'rgba(0,0,0,0.06)',
+                              }}
+                            >
+                              <span className="text-sm truncate" style={{ color: 'var(--text-secondary)' }}>
+                                {r.test_title}
+                              </span>
+                              <span className="text-sm font-bold text-right" style={{ color: 'var(--text-primary)' }}>
+                                {r.score}/40
+                              </span>
+                              <span
+                                className="text-sm font-bold text-right"
+                                style={{ color: bandColor(r.band) }}
+                              >
+                                {r.band}
+                              </span>
+                              <span className="text-xs text-right" style={{ color: 'var(--text-muted)' }}>
+                                {formatDate(r.completed_at)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Users tab ───────────────────────────────────────────────────────── */
+function UsersTab({ initialUsers }: { initialUsers: AdminUser[] }) {
+  const [users, setUsers] = useState(initialUsers)
+  const [subTab, setSubTab] = useState<'all' | 'premium' | 'free' | 'online'>('all')
+  // Re-render tick -- isOnline vaqtga bog'liq, useMemo'da hisoblanmasa
+  // 2 daqiqadan keyin ham "online" ko'rinaverar edi. Har 30s tick +1.
+  const [nowTick, setNowTick] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
+  const [toggling, setToggling] = useState<Record<string, boolean>>({})
+  const [search, setSearch] = useState('')
+  const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null)
+  const [setPassModal, setSetPassModal] = useState<{ userId: string; email: string } | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [savingPass, setSavingPass] = useState(false)
+  const [passSaved, setPassSaved] = useState(false)
+  const [msgModal, setMsgModal] = useState<{ userId: string; name: string } | null>(null)
+  const [msgText, setMsgText] = useState('')
+  const [sendingMsg, setSendingMsg] = useState(false)
+  const [msgSent, setMsgSent] = useState(false)
+  const [msgHistory, setMsgHistory] = useState<{ id: string; message: string; is_read: boolean; created_at: string }[]>([])
+  const [msgHistoryLoading, setMsgHistoryLoading] = useState(false)
+  const [broadcastOpen, setBroadcastOpen] = useState(false)
+  const [broadcastText, setBroadcastText] = useState('')
+  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'premium' | 'free'>('all')
+  const [broadcasting, setBroadcasting] = useState(false)
+  const [broadcastResult, setBroadcastResult] = useState<string | null>(null)
+
+  const handleBroadcast = async () => {
+    if (!broadcastText.trim()) return
+    setBroadcasting(true)
+    setBroadcastResult(null)
+    try {
+      const res = await fetch('/api/admin/messages/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: broadcastText.trim(), target: broadcastTarget }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (res.ok) {
+        const label = broadcastTarget === 'premium' ? 'Premium' : broadcastTarget === 'free' ? 'Oddiy' : ''
+        setBroadcastResult(`✅ ${json.sent} ta ${label ? label + ' ' : ''}foydalanuvchiga yuborildi`)
+        setBroadcastText('')
+        setTimeout(() => { setBroadcastOpen(false); setBroadcastResult(null) }, 2500)
+      } else {
+        setBroadcastResult(`Xato: ${json.error ?? res.status}`)
+      }
+    } finally {
+      setBroadcasting(false)
+    }
+  }
+
+  const handleSetPassword = async () => {
+    if (!setPassModal || newPassword.length < 6) return
+    setSavingPass(true)
+    try {
+      const res = await fetch(`/api/admin/users/${setPassModal.userId}/set-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword }),
+      })
+      if (res.ok) {
+        setPassSaved(true)
+        setTimeout(() => {
+          setSetPassModal(null)
+          setNewPassword('')
+          setPassSaved(false)
+        }, 1500)
+      } else {
+        const json = await res.json()
+        alert(json.error ?? 'Xatolik yuz berdi')
+      }
+    } finally {
+      setSavingPass(false)
+    }
+  }
+
+  const openMsgModal = async (userId: string, name: string) => {
+    setMsgModal({ userId, name })
+    setMsgText('')
+    setMsgSent(false)
+    setMsgHistory([])
+    setMsgHistoryLoading(true)
+    try {
+      const res = await fetch('/api/admin/messages')
+      if (res.ok) {
+        const all = await res.json()
+        setMsgHistory(all.filter((m: { user_id: string }) => m.user_id === userId))
+      }
+    } finally {
+      setMsgHistoryLoading(false)
+    }
+  }
+
+  const handleSendMessage = async () => {
+    if (!msgModal || !msgText.trim()) return
+    setSendingMsg(true)
+    try {
+      const res = await fetch('/api/admin/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: msgModal.userId, message: msgText.trim() }),
+      })
+      if (res.ok) {
+        setMsgSent(true)
+        const sent = { id: Date.now().toString(), message: msgText.trim(), is_read: false, created_at: new Date().toISOString() }
+        setMsgHistory(prev => [sent, ...prev])
+        setTimeout(() => { setMsgSent(false); setMsgText('') }, 1500)
+      } else {
+        const json = await res.json()
+        alert(json.error ?? 'Xatolik yuz berdi')
+      }
+    } finally {
+      setSendingMsg(false)
+    }
+  }
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/users')
+    if (res.ok) setUsers(await res.json())
+    setRefreshing(false)
+  }
+
+  // Har 30s'da: (1) users listni qayta yuklab olamiz -- yangi
+  // last_seen_at kelsin; (2) nowTick'ni bir birlik oshiramiz --
+  // isOnline() qiymatlari qayta hisoblanadi (2 daqiqa o'tgan
+  // user'lar avtomatik offline'ga o'tadi).
+  useEffect(() => {
+    const iv = setInterval(async () => {
+      setNowTick(t => t + 1)
+      try {
+        const r = await fetch('/api/admin/users')
+        if (r.ok) setUsers(await r.json())
+      } catch { /* offline yoki muvaqqat xato -- e'tibor bermaymiz */ }
+    }, 30_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  const togglePremium = async (userId: string, currentPremium: boolean) => {
+    setToggling(prev => ({ ...prev, [userId]: true }))
+    try {
+      const result = await toggleUserPremium(userId, !currentPremium)
+      if (!result.ok) {
+        alert('Xatolik: ' + result.error)
+        return
+      }
+      // Server-side toggleUserPremium mirrors this: grant sets is_premium
+      // + premium_until = +1 month; revoke nulls premium_until. Keep the
+      // client optimistic state consistent with that so the badge/filter
+      // update immediately without a refetch.
+      const now = new Date()
+      const oneMonthLater = new Date(now)
+      oneMonthLater.setMonth(oneMonthLater.getMonth() + 1)
+      const nextPremiumUntil = !currentPremium ? oneMonthLater.toISOString() : null
+      setUsers(prev => prev.map(u =>
+        u.id === userId
+          ? {
+              ...u,
+              is_premium: !currentPremium,
+              premium_until: nextPremiumUntil,
+              active_premium: !currentPremium,
+              premium_expired: false,
+            }
+          : u
+      ))
+    } catch (e) {
+      alert('Kutilmagan xatolik: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      setToggling(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  const initials = (name: string | null, email: string) => {
+    if (name) {
+      const parts = name.trim().split(/\s+/)
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+      return name.slice(0, 2).toUpperCase()
+    }
+    return email.slice(0, 2).toUpperCase()
+  }
+
+  const filtered = users.filter(u => {
+    // Filter by the SAME rule the user's own dashboard uses. Legacy rows
+    // with is_premium=true but null/past premium_until land in "free".
+    const matchSub =
+      subTab === 'all' ? true :
+      subTab === 'premium' ? u.active_premium :
+      subTab === 'free' ? !u.active_premium :
+      isOnline(u.last_seen_at) // 'online'
+    const q = search.toLowerCase()
+    const matchSearch = !q ||
+      (u.full_name ?? '').toLowerCase().includes(q) ||
+      (u.username ?? '').toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    return matchSub && matchSearch
+  })
+
+  const premiumCount = users.filter(u => u.active_premium).length
+  const freeCount = users.filter(u => !u.active_premium).length
+  // nowTick dependency -- vaqt o'tishi bilan chegara siljisin. ESLint
+  // "unused expression" bo'yicha ogohlantirsa ham semantik jihatdan
+  // to'g'ri: bu useMemo o'rniga oddiy hisoblash.
+  void nowTick
+  const onlineCount = users.filter(u => isOnline(u.last_seen_at)).length
+
+  return (
+    <div className="space-y-6">
+      {/* Stats -- 4 karta: Jami, Premium, Oddiy, Hozir online */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="card p-4">
+          <div className="text-3xl font-black" style={{ color: 'var(--text-primary)' }}>{users.length}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Jami foydalanuvchi</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(245,158,11,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--warning)' }}>{premiumCount}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Premium</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(99,102,241,0.3)' }}>
+          <div className="text-3xl font-black" style={{ color: 'var(--accent)' }}>{freeCount}</div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Oddiy</div>
+        </div>
+        <div className="card p-4" style={{ border: '1px solid rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.06)' }}>
+          <div className="text-3xl font-black flex items-center gap-2" style={{ color: '#22c55e' }}>
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#22c55e', boxShadow: '0 0 8px rgba(34,197,94,0.6)' }} />
+            {onlineCount}
+          </div>
+          <div className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Hozir online</div>
+        </div>
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* Sub-tabs */}
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+        >
+          {/* Lucide icons instead of emoji so the labels render
+              consistently across systems / editor round-trips (a prior
+              copy-paste through the wrong codec turned these into
+              mojibake). */}
+          {([
+            { key: 'all',     label: 'Barchasi',  icon: null },
+            { key: 'premium', label: 'Premium',   icon: <Crown size={14} /> },
+            { key: 'free',    label: 'Oddiy',     icon: <User size={14} /> },
+            { key: 'online',  label: `Online (${onlineCount})`, icon: <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#22c55e' }} /> },
+          ] as { key: 'all' | 'premium' | 'free' | 'online'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setSubTab(key)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: subTab === key ? (key === 'online' ? '#22c55e' : 'var(--accent)') : 'transparent',
+                color: subTab === key ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {icon} {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <input
+          type="text"
+          placeholder="Ism yoki email qidirish..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="input-field text-sm flex-1 min-w-[180px]"
+          style={{ maxWidth: 300 }}
+        />
+
+        {/* Broadcast + Refresh */}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => { setBroadcastOpen(true); setBroadcastText(''); setBroadcastResult(null); setBroadcastTarget('all') }}
+            className="btn-primary text-sm flex items-center gap-2"
+          >
+            <Send size={14} /> Hammaga xabar
+          </button>
+          <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+          </button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        {filtered.length} ta foydalanuvchi ko&apos;rsatilmoqda
+      </p>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Users size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Foydalanuvchilar yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          {/* Header */}
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '28px 32px 1fr auto auto auto auto',
+              gap: '10px',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span>#</span>
+            <span />
+            <span>Foydalanuvchi</span>
+            <span className="text-right">To&apos;lovlar</span>
+            <span className="text-right">Qo&apos;shilgan</span>
+            <span className="text-right">So&apos;ngi kirish</span>
+            <span className="text-right">Amal</span>
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {filtered.map((u, idx) => {
+              const isToggling = toggling[u.id]
+              const paymentsExpanded = expandedPaymentId === u.id
+              return (
+                <div key={u.id}>
+                  {/* Main row */}
+                  <div
+                    className="grid items-center px-4 py-3"
+                    style={{ gridTemplateColumns: '28px 32px 1fr auto auto auto auto', gap: '10px' }}
+                  >
+                    {/* Row number */}
+                    <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                      {idx + 1}
+                    </span>
+
+                    {/* Avatar + presence dot */}
+                    <div className="relative shrink-0" title={isOnline(u.last_seen_at) ? 'Online' : 'Offline'}>
+                      {u.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={u.avatar_url}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover"
+                          style={{ background: 'var(--bg-secondary)' }}
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{
+                            background: u.active_premium ? 'rgba(245,158,11,0.15)' : 'rgba(99,102,241,0.12)',
+                            color: u.active_premium ? 'var(--warning)' : 'var(--accent)',
+                          }}
+                        >
+                          {initials(u.full_name, u.email)}
+                        </div>
+                      )}
+                      <span
+                        aria-label={isOnline(u.last_seen_at) ? 'Online' : 'Offline'}
+                        style={{
+                          position: 'absolute',
+                          bottom: -2,
+                          right: -2,
+                          width: 10,
+                          height: 10,
+                          borderRadius: '50%',
+                          background: isOnline(u.last_seen_at) ? '#22c55e' : '#64748b',
+                          border: '2px solid var(--bg-primary)',
+                          boxShadow: isOnline(u.last_seen_at) ? '0 0 6px rgba(34,197,94,0.5)' : undefined,
+                        }}
+                      />
+                    </div>
+
+                    {/* Name + email (+ @username when present) */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                          {u.full_name ?? '—'}
+                        </span>
+                        {u.active_premium ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.25)' }}
+                          >
+                            <Crown size={10} /> Premium
+                          </span>
+                        ) : u.premium_expired ? (
+                          // Legacy row: is_premium=true but the date is
+                          // null / past. User sees themselves as free, so
+                          // admin should too -- shown here in gray so it's
+                          // visible-but-clearly-not-active.
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(148,163,184,0.12)', color: 'var(--text-muted)', border: '1px solid rgba(148,163,184,0.25)' }}
+                          >
+                            <Crown size={10} /> Premium (expired)
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium shrink-0"
+                            style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                          >
+                            <User size={10} /> Oddiy
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {u.username ? <><span style={{ color: 'var(--text-secondary)' }}>@{u.username}</span> · </> : null}
+                        {u.email}
+                      </div>
+                    </div>
+
+                    {/* Payment count badge */}
+                    <div className="shrink-0 text-right">
+                      {u.payment_count > 0 ? (
+                        <button
+                          onClick={() => setExpandedPaymentId(paymentsExpanded ? null : u.id)}
+                          className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all hover:opacity-80"
+                          style={{
+                            background: paymentsExpanded ? 'rgba(99,102,241,0.15)' : 'rgba(99,102,241,0.08)',
+                            color: 'var(--accent)',
+                            border: '1px solid rgba(99,102,241,0.2)',
+                          }}
+                        >
+                          <CreditCard size={12} /> {u.payment_count} ta
+                        </button>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </div>
+
+                    {/* Joined date */}
+                    <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      {formatDate(u.created_at)}
+                    </div>
+
+                    {/* Last seen */}
+                    <div className="text-xs text-right shrink-0" style={{ color: 'var(--text-muted)' }}>
+                      {u.last_sign_in_at ? formatDate(u.last_sign_in_at) : '—'}
+                    </div>
+
+                    {/* Toggle premium + reset password. Button state is
+                        driven by active_premium so a legacy expired row
+                        shows "Premiumga o'tkazish" -- clicking will call
+                        toggleUserPremium with is_premium=true, which
+                        writes a fresh premium_until = now + 1 month. */}
+                    <div className="shrink-0 flex items-center gap-2 justify-end">
+                      <button
+                        onClick={() => togglePremium(u.id, u.active_premium)}
+                        disabled={isToggling}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50"
+                        style={u.active_premium ? {
+                          background: 'rgba(239,68,68,0.1)',
+                          color: 'var(--error)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                        } : {
+                          background: 'rgba(245,158,11,0.1)',
+                          color: 'var(--warning)',
+                          border: '1px solid rgba(245,158,11,0.25)',
+                        }}
+                      >
+                        {isToggling ? '...' : u.active_premium ? 'Oddiyga o\'tkazish' : 'Premiumga o\'tkazish'}
+                      </button>
+                      <button
+                        onClick={() => { setSetPassModal({ userId: u.id, email: u.email }); setNewPassword(''); setPassSaved(false) }}
+                        title="Parol o'rnatish"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-all hover:opacity-80"
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+                      >
+                        🔑
+                      </button>
+                      <button
+                        onClick={() => openMsgModal(u.id, u.full_name ?? u.email)}
+                        title="Xabar yuborish"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg transition-all hover:opacity-80"
+                        style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}
+                      >
+                        <Send size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expandable payment history */}
+                  <AnimatePresence>
+                    {paymentsExpanded && u.payments.length > 0 && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div className="px-4 pb-3 pt-1" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                          <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>
+                            To&apos;lov tarixi
+                          </p>
+                          <div className="space-y-1.5">
+                            {u.payments.map(p => (
+                              <div key={p.id} className="flex items-center justify-between text-xs rounded-lg px-3 py-2"
+                                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                                <div className="flex items-center gap-2">
+                                  <span style={{ color: 'var(--text-muted)' }}>{formatDate(p.created_at)}</span>
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs"
+                                    style={{
+                                      background: p.type === 'premium' ? 'rgba(245,158,11,0.1)' : 'rgba(99,102,241,0.08)',
+                                      color: p.type === 'premium' ? 'var(--warning)' : 'var(--accent)',
+                                    }}>
+                                    {p.type === 'premium'
+                                      ? <><Crown size={11} /> Premium</>
+                                      : <><Calendar size={11} /> Mock Test</>}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                    {p.amount.toLocaleString()} so&apos;m
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                    style={{
+                                      background: p.status === 'approved' ? 'rgba(34,197,94,0.12)' : p.status === 'rejected' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)',
+                                      color: p.status === 'approved' ? 'var(--success)' : p.status === 'rejected' ? 'var(--error)' : 'var(--warning)',
+                                    }}>
+                                    {p.status === 'approved' ? '✓ Tasdiqlandi' : p.status === 'rejected' ? '✗ Rad etildi' : '⏳ Kutilmoqda'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Set-password modal */}
+      <AnimatePresence>
+        {setPassModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setSetPassModal(null); setNewPassword('') }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm"
+              style={{ zIndex: 51 }}
+            >
+              <button
+                onClick={() => { setSetPassModal(null); setNewPassword('') }}
+                className="absolute top-4 right-4 p-1.5 rounded-lg"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <XCircle size={18} />
+              </button>
+
+              <div className="text-2xl mb-3">🔑</div>
+              <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+                Parol o&apos;rnatish
+              </h2>
+              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+                {setPassModal.email}
+              </p>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Yangi parol
+                  </label>
+                  <input
+                    type="text"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSetPassword()}
+                    placeholder="Kamida 6 ta belgi"
+                    className="input-field w-full font-mono"
+                    autoFocus
+                  />
+                </div>
+
+                <button
+                  onClick={handleSetPassword}
+                  disabled={savingPass || newPassword.length < 6}
+                  className="btn-primary w-full font-semibold disabled:opacity-50"
+                >
+                  {passSaved ? '✅ Saqlandi!' : savingPass ? 'Saqlanmoqda...' : 'Saqlash'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Send message modal */}
+      <AnimatePresence>
+        {msgModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setMsgModal(null); setMsgText('') }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card w-full max-w-md overflow-hidden"
+              style={{ zIndex: 51 }}
+            >
+              {/* Header */}
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--accent)' }} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Xabar yuborish</h3>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{msgModal.name}</p>
+                </div>
+                <button onClick={() => { setMsgModal(null); setMsgText('') }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
+              </div>
+
+              {/* Previous messages */}
+              {(msgHistoryLoading || msgHistory.length > 0) && (
+                <div className="border-b" style={{ borderColor: 'var(--border)', maxHeight: 180, overflowY: 'auto' }}>
+                  <div className="px-5 py-2 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+                    Oldingi xabarlar
+                  </div>
+                  {msgHistoryLoading ? (
+                    <div className="px-5 py-3 text-xs" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+                  ) : msgHistory.map(m => (
+                    <div key={m.id} className="px-5 py-2.5 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {new Date(m.created_at).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="ml-auto text-xs px-1.5 py-0.5 rounded-full" style={m.is_read ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' } : { background: 'rgba(245,158,11,0.1)', color: 'var(--warning)' }}>
+                          {m.is_read ? "O'qildi" : "O'qilmagan"}
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{m.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Send form */}
+              <div className="p-5 space-y-3">
+                <textarea
+                  value={msgText}
+                  onChange={e => setMsgText(e.target.value)}
+                  placeholder="Xabar matnini yozing..."
+                  rows={3}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={sendingMsg || !msgText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {msgSent ? '✅ Yuborildi!' : sendingMsg ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Broadcast modal */}
+      <AnimatePresence>
+        {broadcastOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => { setBroadcastOpen(false); setBroadcastResult(null) }}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card w-full max-w-md overflow-hidden"
+              style={{ zIndex: 51 }}
+            >
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--warning)' }} />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Hammaga xabar yuborish</h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Barcha foydalanuvchilarga bir vaqtda yuboriladi</p>
+                </div>
+                <button onClick={() => { setBroadcastOpen(false); setBroadcastResult(null) }} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
+              </div>
+              <div className="p-5 space-y-3">
+                {/* Target selector */}
+                <div>
+                  <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Kimga yuborilsin:</p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: 'all',     label: 'Hammaga', icon: null },
+                      { key: 'premium', label: 'Premium', icon: <Crown size={12} /> },
+                      { key: 'free',    label: 'Oddiy',   icon: <User size={12} /> },
+                    ] as { key: 'all' | 'premium' | 'free'; label: string; icon: React.ReactNode }[]).map(({ key, label, icon }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setBroadcastTarget(key)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                        style={{
+                          background: broadcastTarget === key ? 'rgba(99,102,241,0.15)' : 'var(--bg-secondary)',
+                          color: broadcastTarget === key ? 'var(--accent)' : 'var(--text-muted)',
+                          border: broadcastTarget === key ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        }}
+                      >
+                        {icon} {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <textarea
+                  value={broadcastText}
+                  onChange={e => setBroadcastText(e.target.value)}
+                  placeholder="Yuboriladigan xabar matnini yozing..."
+                  rows={4}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                {broadcastResult && (
+                  <p className="text-sm font-medium" style={{ color: broadcastResult.startsWith('✅') ? 'var(--success)' : 'var(--error)' }}>
+                    {broadcastResult}
+                  </p>
+                )}
+                <button
+                  onClick={handleBroadcast}
+                  disabled={broadcasting || !broadcastText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                >
+                  {broadcasting ? 'Yuborilmoqda...' : <><Send size={14} /> Hammaga yuborish</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ── Promo Codes tab ─────────────────────────────────────────────────── */
+interface PromoUsage {
+  id: string
+  user_name: string | null
+  user_email: string | null
+  user_phone: string | null
+  original_amount: number | null
+  discounted_amount: number | null
+  used_at: string
+}
+
+interface PromoCode {
+  id: string
+  code: string
+  discount_percent: number
+  valid_from: string
+  valid_until: string
+  is_active: boolean
+  created_at: string
+  usage_type?: 'unlimited' | 'one_time'
+  assigned_user_id?: string | null
+  assigned_user_email?: string | null
+  used_by?: string | null
+  used_by_email?: string | null
+  used_at?: string | null
+  usage?: PromoUsage[]
+}
+
+const SETUP_SQL = `-- Run in Supabase SQL Editor → New query → Run
+create table if not exists public.promo_codes (
+  id uuid default gen_random_uuid() primary key,
+  code text not null unique,
+  discount_percent integer not null check (discount_percent between 1 and 100),
+  valid_from timestamptz not null,
+  valid_until timestamptz not null,
+  is_active boolean default true not null,
+  created_at timestamptz default now()
+);
+alter table public.promo_codes enable row level security;
+create policy "Auth users can read active promo codes" on public.promo_codes
+  for select using (auth.role() = 'authenticated');
+
+create table if not exists public.promo_code_usage (
+  id uuid default gen_random_uuid() primary key,
+  promo_code_id uuid references public.promo_codes(id) on delete cascade,
+  user_id uuid references public.profiles(id) on delete cascade,
+  user_name text,
+  user_email text,
+  original_amount integer,
+  discounted_amount integer,
+  used_at timestamptz default now()
+);
+alter table public.promo_code_usage enable row level security;
+create policy "Admin can view all usage" on public.promo_code_usage
+  for select using (true);
+create policy "Auth users can insert own usage" on public.promo_code_usage
+  for insert with check (auth.uid() = user_id);
+
+alter table public.payment_requests
+  add column if not exists promo_code text,
+  add column if not exists original_amount integer;
+
+-- One-time promo code support (run if upgrading existing table)
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS usage_type TEXT DEFAULT 'unlimited';
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS assigned_user_id UUID REFERENCES auth.users(id);
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS used_by UUID REFERENCES auth.users(id);
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS used_at TIMESTAMPTZ;`
+
+function PromoCodesTab({ initialPromoCodes, dbMissing }: { initialPromoCodes: PromoCode[]; dbMissing?: boolean }) {
+  const [codes, setCodes] = useState<PromoCode[]>(initialPromoCodes)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    code: '', discount_percent: 10, valid_from: '', valid_until: '',
+    usage_type: 'unlimited' as 'unlimited' | 'one_time',
+    assigned_email: '',
+  })
+  const [assignedUserId, setAssignedUserId] = useState<string | null>(null)
+  const [emailLookupState, setEmailLookupState] = useState<'idle' | 'loading' | 'found' | 'notfound'>('idle')
+  const [expandedUsage, setExpandedUsage] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const today = new Date().toISOString()
+
+  const statusOf = (c: PromoCode) => {
+    if (!c.is_active) return { label: 'O\'chirilgan', color: 'var(--text-muted)', bg: 'var(--bg-secondary)' }
+    if (today > c.valid_until) return { label: 'Muddati o\'tgan', color: 'var(--error)', bg: 'rgba(239,68,68,0.1)' }
+    if (today < c.valid_from) return { label: 'Hali boshlanmagan', color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' }
+    return { label: 'Faol', color: 'var(--success)', bg: 'rgba(34,197,94,0.1)' }
+  }
+
+  const resetForm = () => {
+    setForm({ code: '', discount_percent: 10, valid_from: '', valid_until: '', usage_type: 'unlimited', assigned_email: '' })
+    setAssignedUserId(null)
+    setEmailLookupState('idle')
+    setFormError('')
+    setEditingId(null)
+  }
+
+  const lookupEmail = async (email: string) => {
+    if (!email.trim()) { setAssignedUserId(null); setEmailLookupState('idle'); return }
+    setEmailLookupState('loading')
+    const res = await fetch(`/api/admin/users?email=${encodeURIComponent(email.trim())}`)
+    if (res.ok) {
+      const json = await res.json()
+      setAssignedUserId(json.id)
+      setEmailLookupState('found')
+    } else {
+      setAssignedUserId(null)
+      setEmailLookupState('notfound')
+    }
+  }
+
+  const handleSave = async () => {
+    if (form.usage_type === 'one_time' && form.assigned_email.trim() && emailLookupState !== 'found') {
+      setFormError("Foydalanuvchi email topilmadi. Avval emailni tekshiring.")
+      return
+    }
+    setSaving(true); setFormError('')
+    const method = editingId ? 'PATCH' : 'POST'
+    const url = editingId ? `/api/admin/promo-codes/${editingId}` : '/api/admin/promo-codes'
+    const payload = {
+      ...form,
+      assigned_user_id: form.usage_type === 'one_time' ? (assignedUserId ?? null) : null,
+    }
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const json = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    if (editingId) {
+      setCodes(prev => prev.map(c => c.id === editingId ? { ...c, ...json } : c))
+    } else {
+      setCodes(prev => [json, ...prev])
+    }
+    resetForm()
+    setSaving(false)
+  }
+
+  const handleToggle = async (c: PromoCode) => {
+    const res = await fetch(`/api/admin/promo-codes/${c.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !c.is_active }),
+    })
+    if (res.ok) setCodes(prev => prev.map(x => x.id === c.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Promokodni o\'chirishni tasdiqlaysizmi?')) return
+    const res = await fetch(`/api/admin/promo-codes/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setCodes(prev => prev.filter(c => c.id !== id))
+  }
+
+  const startEdit = (c: PromoCode) => {
+    setEditingId(c.id)
+    setForm({
+      code: c.code,
+      discount_percent: c.discount_percent,
+      valid_from: c.valid_from.slice(0, 10),
+      valid_until: c.valid_until.slice(0, 10),
+      usage_type: c.usage_type ?? 'unlimited',
+      assigned_email: c.assigned_user_email ?? '',
+    })
+    setAssignedUserId(c.assigned_user_id ?? null)
+    setEmailLookupState(c.assigned_user_email ? 'found' : 'idle')
+  }
+
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('uz-UZ')
+
+  const copySQL = () => {
+    navigator.clipboard.writeText(SETUP_SQL).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* DB setup banner */}
+      {dbMissing && (
+        <div className="card p-5" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="text-2xl">⚠️</div>
+            <div>
+              <p className="font-bold text-sm mb-1" style={{ color: 'var(--warning)' }}>Jadval topilmadi</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                <code>promo_codes</code> jadvali Supabase bazasida mavjud emas.
+                Quyidagi SQL ni bir marta Supabase SQL Editor ga nusxalang va ishga tushiring.
+              </p>
+              <a
+                href="https://supabase.com/dashboard/project/_/sql/new"
+                target="_blank" rel="noopener noreferrer"
+                className="text-xs underline mt-1 inline-block"
+                style={{ color: 'var(--accent)' }}
+              >
+                Supabase SQL Editor →
+              </a>
+            </div>
+          </div>
+          <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', maxHeight: 260 }}>
+            {SETUP_SQL}
+          </pre>
+          <button onClick={copySQL} className="btn-outline text-sm mt-3 flex items-center gap-2">
+            {copied ? '✅ Nusxalandi!' : '📋 SQL ni nusxalash'}
+          </button>
+        </div>
+      )}
+
+      {/* Create / Edit form */}
+      <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+        <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+          {editingId ? '✏️ Promokodni tahrirlash' : '➕ Yangi promokod'}
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-3 mb-3">
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Kod</label>
+            <input
+              className="input-field text-sm uppercase"
+              placeholder="SUMMER20"
+              value={form.code}
+              onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+              style={{ letterSpacing: '0.05em' }}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Chegirma (%)</label>
+            <input
+              className="input-field text-sm"
+              type="number"
+              min={1}
+              max={100}
+              value={form.discount_percent}
+              onChange={e => setForm(f => ({ ...f, discount_percent: Number(e.target.value) }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Boshlanish sanasi</label>
+            <input
+              className="input-field text-sm"
+              type="date"
+              value={form.valid_from}
+              onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tugash sanasi</label>
+            <input
+              className="input-field text-sm"
+              type="date"
+              value={form.valid_until}
+              onChange={e => setForm(f => ({ ...f, valid_until: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tur</label>
+            <select
+              className="input-field text-sm"
+              value={form.usage_type}
+              onChange={e => {
+                const val = e.target.value as 'unlimited' | 'one_time'
+                setForm(f => ({ ...f, usage_type: val, assigned_email: '' }))
+                setAssignedUserId(null)
+                setEmailLookupState('idle')
+              }}
+            >
+              <option value="unlimited">Ko&apos;p marta (unlimited)</option>
+              <option value="one_time">1 martalik (one-time)</option>
+            </select>
+          </div>
+          {form.usage_type === 'one_time' && (
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Foydalanuvchi email <span style={{ color: 'var(--text-muted)' }}>(ixtiyoriy)</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  className="input-field text-sm flex-1"
+                  placeholder="user@example.com"
+                  value={form.assigned_email}
+                  onChange={e => {
+                    setForm(f => ({ ...f, assigned_email: e.target.value }))
+                    setEmailLookupState('idle')
+                    setAssignedUserId(null)
+                  }}
+                  onBlur={e => lookupEmail(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => lookupEmail(form.assigned_email)}
+                  className="btn-outline text-xs px-3"
+                  disabled={!form.assigned_email.trim() || emailLookupState === 'loading'}
+                >
+                  {emailLookupState === 'loading' ? '...' : 'Tekshir'}
+                </button>
+              </div>
+              {emailLookupState === 'found' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--success)' }}>✓ Foydalanuvchi topildi</p>
+              )}
+              {emailLookupState === 'notfound' && (
+                <p className="text-xs mt-1" style={{ color: 'var(--error)' }}>✗ Bunday email ro&apos;yxatdan o&apos;tmagan</p>
+              )}
+            </div>
+          )}
+        </div>
+        {formError && (
+          <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>
+        )}
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+            <Plus size={14} /> {saving ? 'Saqlanmoqda...' : editingId ? 'Saqlash' : 'Qo\'shish'}
+          </button>
+          {editingId && (
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          )}
+        </div>
+      </div>
+
+      {/* List */}
+      {codes.length === 0 && !dbMissing ? (
+        <div className="card p-12 text-center">
+          <Tag size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali promokodlar yo&apos;q</p>
+        </div>
+      ) : codes.length > 0 ? (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '1fr 70px 80px 1fr 1fr 80px 100px 90px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Kod</span><span>Tur</span><span>Chegirma</span><span>Boshlanish</span><span>Tugash</span><span>Ishlatildi</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {codes.map(c => {
+              const st = statusOf(c)
+              const usageList = c.usage ?? []
+              const isUsageOpen = expandedUsage === c.id
+              const isOneTime = c.usage_type === 'one_time'
+              const isUsed = isOneTime && !!c.used_by
+              return (
+                <div key={c.id}>
+                  <div className="grid items-center px-4 py-3 text-sm"
+                    style={{ gridTemplateColumns: '1fr 70px 80px 1fr 1fr 80px 100px 90px', gap: 8 }}>
+                    <div>
+                      <span className="font-mono font-bold" style={{ color: 'var(--text-primary)', letterSpacing: '0.05em' }}>{c.code}</span>
+                      {isOneTime && c.assigned_user_email && (
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>→ {c.assigned_user_email}</div>
+                      )}
+                      {isUsed && c.used_by_email && (
+                        <div className="text-xs mt-0.5" style={{ color: 'var(--warning)' }}>✓ {c.used_by_email}</div>
+                      )}
+                    </div>
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium text-center"
+                      style={{
+                        background: isOneTime ? 'rgba(245,158,11,0.12)' : 'rgba(34,197,94,0.12)',
+                        color: isOneTime ? 'var(--warning)' : 'var(--success)',
+                        border: `1px solid ${isOneTime ? 'rgba(245,158,11,0.3)' : 'rgba(34,197,94,0.3)'}`,
+                      }}>
+                      {isOneTime ? '1x' : '∞'}
+                    </span>
+                    <span className="font-semibold" style={{ color: 'var(--accent)' }}>{c.discount_percent}%</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_from)}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{fmtDate(c.valid_until)}</span>
+                    <button
+                      onClick={() => setExpandedUsage(isUsageOpen ? null : c.id)}
+                      className="text-xs font-semibold flex items-center gap-1"
+                      style={{ color: usageList.length > 0 ? 'var(--accent)' : 'var(--text-muted)' }}
+                    >
+                      {usageList.length}x {usageList.length > 0 && (isUsageOpen ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+                    </button>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                      {isOneTime && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                          style={{
+                            background: isUsed ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)',
+                            color: isUsed ? 'var(--warning)' : 'var(--success)',
+                          }}>
+                          {isUsed ? 'Ishlatilgan' : 'Faol'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 justify-end">
+                      <button onClick={() => startEdit(c)} title="Tahrirlash"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                        <Edit3 size={12} />
+                      </button>
+                      <button onClick={() => handleToggle(c)} title={c.is_active ? 'O\'chirish' : 'Yoqish'}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: c.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: c.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                        {c.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                      </button>
+                      <button onClick={() => handleDelete(c.id)} title="O'chirish"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                        style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Usage expand */}
+                  {isUsageOpen && usageList.length > 0 && (
+                    <div className="px-4 pb-3" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border)' }}>
+                      <p className="text-xs font-semibold uppercase tracking-wide py-2" style={{ color: 'var(--text-muted)' }}>Ishlatgan foydalanuvchilar</p>
+                      <div className="space-y-1">
+                        {usageList.map(u => (
+                          <div key={u.id} className="text-xs py-2 px-3 rounded-lg space-y-1"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{u.user_name || 'Noma\'lum'}</span>
+                                {u.user_email && <span style={{ color: 'var(--text-muted)' }}>{u.user_email}</span>}
+                                {u.user_phone && <span style={{ color: 'var(--text-muted)' }}>{u.user_phone}</span>}
+                              </div>
+                              <div className="flex items-center gap-4 flex-wrap text-right">
+                              {u.original_amount != null && (
+                                <span style={{ color: 'var(--text-muted)' }}>
+                                  <s>{formatPrice(u.original_amount)}</s> → <b style={{ color: 'var(--success)' }}>{formatPrice(u.discounted_amount ?? u.original_amount)}</b>
+                                </span>
+                              )}
+                                <span style={{ color: 'var(--text-muted)' }}>{new Date(u.used_at).toLocaleString('uz-UZ')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/* ── Referrals tab ───────────────────────────────────────────────────── */
+interface ReferrerStat {
+  id: string
+  full_name: string | null
+  email: string
+  referral_code: string | null
+  converted_count: number
+}
+
+function ReferralsTab() {
+  const [stats, setStats] = useState<ReferrerStat[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<string | null>(null)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/referrals')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) {
+      const json = await res.json()
+      setStats(json.stats ?? [])
+    }
+    setLoading(false)
+  }
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/referrals')
+    if (res.ok) {
+      const json = await res.json()
+      setStats(json.stats ?? [])
+    }
+    setRefreshing(false)
+  }
+
+  const backfill = async () => {
+    setBackfilling(true)
+    setBackfillResult(null)
+    const res = await fetch('/api/admin/referral/backfill', { method: 'POST' })
+    const json = await res.json().catch(() => ({}))
+    if (res.ok) {
+      setBackfillResult(`${json.updated ?? 0} ta foydalanuvchiga kod berildi (${json.failed ?? 0} ta xato, jami ${json.total ?? 0} ta)`)
+      await refresh()
+    } else {
+      setBackfillResult(`Xato: ${json.error ?? res.status}`)
+    }
+    setBackfilling(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-4" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <div className="flex items-center gap-2">
+          <Users size={18} style={{ color: 'var(--warning)' }} />
+          <h3 className="font-bold" style={{ color: 'var(--warning)' }}>Jadval topilmadi — Referral tizimi</h3>
+        </div>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Supabase SQL Editor da migration faylini ishga tushiring.</p>
+        <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <button onClick={backfill} disabled={backfilling} className="btn-primary text-sm flex items-center gap-2">
+          {backfilling ? <RefreshCw size={14} className="animate-spin" /> : <Users size={14} />}
+          Eski userlar uchun kod generatsiya qilish
+        </button>
+        {backfillResult && <span className="text-sm" style={{ color: 'var(--success)' }}>{backfillResult}</span>}
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2 ml-auto">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+          style={{ gridTemplateColumns: '1fr 1fr 160px 100px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+          <span>Ism</span>
+          <span>Email</span>
+          <span>Referral kodi</span>
+          <span className="text-center">Premium olganlar</span>
+        </div>
+        <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+          {stats.length === 0 ? (
+            <div className="p-12 text-center">
+              <p style={{ color: 'var(--text-muted)' }}>Foydalanuvchilar topilmadi</p>
+            </div>
+          ) : stats.map(u => (
+            <div key={u.id} className="grid items-center px-4 py-3 text-sm"
+              style={{ gridTemplateColumns: '1fr 1fr 160px 100px', gap: 8 }}>
+              <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{u.full_name ?? '—'}</span>
+              <span className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</span>
+              <span className="font-mono font-bold" style={{ color: u.referral_code ? 'var(--accent)' : 'var(--text-muted)', letterSpacing: '0.05em' }}>
+                {u.referral_code ?? '—'}
+              </span>
+              <span className="text-center font-bold" style={{ color: u.converted_count > 0 ? 'var(--warning)' : 'var(--text-muted)' }}>
+                {u.converted_count}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Feedback tab ────────────────────────────────────────────────────── */
+interface FeedbackItem {
+  id: string
+  user_id: string
+  user_name: string | null
+  user_email: string
+  message: string
+  status: string
+  created_at: string
+}
+
+/* ── Articles Tab ────────────────────────────────────────────────────── */
+type ArticleCategory = 'literature' | 'science' | 'history' | 'humanities'
+type ArticleDifficulty = 'easy' | 'medium' | 'hard'
+
+interface ArticleItem {
+  id: string
+  title: string
+  file_url: string | null
+  cover_image_url: string | null
+  is_premium: boolean
+  is_published: boolean
+  order_index: number
+  category: ArticleCategory | null
+  difficulty: ArticleDifficulty | null
+  read_time: number | null
+  description: string | null
+  content: string | null
+  source_text: string | null
+  source_url: string | null
+  has_test: boolean
+  created_at: string
+}
+
+const ARTICLE_CATEGORY_OPTIONS: { value: ArticleCategory; label: string }[] = [
+  { value: 'literature', label: 'Adabiyot (Literature)' },
+  { value: 'science',    label: 'Fan (Science)' },
+  { value: 'history',    label: 'Tarix (History)' },
+  { value: 'humanities', label: 'Gumanitar (Humanities)' },
+]
+
+const ARTICLE_DIFFICULTY_OPTIONS: { value: ArticleDifficulty; label: string }[] = [
+  { value: 'easy',   label: 'Oson (Easy)' },
+  { value: 'medium', label: "O'rta (Medium)" },
+  { value: 'hard',   label: 'Qiyin (Hard)' },
+]
+
+function ArticlesTab() {
+  const [articles, setArticles]           = useState<ArticleItem[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [selectedId, setSelectedId]       = useState('')
+  const [saving, setSaving]               = useState(false)
+  const [message, setMessage]             = useState<{ ok: boolean; text: string } | null>(null)
+  const [showCreate, setShowCreate]       = useState(false)
+  const [creating, setCreating]           = useState(false)
+  const [togglingPremium, setTogglingPremium]   = useState(false)
+
+  // Edit form state (mavjud article uchun)
+  const [editTitle, setEditTitle]           = useState('')
+  const [editOrderIndex, setEditOrderIndex] = useState(0)
+  const [editCategory, setEditCategory]     = useState<ArticleCategory>('literature')
+  const [editDifficulty, setEditDifficulty] = useState<ArticleDifficulty>('medium')
+  const [editReadTime, setEditReadTime]     = useState(3)
+  const [editDescription, setEditDescription] = useState('')
+  const [editContent, setEditContent]         = useState('')
+  const [editSourceText, setEditSourceText]   = useState('')
+  const [editSourceUrl, setEditSourceUrl]     = useState('')
+
+  // Yangi maqola create modal state
+  const [newTitle, setNewTitle]             = useState('')
+  const [newCategory, setNewCategory]       = useState<ArticleCategory>('literature')
+  const [newDifficulty, setNewDifficulty]   = useState<ArticleDifficulty>('medium')
+  const [newReadTime, setNewReadTime]       = useState(3)
+  const [newDescription, setNewDescription] = useState('')
+  const [newContent, setNewContent]         = useState('')
+  const [newSourceText, setNewSourceText]   = useState('')
+  const [newSourceUrl, setNewSourceUrl]     = useState('')
+
+  useEffect(() => {
+    fetch('/api/admin/articles')
+      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setArticles(d) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const selectedArticle = articles.find(a => a.id === selectedId) ?? null
+
+  function handleArticleChange(id: string) {
+    setSelectedId(id)
+    const art = articles.find(a => a.id === id)
+    setEditTitle(art?.title ?? '')
+    setEditOrderIndex(art?.order_index ?? 0)
+    setEditCategory(art?.category ?? 'literature')
+    setEditDifficulty(art?.difficulty ?? 'medium')
+    setEditReadTime(art?.read_time ?? 3)
+    setEditDescription(art?.description ?? '')
+    setEditContent(art?.content ?? '')
+    setEditSourceText(art?.source_text ?? '')
+    setEditSourceUrl(art?.source_url ?? '')
+    setMessage(null)
+  }
+
+  async function handleSave() {
+    if (!selectedId) return
+    const trimmedTitle = editTitle.trim()
+    if (!trimmedTitle) { setMessage({ ok: false, text: 'Sarlavha bo\'sh bo\'lolmaydi' }); return }
+
+    // Manba maydonlari -- ikkalasi ham to'ldirilishi yoki ikkalasi
+    // bo'sh bo'lishi kerak. Faqat bittasi to'ldirilsa xato.
+    const srcText = editSourceText.trim()
+    const srcUrl = editSourceUrl.trim()
+    if ((srcText && !srcUrl) || (!srcText && srcUrl)) {
+      setMessage({ ok: false, text: 'Manba matni va havolasi ikkalasi ham to\'ldirilishi kerak' })
+      return
+    }
+
+    setSaving(true); setMessage(null)
+    try {
+      const patch: Record<string, unknown> = {
+        title:       trimmedTitle,
+        order_index: editOrderIndex,
+        category:    editCategory,
+        difficulty:  editDifficulty,
+        read_time:   editReadTime,
+        description: editDescription.trim() || null,
+        content:     editContent.trim() || null,
+        source_text: srcText || null,
+        source_url:  srcUrl || null,
+      }
+      const res = await fetch(`/api/articles/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Saqlashda xato') }
+      const updated = await res.json()
+      setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, ...updated } : a))
+      setMessage({ ok: true, text: 'Saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik yuz berdi' })
+    } finally { setSaving(false) }
+  }
+
+  async function handleTogglePremium() {
+    if (!selectedArticle) return
+    setTogglingPremium(true)
+    try {
+      const res = await fetch(`/api/articles/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_premium: !selectedArticle.is_premium }),
+      })
+      if (res.ok) setArticles(prev => prev.map(a => a.id === selectedId ? { ...a, is_premium: !a.is_premium } : a))
+    } finally { setTogglingPremium(false) }
+  }
+
+  async function handleCreate() {
+    if (!newTitle.trim()) return
+    // Manba xor validatsiya (birga bo'lishi shart)
+    const nSrcText = newSourceText.trim()
+    const nSrcUrl = newSourceUrl.trim()
+    if ((nSrcText && !nSrcUrl) || (!nSrcText && nSrcUrl)) {
+      setMessage({ ok: false, text: 'Manba matni va havolasi ikkalasi ham to\'ldirilishi kerak' })
+      return
+    }
+    setCreating(true)
+    try {
+      const res = await fetch('/api/articles', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title:       newTitle.trim(),
+          category:    newCategory,
+          difficulty:  newDifficulty,
+          read_time:   newReadTime,
+          description: newDescription.trim() || null,
+          content:     newContent.trim() || null,
+          source_text: nSrcText || null,
+          source_url:  nSrcUrl || null,
+        }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setArticles(prev => [...prev, created])
+        setSelectedId(created.id)
+        setEditTitle(created.title ?? '')
+        setEditOrderIndex(created.order_index ?? 0)
+        setEditCategory(created.category ?? 'literature')
+        setEditDifficulty(created.difficulty ?? 'medium')
+        setEditReadTime(created.read_time ?? 3)
+        setEditDescription(created.description ?? '')
+        setEditContent(created.content ?? '')
+        setEditSourceText(created.source_text ?? '')
+        setEditSourceUrl(created.source_url ?? '')
+        setShowCreate(false)
+        // Modal state'ni default'ga qaytaramiz -- keyingi ochilishda toza.
+        setNewTitle(''); setNewCategory('literature'); setNewDifficulty('medium')
+        setNewReadTime(3); setNewDescription(''); setNewContent('')
+        setNewSourceText(''); setNewSourceUrl('')
+        setMessage(null)
+      } else {
+        const e = await res.json().catch(() => ({}))
+        setMessage({ ok: false, text: e.error ?? 'Yaratishda xato' })
+      }
+    } finally { setCreating(false) }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center p-12">
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{articles.length} ta maqola</span>
+        <button onClick={() => { setShowCreate(true) }}
+          className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} /> Yangi maqola
+        </button>
+      </div>
+
+      <div className="card p-4">
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Maqola tanlang</label>
+        <select value={selectedId} onChange={e => handleArticleChange(e.target.value)} className="input-field">
+          <option value="">— Maqola tanlang —</option>
+          {articles.map(a => (
+            <option key={a.id} value={a.id}>{a.title}{!a.is_published ? ' (Draft)' : ''}</option>
+          ))}
+        </select>
+      </div>
+
+      {selectedId && (
+        <div className="card p-5 space-y-4">
+          {/* Sarlavha + tartib */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Sarlavha
+              </label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                className="input-field w-full text-sm"
+                placeholder="Maqola sarlavhasi..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Tartib
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={editOrderIndex}
+                onChange={e => setEditOrderIndex(Number(e.target.value))}
+                className="input-field w-full text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Kategoriya + qiyinchilik + o'qish vaqti */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Kategoriya
+              </label>
+              <select
+                value={editCategory}
+                onChange={e => setEditCategory(e.target.value as ArticleCategory)}
+                className="input-field w-full text-sm"
+              >
+                {ARTICLE_CATEGORY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Qiyinchilik darajasi
+              </label>
+              <select
+                value={editDifficulty}
+                onChange={e => setEditDifficulty(e.target.value as ArticleDifficulty)}
+                className="input-field w-full text-sm"
+              >
+                {ARTICLE_DIFFICULTY_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                O&apos;qish vaqti (daq.)
+              </label>
+              <input
+                type="number"
+                min={1} max={30}
+                value={editReadTime}
+                onChange={e => setEditReadTime(Number(e.target.value))}
+                className="input-field w-full text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Qisqa tavsif */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+              Qisqa tavsif
+            </label>
+            <textarea
+              value={editDescription}
+              onChange={e => setEditDescription(e.target.value)}
+              rows={3}
+              className="input-field w-full text-sm resize-y"
+              placeholder="2-3 gaplik qisqa tavsif -- Today's Picks katta kartasida ko'rinadi"
+            />
+          </div>
+
+          {/* Markdown content */}
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+              Maqola matni (Markdown)
+            </label>
+            <textarea
+              value={editContent}
+              onChange={e => setEditContent(e.target.value)}
+              rows={15}
+              className="input-field w-full text-sm resize-y font-mono"
+              placeholder={"# Sarlavha\n\nParagraf matn..."}
+              style={{ fontSize: 13, lineHeight: 1.55 }}
+            />
+            <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+              Markdown: <code># Katta sarlavha</code>, <code>## Kichik sarlavha</code>, <code>**qalin**</code>, <code>*italik*</code>, <code>- ro&apos;yxat</code>
+            </p>
+          </div>
+
+          {/* Manba bo'limi -- ixtiyoriy attribution.
+              Ikkalasi ham to'ldirilishi yoki ikkalasi ham bo'sh
+              bo'lishi kerak; validatsiya handleSave'da. */}
+          <div className="pt-4 space-y-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Manba (ixtiyoriy)</p>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Manba matni
+              </label>
+              <textarea
+                value={editSourceText}
+                onChange={e => setEditSourceText(e.target.value)}
+                rows={2}
+                className="input-field w-full text-sm resize-y"
+                placeholder="Adapted from Wikipedia article 'Wright brothers', licensed under CC BY-SA 4.0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Manba havolasi
+              </label>
+              <input
+                type="url"
+                value={editSourceUrl}
+                onChange={e => setEditSourceUrl(e.target.value)}
+                className="input-field w-full text-sm"
+                placeholder="https://en.wikipedia.org/wiki/Wright_brothers"
+              />
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* is_premium toggle */}
+          <div className="flex items-center justify-between py-1">
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Premium holati</span>
+            <button
+              onClick={handleTogglePremium}
+              disabled={togglingPremium}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+              style={selectedArticle?.is_premium ? {
+                background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)',
+              } : {
+                background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)',
+              }}
+            >
+              {selectedArticle?.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+              {togglingPremium ? '...' : selectedArticle?.is_premium ? 'Premium' : 'Bepul'}
+            </button>
+          </div>
+
+          {message && (
+            <div className="p-3 rounded-xl text-sm font-medium"
+              style={{
+                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: message.ok ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {message.ok ? '✅' : '❌'} {message.text}
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving || !editTitle.trim()}
+            className="btn-primary w-full flex items-center justify-center gap-2"
+            style={{
+              opacity: saving || !editTitle.trim() ? 0.5 : 1,
+              cursor: saving || !editTitle.trim() ? 'not-allowed' : 'pointer',
+            }}>
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Saqlanmoqda…</> : <><Upload size={16} /> Saqlash</>}
+          </button>
+        </div>
+      )}
+
+      {!selectedId && (
+        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+          Yuqoridan maqola tanlang
+        </div>
+      )}
+
+      {/* Create modal -- 6 maydonli to'liq forma */}
+      <AnimatePresence>
+        {showCreate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowCreate(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+              style={{ zIndex: 51 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi maqola</h3>
+                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
+                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                </button>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Sarlavha
+                </label>
+                <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                  placeholder="Maqola sarlavhasi..." className="input-field w-full text-sm" autoFocus />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Kategoriya
+                  </label>
+                  <select
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value as ArticleCategory)}
+                    className="input-field w-full text-sm"
+                  >
+                    {ARTICLE_CATEGORY_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Qiyinchilik darajasi
+                  </label>
+                  <select
+                    value={newDifficulty}
+                    onChange={e => setNewDifficulty(e.target.value as ArticleDifficulty)}
+                    className="input-field w-full text-sm"
+                  >
+                    {ARTICLE_DIFFICULTY_OPTIONS.map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    O&apos;qish vaqti (daq.)
+                  </label>
+                  <input
+                    type="number"
+                    min={1} max={30}
+                    value={newReadTime}
+                    onChange={e => setNewReadTime(Number(e.target.value))}
+                    className="input-field w-full text-sm"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Qisqa tavsif
+                </label>
+                <textarea
+                  value={newDescription}
+                  onChange={e => setNewDescription(e.target.value)}
+                  rows={3}
+                  className="input-field w-full text-sm resize-y"
+                  placeholder="2-3 gaplik qisqa tavsif -- Today's Picks katta kartasida ko'rinadi"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Maqola matni (Markdown)
+                </label>
+                <textarea
+                  value={newContent}
+                  onChange={e => setNewContent(e.target.value)}
+                  rows={12}
+                  className="input-field w-full text-sm resize-y font-mono"
+                  placeholder={"# Sarlavha\n\nParagraf matn..."}
+                  style={{ fontSize: 13, lineHeight: 1.55 }}
+                />
+                <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Markdown: <code># Katta sarlavha</code>, <code>## Kichik</code>, <code>**qalin**</code>, <code>*italik*</code>, <code>- ro&apos;yxat</code>
+                </p>
+              </div>
+
+              {/* Manba (ixtiyoriy) -- edit form bilan bir xil naqsh */}
+              <div className="pt-3 space-y-3" style={{ borderTop: '1px solid var(--border)' }}>
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Manba (ixtiyoriy)</p>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Manba matni
+                  </label>
+                  <textarea
+                    value={newSourceText}
+                    onChange={e => setNewSourceText(e.target.value)}
+                    rows={2}
+                    className="input-field w-full text-sm resize-y"
+                    placeholder="Adapted from Wikipedia article 'Wright brothers', licensed under CC BY-SA 4.0"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                    Manba havolasi
+                  </label>
+                  <input
+                    type="url"
+                    value={newSourceUrl}
+                    onChange={e => setNewSourceUrl(e.target.value)}
+                    className="input-field w-full text-sm"
+                    placeholder="https://en.wikipedia.org/wiki/Wright_brothers"
+                  />
+                </div>
+              </div>
+
+              <button onClick={handleCreate} disabled={creating || !newTitle.trim()}
+                className="btn-primary w-full text-sm disabled:opacity-50">
+                {creating ? 'Yaratilyapti...' : 'Yaratish'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ── Books Tab ───────────────────────────────────────────────────────── */
+type BookSourceType = 'heyzine' | 'pdf'
+
+interface BookItem {
+  id: string
+  title: string
+  author: string | null
+  heyzine_url: string | null
+  source_type: BookSourceType | null
+  pdf_url: string | null
+  cover_image_url: string | null
+  recommendation: string | null
+  category: BookCategory
+  is_premium: boolean
+  is_published: boolean
+  created_at: string
+}
+
+// PDF upload cheklovlari -- storage bucket 50 MB limit bilan
+// yaratilgan, client tomonda ham xato early qaytishi uchun.
+const PDF_MAX_BYTES = 50 * 1024 * 1024
+const PDF_MIME = 'application/pdf'
+
+// Storage'ga xavfsiz fayl nomi -- UUID prefiks bilan collisions'ning
+// oldini oladi, faqat a-zA-Z0-9.-_ belgilar qoladi.
+function safePdfName(name: string): string {
+  const clean = name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+  const uuid = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2)
+  return `${uuid}-${clean}`
+}
+
+// public URL'dan storage path'ni ajratib olish -- eski faylni
+// almashtirishda o'chirish uchun kerak. URL: .../storage/v1/object/public/books/<PATH>
+function pdfPathFromUrl(url: string | null): string | null {
+  if (!url) return null
+  const m = url.match(/\/storage\/v1\/object\/public\/books\/(.+)$/)
+  return m ? decodeURIComponent(m[1]) : null
+}
+
+const BOOK_CATEGORY_LABELS: Record<BookCategory, string> = {
+  grammar: 'Grammatika',
+  ielts: 'IELTS',
+  vocabulary: "Lug'at",
+  fun_reads: 'Qiziqarli kitoblar',
+}
+
+function CategoryBadge({ category }: { category: BookCategory }) {
+  const c = BOOK_CATEGORY_COLORS[category]
+  return (
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${c.bg} ${c.text} ${c.border}`}>
+      {BOOK_CATEGORY_LABELS[category]}
+    </span>
+  )
+}
+
+function BooksTab() {
+  const [books, setBooks]                           = useState<BookItem[]>([])
+  const [loading, setLoading]                       = useState(true)
+  const [selectedId, setSelectedId]                 = useState('')
+  const [message, setMessage]                       = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Edit fields
+  const [editTitle, setEditTitle]                   = useState('')
+  const [editAuthor, setEditAuthor]                 = useState('')
+  const [editUrl, setEditUrl]                       = useState('')
+  const [editRecommendation, setEditRecommendation] = useState('')
+  const [editCategory, setEditCategory]             = useState<BookCategory>(DEFAULT_BOOK_CATEGORY)
+  const [editSourceType, setEditSourceType]         = useState<BookSourceType>('heyzine')
+  const [editPdfFile, setEditPdfFile]               = useState<File | null>(null)
+  const [editPdfUploading, setEditPdfUploading]     = useState(false)
+  const [editPdfProgress, setEditPdfProgress]       = useState(0)
+  const editPdfInputRef                             = useRef<HTMLInputElement>(null)
+  const [saving, setSaving]                         = useState(false)
+
+  // Cover image
+  const [selectedCoverFile, setSelectedCoverFile]   = useState<File | null>(null)
+  const [savingCover, setSavingCover]               = useState(false)
+  const [coverUrls, setCoverUrls]                   = useState<Record<string, string | null>>({})
+  const coverInputRef                               = useRef<HTMLInputElement>(null)
+
+  // Delete book
+  const [showDeleteBook, setShowDeleteBook]         = useState(false)
+  const [deletingBook, setDeletingBook]             = useState(false)
+
+  // Create modal
+  const [showCreate, setShowCreate]                 = useState(false)
+  const [newTitle, setNewTitle]                     = useState('')
+  const [newAuthor, setNewAuthor]                   = useState('')
+  const [newUrl, setNewUrl]                         = useState('')
+  const [newPremium, setNewPremium]                 = useState(false)
+  const [newCategory, setNewCategory]               = useState<BookCategory>(DEFAULT_BOOK_CATEGORY)
+  const [newSourceType, setNewSourceType]           = useState<BookSourceType>('heyzine')
+  const [newPdfFile, setNewPdfFile]                 = useState<File | null>(null)
+  const [newPdfUploading, setNewPdfUploading]       = useState(false)
+  const [newPdfProgress, setNewPdfProgress]         = useState(0)
+  const newPdfInputRef                              = useRef<HTMLInputElement>(null)
+  const [creating, setCreating]                     = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/books')
+      .then(async r => { const d = await r.json().catch(() => []); if (Array.isArray(d)) setBooks(d) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const selectedBook = books.find(b => b.id === selectedId) ?? null
+  const currentCover = selectedId in coverUrls ? coverUrls[selectedId] : (selectedBook?.cover_image_url ?? null)
+
+  function handleBookChange(id: string) {
+    const b = books.find(x => x.id === id)
+    setSelectedId(id)
+    setEditTitle(b?.title ?? '')
+    setEditAuthor(b?.author ?? '')
+    setEditUrl(b?.heyzine_url ?? '')
+    setEditRecommendation(b?.recommendation ?? '')
+    setEditCategory(b?.category ?? DEFAULT_BOOK_CATEGORY)
+    // source_type + pdf state prefill. Eski qatorlarda source_type
+    // null bo'lsa 'heyzine' default -- backward compat.
+    setEditSourceType(b?.source_type ?? 'heyzine')
+    setEditPdfFile(null); setEditPdfUploading(false); setEditPdfProgress(0)
+    if (editPdfInputRef.current) editPdfInputRef.current.value = ''
+    setSelectedCoverFile(null); setMessage(null); setShowDeleteBook(false)
+    if (coverInputRef.current) coverInputRef.current.value = ''
+  }
+
+  // PDF fayl tanlanganda validation. Xato bo'lsa message'ga chiqadi va
+  // fayl set qilinmaydi.
+  function pickPdf(file: File | null, target: 'edit' | 'new') {
+    if (!file) return
+    if (file.type !== PDF_MIME) {
+      setMessage({ ok: false, text: 'Faqat PDF fayl yuklash mumkin' })
+      return
+    }
+    if (file.size > PDF_MAX_BYTES) {
+      setMessage({ ok: false, text: 'Fayl juda katta (50 MB dan ko\'p)' })
+      return
+    }
+    setMessage(null)
+    if (target === 'edit') setEditPdfFile(file)
+    else setNewPdfFile(file)
+  }
+
+  // Storage'ga yuklash + oldingi faylni tozalash (agar mavjud). Client
+  // Supabase browser client'ni ishlatadi -- books bucket public read,
+  // authenticated admin insert policy'ga tayanadi.
+  async function uploadBookPdf(file: File, oldUrl: string | null, onProgress: (p: number) => void): Promise<string> {
+    const supabase = createBrowserClient()
+    const path = safePdfName(file.name)
+
+    // supabase.storage.upload progress event bermaydi -- naive naqsh
+    // sifatida 5% dan 95% gacha oshiramiz, tugagach 100%.
+    onProgress(5)
+    const progressTimer = setInterval(() => {
+      onProgress(Math.min(95, Math.random() * 100))
+    }, 400)
+    let publicUrl = ''
+    try {
+      const { error } = await supabase.storage.from('books').upload(path, file, {
+        contentType: PDF_MIME, cacheControl: '3600', upsert: false,
+      })
+      if (error) throw error
+      const { data } = supabase.storage.from('books').getPublicUrl(path)
+      publicUrl = data.publicUrl
+    } finally {
+      clearInterval(progressTimer)
+      onProgress(100)
+    }
+
+    // Eski PDF'ni tozalash (yangi muvaffaqiyatli bo'lgach).
+    // Xato bo'lsa yutamiz -- yangi fayl allaqachon saqlangan.
+    const oldPath = pdfPathFromUrl(oldUrl)
+    if (oldPath && oldPath !== path) {
+      supabase.storage.from('books').remove([oldPath]).catch(() => null)
+    }
+    return publicUrl
+  }
+
+  async function handleSave() {
+    if (!selectedId || !selectedBook) return
+    const titleChanged          = editTitle.trim() && editTitle.trim()          !== selectedBook.title
+    const authorChanged         = editAuthor.trim()         !== (selectedBook.author         ?? '')
+    const recommendationChanged = editRecommendation.trim() !== (selectedBook.recommendation ?? '')
+    const categoryChanged       = editCategory !== (selectedBook.category ?? DEFAULT_BOOK_CATEGORY)
+    const sourceTypeChanged     = editSourceType !== (selectedBook.source_type ?? 'heyzine')
+    const heyzineChanged        = editSourceType === 'heyzine'
+      && editUrl.trim() !== ''
+      && editUrl.trim() !== (selectedBook.heyzine_url ?? '')
+    const hasNewPdf             = editSourceType === 'pdf' && editPdfFile !== null
+
+    if (!titleChanged && !authorChanged && !recommendationChanged
+      && !categoryChanged && !sourceTypeChanged && !heyzineChanged && !hasNewPdf) return
+
+    // Manba turi ma'lumoti mavjudligini tasdiqlash -- bo'sh bo'lsa xato.
+    if (editSourceType === 'heyzine' && !editUrl.trim()) {
+      setMessage({ ok: false, text: 'Heyzine URL kiritilishi shart' }); return
+    }
+    if (editSourceType === 'pdf' && !editPdfFile && !selectedBook.pdf_url) {
+      setMessage({ ok: false, text: 'PDF fayl tanlanishi shart' }); return
+    }
+
+    setSaving(true); setMessage(null)
+    try {
+      // Agar yangi PDF tanlangan bo'lsa oldin yuklab olamiz.
+      let pdfUrl: string | null = selectedBook.pdf_url
+      if (hasNewPdf && editPdfFile) {
+        setEditPdfUploading(true); setEditPdfProgress(0)
+        try {
+          pdfUrl = await uploadBookPdf(editPdfFile, selectedBook.pdf_url, setEditPdfProgress)
+        } finally { setEditPdfUploading(false) }
+      }
+
+      const body: Record<string, unknown> = {}
+      if (titleChanged)          body.title          = editTitle.trim()
+      if (authorChanged)         body.author         = editAuthor.trim()
+      if (recommendationChanged) body.recommendation = editRecommendation.trim()
+      if (categoryChanged)       body.category       = editCategory
+      if (sourceTypeChanged)     body.source_type    = editSourceType
+      // Manba maydonlari: turga qarab bittasi to'ldiriladi, ikkinchisi
+      // null'ga tushiriladi -- eski qiymat qolib ketmasin.
+      if (editSourceType === 'heyzine') {
+        if (heyzineChanged || sourceTypeChanged) body.heyzine_url = editUrl.trim()
+        if (sourceTypeChanged) body.pdf_url = null
+      } else {
+        if (hasNewPdf || sourceTypeChanged) body.pdf_url = pdfUrl
+        if (sourceTypeChanged) body.heyzine_url = null
+      }
+
+      const res = await fetch(`/api/books/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Saqlashda xato') }
+      const updated = await res.json()
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, ...updated } : b))
+      setEditPdfFile(null)
+      if (editPdfInputRef.current) editPdfInputRef.current.value = ''
+      setMessage({ ok: true, text: 'Saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggle(field: 'is_premium' | 'is_published') {
+    if (!selectedBook) return
+    const res = await fetch(`/api/books/${selectedId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: !selectedBook[field] }),
+    })
+    if (res.ok) setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, [field]: !b[field] } : b))
+  }
+
+  async function handleSaveCover() {
+    if (!selectedId || !selectedCoverFile) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const urlRes = await fetch('/api/admin/book-cover-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: selectedId, fileName: selectedCoverFile.name }),
+      })
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xato') }
+      const { signedUrl, contentType, publicUrl } = await urlRes.json()
+
+      const upRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: selectedCoverFile })
+      if (!upRes.ok) throw new Error(`Storage xatosi ${upRes.status}`)
+
+      await fetch(`/api/books/${selectedId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_image_url: publicUrl }),
+      })
+      setCoverUrls(prev => ({ ...prev, [selectedId]: publicUrl }))
+      setArticlesLike(publicUrl)
+      setSelectedCoverFile(null)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+      setMessage({ ok: true, text: 'Muqova saqlandi!' })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSavingCover(false) }
+
+    function setArticlesLike(url: string) {
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, cover_image_url: url } : b))
+    }
+  }
+
+  async function handleDeleteCover() {
+    if (!selectedId) return
+    setSavingCover(true); setMessage(null)
+    try {
+      const res = await fetch('/api/admin/book-cover-url', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId: selectedId }),
+      })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+      setCoverUrls(prev => ({ ...prev, [selectedId]: null }))
+      setBooks(prev => prev.map(b => b.id === selectedId ? { ...b, cover_image_url: null } : b))
+      setMessage({ ok: true, text: "Muqova o'chirildi!" })
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setSavingCover(false) }
+  }
+
+  async function handleDeleteBook() {
+    if (!selectedId) return
+    setDeletingBook(true); setMessage(null)
+    try {
+      const res = await fetch(`/api/books/${selectedId}`, { method: 'DELETE' })
+      if (!res.ok && res.status !== 204) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Xato') }
+      setBooks(prev => prev.filter(b => b.id !== selectedId))
+      setSelectedId(''); setShowDeleteBook(false); setMessage(null)
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setDeletingBook(false) }
+  }
+
+  async function handleCreate() {
+    if (!newTitle.trim()) return
+    if (newSourceType === 'heyzine' && !newUrl.trim()) {
+      setMessage({ ok: false, text: 'Heyzine URL kiritilishi shart' }); return
+    }
+    if (newSourceType === 'pdf' && !newPdfFile) {
+      setMessage({ ok: false, text: 'PDF fayl tanlanishi shart' }); return
+    }
+    setCreating(true)
+    try {
+      let pdfUrl: string | null = null
+      if (newSourceType === 'pdf' && newPdfFile) {
+        setNewPdfUploading(true); setNewPdfProgress(0)
+        try {
+          pdfUrl = await uploadBookPdf(newPdfFile, null, setNewPdfProgress)
+        } finally { setNewPdfUploading(false) }
+      }
+
+      const body: Record<string, unknown> = {
+        title: newTitle.trim(),
+        author: newAuthor.trim() || null,
+        is_premium: newPremium,
+        category: newCategory,
+        source_type: newSourceType,
+      }
+      if (newSourceType === 'heyzine') body.heyzine_url = newUrl.trim()
+      else body.pdf_url = pdfUrl
+
+      const res = await fetch('/api/books', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setBooks(prev => [created, ...prev])
+        setSelectedId(created.id); handleBookChange(created.id)
+        setShowCreate(false)
+        setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false)
+        setNewCategory(DEFAULT_BOOK_CATEGORY); setNewSourceType('heyzine')
+        setNewPdfFile(null); setNewPdfProgress(0)
+        if (newPdfInputRef.current) newPdfInputRef.current.value = ''
+      } else {
+        const e = await res.json().catch(() => ({}))
+        setMessage({ ok: false, text: e.error ?? 'Yaratishda xato' })
+      }
+    } catch (e) {
+      setMessage({ ok: false, text: e instanceof Error ? e.message : 'Xatolik' })
+    } finally { setCreating(false) }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center p-12">
+      <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin"
+        style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  return (
+    <div className="space-y-4 max-w-lg">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{books.length} ta kitob</span>
+        <button onClick={() => { setShowCreate(true); setNewTitle(''); setNewAuthor(''); setNewUrl(''); setNewPremium(false); setNewCategory(DEFAULT_BOOK_CATEGORY) }}
+          className="btn-primary flex items-center gap-2 text-sm">
+          <Plus size={15} /> Yangi kitob
+        </button>
+      </div>
+
+      <div className="card p-4">
+        <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Kitob tanlang</label>
+        <div className="flex items-center gap-2">
+          <select value={selectedId} onChange={e => handleBookChange(e.target.value)} className="input-field flex-1">
+            <option value="">— Kitob tanlang —</option>
+            {books.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.title} - {BOOK_CATEGORY_LABELS[b.category ?? DEFAULT_BOOK_CATEGORY]}{!b.is_published ? ' (Draft)' : ''}
+              </option>
+            ))}
+          </select>
+          {selectedBook && <CategoryBadge category={selectedBook.category ?? DEFAULT_BOOK_CATEGORY} />}
+          {selectedBook && (
+            <span
+              className="text-xs px-2 py-0.5 rounded-full font-medium border whitespace-nowrap"
+              title={(selectedBook.source_type ?? 'heyzine') === 'pdf' ? 'PDF fayl' : 'Heyzine URL'}
+              style={(selectedBook.source_type ?? 'heyzine') === 'pdf'
+                ? { background: 'rgba(59,130,246,0.12)', color: '#60a5fa', borderColor: 'rgba(59,130,246,0.30)' }
+                : { background: 'var(--bg-secondary)',   color: 'var(--text-muted)', borderColor: 'var(--border)' }}
+            >
+              {(selectedBook.source_type ?? 'heyzine') === 'pdf' ? '📄 PDF' : '🔗 Heyzine'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {selectedId && selectedBook && (
+        <div className="card p-5 space-y-4">
+          {/* Edit fields */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha</label>
+              <input type="text" value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input-field w-full text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Muallif</label>
+              <input type="text" value={editAuthor} onChange={e => setEditAuthor(e.target.value)} placeholder="Muallif ismi..." className="input-field w-full text-sm" />
+            </div>
+
+            {/* Kitob manbasi -- toggle + shartli input (Heyzine URL yoki PDF dropzone) */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Kitob manbasi *</label>
+              <div className="flex gap-2">
+                {([
+                  { value: 'heyzine' as const, label: '🔗 Heyzine URL' },
+                  { value: 'pdf' as const,     label: '📄 PDF fayl' },
+                ]).map(opt => {
+                  const active = editSourceType === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setEditSourceType(opt.value)}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                      style={active
+                        ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
+                        : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {editSourceType === 'heyzine' ? (
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL</label>
+                <input type="url" value={editUrl} onChange={e => setEditUrl(e.target.value)} placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>PDF fayl * (.pdf, maks 50MB)</label>
+                {/* Mavjud PDF ma'lumoti -- almashtirish uchun signalka */}
+                {!editPdfFile && selectedBook?.pdf_url && (
+                  <p className="text-xs mb-2" style={{ color: 'var(--text-muted)' }}>
+                    Joriy fayl mavjud. Yangi tanlash yuklab, eskisi o&apos;chiriladi.
+                  </p>
+                )}
+                <div
+                  className="relative flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors"
+                  style={{
+                    border: `2px dashed ${editPdfFile ? 'var(--accent)' : 'var(--border)'}`,
+                    background: editPdfFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+                  }}
+                  onClick={() => editPdfInputRef.current?.click()}
+                >
+                  {editPdfFile ? (
+                    <>
+                      <FileText size={22} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{editPdfFile.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(editPdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation()
+                          setEditPdfFile(null)
+                          if (editPdfInputRef.current) editPdfInputRef.current.value = ''
+                        }}
+                        className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1">
+                      <FileText size={20} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        PDF faylni bu yerga tashlang yoki bosing
+                      </span>
+                    </div>
+                  )}
+                  <input
+                    ref={editPdfInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={e => pickPdf(e.target.files?.[0] ?? null, 'edit')}
+                  />
+                </div>
+                {/* Upload progress */}
+                {editPdfUploading && (
+                  <div className="mt-2">
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                      <div
+                        className="h-full transition-all"
+                        style={{ width: `${editPdfProgress}%`, background: 'var(--accent)' }}
+                      />
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                      Yuklanmoqda… {editPdfProgress.toFixed(0)}%
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun o&apos;qish kerak)</label>
+              <textarea
+                value={editRecommendation}
+                onChange={e => setEditRecommendation(e.target.value)}
+                placeholder="Bu kitob IELTS Reading uchun ideal, chunki..."
+                rows={3}
+                className="input-field w-full text-sm resize-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Kategoriya *</label>
+              <div className="flex flex-wrap gap-2">
+                {BOOK_CATEGORIES.map(cat => {
+                  const c = BOOK_CATEGORY_COLORS[cat]
+                  const active = editCategory === cat
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setEditCategory(cat)}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-all ${active ? `${c.bg} ${c.text} ${c.border}` : ''}`}
+                      style={!active ? { background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderColor: 'var(--border)' } : undefined}
+                    >
+                      {BOOK_CATEGORY_LABELS[cat]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Toggles */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+              <button onClick={() => handleToggle('is_premium')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedBook.is_premium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedBook.is_premium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                {selectedBook.is_premium ? 'Premium' : 'Bepul'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nashr holati</span>
+              <button onClick={() => handleToggle('is_published')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                style={selectedBook.is_published ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {selectedBook.is_published ? <CheckCircle size={13} /> : <ToggleLeft size={13} />}
+                {selectedBook.is_published ? 'Published' : 'Draft'}
+              </button>
+            </div>
+          </div>
+
+          <hr style={{ borderColor: 'var(--border)' }} />
+
+          {/* Cover image */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>Muqova rasmi</p>
+            {currentCover && !selectedCoverFile && (
+              <div className="relative rounded-xl overflow-hidden flex items-center justify-center" style={{ aspectRatio: '3 / 4', maxWidth: 120, background: '#111', border: '1px solid var(--border)' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentCover} alt="cover" className="w-full h-full object-contain" />
+                <button type="button" onClick={handleDeleteCover} disabled={savingCover}
+                  className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                  style={{ background: 'rgba(239,68,68,0.85)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                  {savingCover ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                  O&apos;chirish
+                </button>
+              </div>
+            )}
+            <div className="relative flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+              style={{
+                border: `2px dashed ${selectedCoverFile ? 'var(--accent)' : 'var(--border)'}`,
+                background: selectedCoverFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+              }}
+              onClick={() => coverInputRef.current?.click()}>
+              {selectedCoverFile ? (
+                <>
+                  <div className="w-10 h-10 rounded-lg overflow-hidden shrink-0" style={{ border: '1px solid var(--border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={URL.createObjectURL(selectedCoverFile)} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{selectedCoverFile.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(selectedCoverFile.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <button type="button"
+                    onClick={e => { e.stopPropagation(); setSelectedCoverFile(null); if (coverInputRef.current) coverInputRef.current.value = '' }}
+                    className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                    <X size={14} />
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 py-1">
+                  <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {currentCover ? 'Rasmni almashtirish' : 'JPG, PNG, WebP yuklash'}
+                  </span>
+                </div>
+              )}
+              <input ref={coverInputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden"
+                onChange={e => setSelectedCoverFile(e.target.files?.[0] ?? null)} />
+            </div>
+            {selectedCoverFile && (
+              <button onClick={handleSaveCover} disabled={savingCover}
+                className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+                style={{ opacity: savingCover ? 0.6 : 1 }}>
+                {savingCover ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda…</> : <><Upload size={14} /> Rasmni saqlash</>}
+              </button>
+            )}
+          </div>
+
+          {message && (
+            <div className="p-3 rounded-xl text-sm font-medium"
+              style={{
+                background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: message.ok ? 'var(--success)' : 'var(--error)',
+                border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              }}>
+              {message.ok ? '✅' : '❌'} {message.text}
+            </div>
+          )}
+
+          {/* Save / Delete book */}
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
+              style={{ opacity: saving ? 0.6 : 1 }}>
+              {saving ? <><Loader2 size={15} className="animate-spin" /> Saqlanmoqda…</> : 'Saqlash'}
+            </button>
+            <button onClick={() => setShowDeleteBook(true)}
+              className="px-3 py-2 rounded-xl text-sm font-medium"
+              style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+
+          {showDeleteBook && (
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl"
+              style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              <p className="text-sm font-medium" style={{ color: 'var(--error)' }}>Kitobni o&apos;chirishni tasdiqlaysizmi?</p>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => setShowDeleteBook(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  Bekor
+                </button>
+                <button onClick={handleDeleteBook} disabled={deletingBook}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium"
+                  style={{ background: 'var(--error)', color: '#fff', opacity: deletingBook ? 0.7 : 1 }}>
+                  {deletingBook ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Ha, o&apos;chirish
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedId && (
+        <div className="card p-10 text-center" style={{ color: 'var(--text-muted)' }}>
+          Yuqoridan kitob tanlang
+        </div>
+      )}
+
+      {/* Create modal */}
+      <AnimatePresence>
+        {showCreate && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setShowCreate(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card p-6 w-full max-w-sm space-y-4"
+              style={{ zIndex: 51 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>Yangi kitob</h3>
+                <button onClick={() => setShowCreate(false)} style={{ color: 'var(--text-muted)' }}>
+                  <Plus size={18} style={{ transform: 'rotate(45deg)' }} />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                  <input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)}
+                    placeholder="Kitob nomi..." className="input-field w-full text-sm" autoFocus />
+                </div>
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Muallif</label>
+                  <input type="text" value={newAuthor} onChange={e => setNewAuthor(e.target.value)}
+                    placeholder="Muallif ismi..." className="input-field w-full text-sm" />
+                </div>
+
+                {/* Kitob manbasi toggle -- Heyzine yoki PDF */}
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Kitob manbasi *</label>
+                  <div className="flex gap-2">
+                    {([
+                      { value: 'heyzine' as const, label: '🔗 Heyzine URL' },
+                      { value: 'pdf' as const,     label: '📄 PDF fayl' },
+                    ]).map(opt => {
+                      const active = newSourceType === opt.value
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setNewSourceType(opt.value)}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                          style={active
+                            ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
+                            : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                        >
+                          {opt.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {newSourceType === 'heyzine' ? (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Heyzine URL *</label>
+                    <input type="url" value={newUrl} onChange={e => setNewUrl(e.target.value)}
+                      placeholder="https://heyzine.com/flip-book/..." className="input-field w-full text-sm" />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>PDF fayl * (.pdf, maks 50MB)</label>
+                    <div
+                      className="relative flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-colors"
+                      style={{
+                        border: `2px dashed ${newPdfFile ? 'var(--accent)' : 'var(--border)'}`,
+                        background: newPdfFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)',
+                      }}
+                      onClick={() => newPdfInputRef.current?.click()}
+                    >
+                      {newPdfFile ? (
+                        <>
+                          <FileText size={22} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{newPdfFile.name}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{(newPdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={e => {
+                              e.stopPropagation()
+                              setNewPdfFile(null)
+                              if (newPdfInputRef.current) newPdfInputRef.current.value = ''
+                            }}
+                            className="p-1 rounded-lg" style={{ color: 'var(--text-muted)' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 py-1">
+                          <FileText size={20} style={{ color: 'var(--text-muted)' }} />
+                          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            PDF faylni bu yerga tashlang yoki bosing
+                          </span>
+                        </div>
+                      )}
+                      <input
+                        ref={newPdfInputRef}
+                        type="file"
+                        accept="application/pdf"
+                        className="hidden"
+                        onChange={e => pickPdf(e.target.files?.[0] ?? null, 'new')}
+                      />
+                    </div>
+                    {newPdfUploading && (
+                      <div className="mt-2">
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                          <div
+                            className="h-full transition-all"
+                            style={{ width: `${newPdfProgress}%`, background: 'var(--accent)' }}
+                          />
+                        </div>
+                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                          Yuklanmoqda… {newPdfProgress.toFixed(0)}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs font-medium block mb-1.5" style={{ color: 'var(--text-muted)' }}>Kategoriya *</label>
+                  <div className="flex flex-wrap gap-2">
+                    {BOOK_CATEGORIES.map(cat => {
+                      const c = BOOK_CATEGORY_COLORS[cat]
+                      const active = newCategory === cat
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setNewCategory(cat)}
+                          className={`text-xs px-3 py-1.5 rounded-full font-medium border transition-all ${active ? `${c.bg} ${c.text} ${c.border}` : ''}`}
+                          style={!active ? { background: 'var(--bg-secondary)', color: 'var(--text-muted)', borderColor: 'var(--border)' } : undefined}
+                        >
+                          {BOOK_CATEGORY_LABELS[cat]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Premium</span>
+                  <button type="button" onClick={() => setNewPremium(p => !p)}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                    style={newPremium ? { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' } : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {newPremium ? <Crown size={13} /> : <ToggleLeft size={13} />}
+                    {newPremium ? 'Premium' : 'Bepul'}
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleCreate}
+                disabled={
+                  creating || !newTitle.trim() ||
+                  (newSourceType === 'heyzine' && !newUrl.trim()) ||
+                  (newSourceType === 'pdf' && !newPdfFile)
+                }
+                className="btn-primary w-full text-sm disabled:opacity-50"
+              >
+                {creating
+                  ? (newPdfUploading ? `Yuklanmoqda ${newPdfProgress.toFixed(0)}%…` : 'Yaratilyapti...')
+                  : 'Yaratish'}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function FeedbackTab() {
+  const [items, setItems] = useState<FeedbackItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [replyModal, setReplyModal] = useState<FeedbackItem | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [sending, setSending] = useState(false)
+  const [replySent, setReplySent] = useState(false)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/feedback')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) setItems(await res.json())
+    setLoading(false)
+  }
+
+  const refresh = async () => {
+    setRefreshing(true)
+    const res = await fetch('/api/admin/feedback')
+    if (res.ok) setItems(await res.json())
+    setRefreshing(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const openReply = (item: FeedbackItem) => {
+    setReplyModal(item)
+    setReplyText('')
+    setReplySent(false)
+  }
+
+  const handleSendReply = async () => {
+    if (!replyModal || !replyText.trim()) return
+    setSending(true)
+    try {
+      const msgRes = await fetch('/api/admin/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: replyModal.user_id, message: replyText.trim() }),
+      })
+      if (!msgRes.ok) {
+        const json = await msgRes.json().catch(() => ({}))
+        alert(json.error ?? 'Xatolik yuz berdi')
+        setSending(false)
+        return
+      }
+      await fetch(`/api/admin/feedback/${replyModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'replied' }),
+      })
+      setItems(prev => prev.map(f => f.id === replyModal.id ? { ...f, status: 'replied' } : f))
+      setReplySent(true)
+      setTimeout(() => { setReplyModal(null); setReplySent(false) }, 1500)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ feedback jadvali topilmadi</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Supabase SQL Editor da migration ni ishga tushiring, keyin sahifani yangilang.
+        </p>
+        <button onClick={load} className="btn-primary text-sm">Qayta urinish</button>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <RefreshCw size={24} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
+      </div>
+    )
+  }
+
+  const fmtTime = (iso: string) =>
+    new Date(iso).toLocaleString('uz-UZ', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {items.length} ta feedback · {items.filter(f => f.status === 'new').length} ta yangi
+        </p>
+        <button onClick={refresh} disabled={refreshing} className="btn-outline text-sm flex items-center gap-2">
+          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} /> Yangilash
+        </button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="card p-12 text-center">
+          <MessageSquare size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali feedback yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div
+            className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{
+              gridTemplateColumns: '1fr 2fr auto auto',
+              gap: '12px',
+              color: 'var(--text-muted)',
+              background: 'var(--bg-secondary)',
+              borderBottom: '1px solid var(--border)',
+            }}
+          >
+            <span>Foydalanuvchi</span>
+            <span>Xabar</span>
+            <span>Vaqt</span>
+            <span className="text-right">Amal</span>
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {items.map(item => (
+              <div
+                key={item.id}
+                className="grid items-start px-4 py-3"
+                style={{ gridTemplateColumns: '1fr 2fr auto auto', gap: '12px' }}
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                    {item.user_name ?? '—'}
+                  </div>
+                  <div className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {item.user_email}
+                  </div>
+                </div>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {item.message}
+                </p>
+                <div className="shrink-0">
+                  <div className="text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                    {fmtTime(item.created_at)}
+                  </div>
+                  <span
+                    className="inline-block mt-1 text-xs px-2 py-0.5 rounded-full font-medium"
+                    style={item.status === 'replied'
+                      ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)' }
+                      : { background: 'rgba(245,158,11,0.12)', color: 'var(--warning)' }}
+                  >
+                    {item.status === 'replied' ? '✓ Javob berilgan' : '● Yangi'}
+                  </span>
+                </div>
+                <div className="shrink-0">
+                  <button
+                    onClick={() => openReply(item)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:opacity-80"
+                    style={{
+                      background: item.status === 'replied' ? 'var(--bg-secondary)' : 'rgba(99,102,241,0.1)',
+                      color: item.status === 'replied' ? 'var(--text-muted)' : 'var(--accent)',
+                      border: item.status === 'replied' ? '1px solid var(--border)' : '1px solid rgba(99,102,241,0.25)',
+                    }}
+                  >
+                    {item.status === 'replied' ? 'Qayta javob' : 'Javob berish'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reply modal */}
+      <AnimatePresence>
+        {replyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setReplyModal(null)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.92, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: 'spring', damping: 24, stiffness: 300 }}
+              className="relative card w-full max-w-md overflow-hidden"
+              style={{ zIndex: 51 }}
+            >
+              <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+                <Send size={15} style={{ color: 'var(--accent)' }} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>Feedback'ga javob</h3>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
+                    {replyModal.user_name ?? replyModal.user_email}
+                  </p>
+                </div>
+                <button onClick={() => setReplyModal(null)} className="p-1.5 rounded-lg" style={{ color: 'var(--text-muted)' }}>
+                  <XCircle size={17} />
+                </button>
+              </div>
+
+              {/* Original feedback */}
+              <div className="px-5 py-3 border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg-secondary)' }}>
+                <p className="text-xs font-semibold mb-1.5 uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  Foydalanuvchi yozgani
+                </p>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {replyModal.message}
+                </p>
+              </div>
+
+              <div className="p-5 space-y-3">
+                <textarea
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Javob matnini yozing..."
+                  rows={4}
+                  className="input-field w-full resize-none text-sm"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSendReply}
+                  disabled={sending || !replyText.trim()}
+                  className="btn-primary w-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {replySent ? '✅ Yuborildi!' : sending ? 'Yuborilmoqda...' : <><Send size={14} /> Yuborish</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+/* ── Music tab ───────────────────────────────────────────────────────── */
+interface MusicTrack {
+  id: string
+  title: string
+  youtube_url: string
+  order_index: number
+  is_active: boolean
+  created_at: string
+}
+
+function MusicTab() {
+  const [tracks, setTracks] = useState<MusicTrack[]>([])
+  const [loading, setLoading] = useState(true)
+  const [dbMissing, setDbMissing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({ title: '', youtube_url: '', order_index: 0, is_active: true })
+  const [toast, setToast] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/music')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) { const data = await res.json(); setTracks(Array.isArray(data) ? data : []) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    if (!toast) return
+    const id = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(id)
+  }, [toast])
+
+  const resetForm = () => {
+    setForm({ title: '', youtube_url: '', order_index: tracks.length, is_active: true })
+    setFormError('')
+    setShowForm(false)
+    setEditingId(null)
+  }
+
+  const openAdd = () => {
+    setForm({ title: '', youtube_url: '', order_index: tracks.length, is_active: true })
+    setFormError('')
+    setEditingId(null)
+    setShowForm(true)
+  }
+
+  const openEdit = (t: MusicTrack) => {
+    setForm({ title: t.title, youtube_url: t.youtube_url, order_index: t.order_index, is_active: t.is_active })
+    setFormError('')
+    setEditingId(t.id)
+    setShowForm(true)
+  }
+
+  const validateForm = () => {
+    if (!form.title.trim() || form.title.trim().length < 3) { setFormError("Nomi kamida 3 belgidan iborat bo'lishi kerak"); return false }
+    if (!form.youtube_url.trim()) { setFormError('YouTube URL kiritilishi shart'); return false }
+    if (!Number.isInteger(form.order_index) || form.order_index < 0) { setFormError("Tartib raqami musbat butun son bo'lishi kerak"); return false }
+    return true
+  }
+
+  const handleAdd = async () => {
+    if (!validateForm()) return
+    setSaving(true); setFormError('')
+    const res = await fetch('/api/admin/music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    const json = await res.json()
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    setTracks(prev => [...prev, json])
+    resetForm()
+    setSaving(false)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingId || !validateForm()) return
+    setSaving(true); setFormError('')
+    const res = await fetch(`/api/admin/music/${editingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(form),
+    })
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+    setTracks(prev => prev.map(x => x.id === editingId ? json : x))
+    resetForm()
+    setSaving(false)
+    setToast('Musiqa yangilandi')
+  }
+
+  const handleSubmit = editingId ? handleEditSave : handleAdd
+
+  const handleToggle = async (t: MusicTrack) => {
+    const res = await fetch(`/api/admin/music/${t.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !t.is_active }),
+    })
+    if (res.ok) setTracks(prev => prev.map(x => x.id === t.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Musiqani o'chirishni tasdiqlaysizmi?")) return
+    const res = await fetch(`/api/admin/music/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setTracks(prev => prev.filter(x => x.id !== id))
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) return (
+    <div className="card p-6" style={{ border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.05)' }}>
+      <p className="font-bold text-sm mb-2" style={{ color: 'var(--warning)' }}>⚠️ background_music jadvali topilmadi</p>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>Quyidagi SQL ni Supabase SQL Editor da ishlating:</p>
+      <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-primary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
+{`CREATE TABLE IF NOT EXISTS background_music (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  title TEXT NOT NULL,
+  youtube_url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE background_music ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Music readable by authenticated" ON background_music
+  FOR SELECT TO authenticated USING (true);`}
+      </pre>
+    </div>
+  )
+
+  return (
+    <div className="space-y-6">
+      {toast && (
+        <div className="p-3 rounded-xl text-sm font-medium" style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Add / Edit form */}
+      {showForm ? (
+        <div className="card p-5" style={{ border: '1px solid var(--border)' }}>
+          <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+            {editingId ? 'Musiqani tahrirlash' : 'Yangi musiqa'}
+          </h3>
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Nomi</label>
+              <input
+                className="input-field text-sm w-full"
+                placeholder="Lo-fi Study Beat"
+                value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>YouTube URL</label>
+              <input
+                className="input-field text-sm w-full"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={form.youtube_url}
+                onChange={e => setForm(f => ({ ...f, youtube_url: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib (order)</label>
+              <input
+                className="input-field text-sm"
+                type="number"
+                min={0}
+                value={form.order_index}
+                onChange={e => setForm(f => ({ ...f, order_index: Number(e.target.value) }))}
+              />
+            </div>
+            <div className="flex items-end gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={form.is_active}
+                  onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+                  className="rounded"
+                />
+                Faol
+              </label>
+            </div>
+          </div>
+          {formError && <p className="text-xs mb-3" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+          <div className="flex gap-2">
+            <button onClick={handleSubmit} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+              {editingId ? <Edit3 size={14} /> : <Plus size={14} />}
+              {saving ? 'Saqlanmoqda...' : editingId ? 'Saqlash' : 'Qo\'shish'}
+            </button>
+            <button onClick={resetForm} className="btn-outline text-sm">Bekor qilish</button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={openAdd}
+          className="btn-primary text-sm flex items-center gap-2"
+        >
+          <Plus size={14} /> Yangi musiqa qo&apos;shish
+        </button>
+      )}
+
+      {/* List */}
+      {tracks.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Music size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali musiqalar qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '40px 1fr 1fr 80px 108px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>#</span><span>Nomi</span><span>YouTube URL</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {tracks.map(t => (
+              <div key={t.id} className="grid items-center px-4 py-3 text-sm"
+                style={{ gridTemplateColumns: '40px 1fr 1fr 80px 108px', gap: 8 }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{t.order_index}</span>
+                <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>{t.title}</span>
+                <a
+                  href={t.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs truncate hover:underline"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  {t.youtube_url}
+                </a>
+                <span
+                  className="text-xs px-2 py-1 rounded-full font-medium text-center"
+                  style={{
+                    background: t.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
+                    color: t.is_active ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                >
+                  {t.is_active ? 'Faol' : 'O\'chiq'}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button
+                    onClick={() => handleToggle(t)}
+                    title={t.is_active ? "O'chirish" : 'Yoqish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: t.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: t.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {t.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(t)}
+                    title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(t.id)}
+                    title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type VideoCategory = 'ielts' | 'self_improvement'
+
+interface AdminVideo {
+  id: string
+  title: string
+  video_url: string
+  video_source: 'youtube' | 'upload' | null
+  thumbnail_url: string | null
+  recommendation: string | null
+  is_premium: boolean
+  is_published: boolean
+  category: VideoCategory | null
+  created_at: string
+}
+
+type VideoSource = 'youtube' | 'upload'
+
+const VL_BLANK = {
+  title:         '',
+  video_url:     '',
+  recommendation:'',
+  is_premium:    false,
+  is_published:  true,
+  video_source:  'youtube' as VideoSource,
+  thumbnail_url: null as string | null,
+  // Yangi video default 'ielts' -- IELTS darslari asosiy content turi.
+  category:      'ielts' as VideoCategory,
+}
+
+const VIDEO_CATEGORY_LABEL: Record<VideoCategory, string> = {
+  ielts: 'IELTS darslari',
+  self_improvement: "O'z-o'zini rivojlantirish",
+}
+
+function getYtId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
+  return m ? m[1] : null
+}
+
+function VideoLessonsTab() {
+  const [videos,         setVideos]         = useState<AdminVideo[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState<string | null>(null)
+  const [formError,      setFormError]      = useState('')
+  const [modal,          setModal]          = useState<{ mode: 'add' | 'edit'; data: typeof VL_BLANK & { id?: string } } | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<'all' | VideoCategory>('all')
+  const [videoFile,      setVideoFile]      = useState<File | null>(null)
+  const [posterFile,     setPosterFile]     = useState<File | null>(null)
+  const [videoProgress,  setVideoProgress]  = useState(0)
+  const [posterProgress, setPosterProgress] = useState(0)
+  const videoXhrRef   = useRef<XMLHttpRequest | null>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
+  const posterInputRef= useRef<HTMLInputElement>(null)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/video-lessons')
+    if (res.ok) { const d = await res.json(); setVideos(Array.isArray(d) ? d : []) }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  function resetFiles() {
+    setVideoFile(null); setPosterFile(null); setVideoProgress(0); setPosterProgress(0)
+    if (videoInputRef.current)  videoInputRef.current.value  = ''
+    if (posterInputRef.current) posterInputRef.current.value = ''
+  }
+  function openAdd() {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'add', data: { ...VL_BLANK } })
+  }
+  function openEdit(v: AdminVideo) {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'edit', data: {
+      id: v.id, title: v.title, video_url: v.video_url,
+      recommendation: v.recommendation ?? '',
+      is_premium: v.is_premium, is_published: v.is_published,
+      video_source:  (v.video_source as VideoSource) ?? 'youtube',
+      thumbnail_url: v.thumbnail_url ?? null,
+      category:      v.category ?? 'ielts',
+    }})
+  }
+  function closeModal() {
+    if (videoXhrRef.current) { videoXhrRef.current.abort(); videoXhrRef.current = null }
+    setModal(null); setFormError(''); resetFiles()
+  }
+
+  async function uploadToStorage(file: File, type: 'video' | 'poster', onProgress: (p: number) => void): Promise<string> {
+    const urlRes = await fetch('/api/admin/video-lessons/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, fileName: file.name, contentType: file.type }),
+    })
+    if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+    const { signedUrl, publicUrl } = await urlRes.json()
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      if (type === 'video') videoXhrRef.current = xhr
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`))
+      xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+      xhr.open('PUT', signedUrl)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.send(file)
+    })
+    return publicUrl
+  }
+
+  async function handleSave() {
+    if (!modal) return
+    if (!modal.data.title.trim()) { setFormError('Sarlavha kiritilishi shart'); return }
+    const isUpload = modal.data.video_source === 'upload'
+    if (isUpload && !videoFile && !modal.data.video_url) { setFormError('Video fayl tanlanishi shart'); return }
+    if (!isUpload && !modal.data.video_url.trim())        { setFormError('YouTube URL kiritilishi shart'); return }
+    if (videoFile && videoFile.size > 5 * 1024 * 1024 * 1024) { setFormError('Fayl hajmi 5GB dan oshmasligi kerak'); return }
+    if (posterFile && posterFile.size > 5 * 1024 * 1024) { setFormError('Poster hajmi 5MB dan oshmasligi kerak'); return }
+
+    setSaving(true); setFormError('')
+    let videoUrl  = modal.data.video_url
+    let thumbUrl  = modal.data.thumbnail_url
+
+    try {
+      if (isUpload && videoFile) {
+        setVideoProgress(0)
+        videoUrl = await uploadToStorage(videoFile, 'video', p => setVideoProgress(p))
+      }
+      if (posterFile) {
+        setPosterProgress(0)
+        thumbUrl = await uploadToStorage(posterFile, 'poster', p => setPosterProgress(p))
+      }
+
+      const body = {
+        title:          modal.data.title.trim(),
+        video_url:      videoUrl.trim(),
+        video_source:   modal.data.video_source,
+        thumbnail_url:  thumbUrl || null,
+        recommendation: modal.data.recommendation?.trim() || null,
+        is_premium:     modal.data.is_premium,
+        is_published:   modal.data.is_published,
+        category:       modal.data.category,
+      }
+      const res = modal.mode === 'add'
+        ? await fetch('/api/admin/video-lessons',                    { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(`/api/admin/video-lessons/${modal.data.id}`,   { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+      if (modal.mode === 'add') setVideos(prev => [json, ...prev])
+      else setVideos(prev => prev.map(v => v.id === modal.data.id ? json : v))
+      closeModal()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Xatolik')
+    }
+    setSaving(false)
+  }
+
+  const handleTogglePublish = async (v: AdminVideo) => {
+    const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !v.is_published }),
+    })
+    if (res.ok) setVideos(prev => prev.map(x => x.id === v.id ? { ...x, is_published: !v.is_published } : x))
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Bu video darsni o'chirishni tasdiqlaysizmi?")) return
+    setDeleting(id)
+    const res = await fetch(`/api/admin/video-lessons/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setVideos(prev => prev.filter(v => v.id !== id))
+    setDeleting(null)
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  // Category filter -- client-side. Backend hamma videolarni qaytaradi;
+  // admin bir vaqtda faqat bir toifani ko'radi.
+  const filteredVideos = categoryFilter === 'all'
+    ? videos
+    : videos.filter(v => (v.category ?? 'ielts') === categoryFilter)
+  const ieltsCount = videos.filter(v => (v.category ?? 'ielts') === 'ielts').length
+  const selfCount  = videos.filter(v => v.category === 'self_improvement').length
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
+        <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi video qo&apos;shish
+        </button>
+      </div>
+
+      {/* Category filter tabs */}
+      {videos.length > 0 && (
+        <div
+          className="flex gap-1 p-1 rounded-xl"
+          style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', width: 'fit-content', maxWidth: '100%', overflowX: 'auto' }}
+        >
+          {([
+            { key: 'all',              label: `Barchasi (${videos.length})` },
+            { key: 'ielts',            label: `IELTS darslari (${ieltsCount})` },
+            { key: 'self_improvement', label: `O'z-o'zini rivojlantirish (${selfCount})` },
+          ] as { key: 'all' | VideoCategory; label: string }[]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setCategoryFilter(key)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap"
+              style={{
+                background: categoryFilter === key ? 'var(--accent)' : 'transparent',
+                color: categoryFilter === key ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {videos.length === 0 ? (
+        <div className="card p-16 text-center">
+          <div className="text-4xl mb-3">🎬</div>
+          <p style={{ color: 'var(--text-muted)' }}>Hali video darslar qo&apos;shilmagan</p>
+        </div>
+      ) : filteredVideos.length === 0 ? (
+        <div className="card p-12 text-center">
+          <p style={{ color: 'var(--text-muted)' }}>Bu toifada video yo&apos;q</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>Preview</span><span>Sarlavha</span><span>Toifa</span><span>Turi</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {filteredVideos.map(v => {
+              const ytId = getYtId(v.video_url)
+              const thumb = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
+              const cat: VideoCategory = v.category ?? 'ielts'
+              const isIelts = cat === 'ielts'
+              return (
+                <div key={v.id} className="grid items-center px-4 py-3"
+                  style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8 }}>
+                  <div className="rounded-lg overflow-hidden shrink-0"
+                    style={{ width: 88, height: 50, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                    {thumb
+                      ? <img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      : <div className="w-full h-full flex items-center justify-center"><Play size={14} style={{ color: 'var(--text-muted)' }} /></div>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                    {v.recommendation && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{v.recommendation}</p>}
+                  </div>
+                  {/* Category badge -- IELTS ko'k, Self-improvement yashil */}
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                    style={isIelts
+                      ? { background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.30)' }
+                      : { background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.30)' }}>
+                    {isIelts ? 'IELTS' : "O'z-o'zini riv."}
+                  </span>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                    style={v.is_premium
+                      ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
+                      : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    {v.is_premium ? '👑 Premium' : 'Bepul'}
+                  </span>
+                  <button onClick={() => handleTogglePublish(v)}
+                    className="text-xs px-2 py-1 rounded-lg font-medium text-center"
+                    style={v.is_published
+                      ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                      : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {v.is_published ? 'Chop' : 'Draft'}
+                  </button>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button onClick={() => openEdit(v)} title="Tahrirlash"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                      <Edit3 size={12} />
+                    </button>
+                    <button onClick={() => handleDelete(v.id)} disabled={deleting === v.id} title="O'chirish"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                      style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                      {deleting === v.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit modal ───────────────────────────────────────────── */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                {modal.mode === 'add' ? '🎬 Yangi video qo\'shish' : '✏️ Videoni tahrirlash'}
+              </h3>
+              <button onClick={closeModal} disabled={saving} className="p-1 rounded-lg hover:opacity-70"
+                style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            {/* 1. Title */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="IELTS Writing Task 1 dars..."
+                value={modal.data.title}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            </div>
+
+            {/* 2. Category dropdown -- majburiy, default 'ielts' */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Video toifasi *</label>
+              <select
+                className="input-field text-sm w-full"
+                value={modal.data.category}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, category: e.target.value as VideoCategory } } : m)}
+              >
+                <option value="ielts">{VIDEO_CATEGORY_LABEL.ielts}</option>
+                <option value="self_improvement">{VIDEO_CATEGORY_LABEL.self_improvement}</option>
+              </select>
+            </div>
+
+            {/* 3. Source toggle */}
+            <div>
+              <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--text-secondary)' }}>Video manbasi</label>
+              <div className="flex gap-2">
+                {(['youtube', 'upload'] as VideoSource[]).map(src => (
+                  <button key={src} type="button" disabled={saving}
+                    onClick={() => {
+                      resetFiles()
+                      setModal(m => m ? { ...m, data: { ...m.data, video_source: src, video_url: src === 'upload' ? '' : m.data.video_url } } : m)
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                    style={modal.data.video_source === src
+                      ? { background: 'var(--accent)', color: '#fff', border: '1px solid var(--accent)' }
+                      : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                    {src === 'youtube' ? <><Play size={14} /> YouTube URL</> : <><Upload size={14} /> Fayl yuklash</>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 3a. YouTube URL */}
+            {modal.data.video_source === 'youtube' && (
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>YouTube URL *</label>
+                <input className="input-field text-sm w-full" placeholder="https://www.youtube.com/watch?v=..."
+                  value={modal.data.video_url}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, video_url: e.target.value } } : m)} />
+                {getYtId(modal.data.video_url) && !modal.data.thumbnail_url && !posterFile && (
+                  <div className="mt-2 rounded-lg overflow-hidden" style={{ maxWidth: 180, border: '1px solid var(--border)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`https://img.youtube.com/vi/${getYtId(modal.data.video_url)}/mqdefault.jpg`}
+                      alt="YT preview" style={{ width: '100%', display: 'block' }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 3b. File upload */}
+            {modal.data.video_source === 'upload' && (
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                  Video fayl * (.mp4, .webm, .mov — maks 5GB)
+                </label>
+                <div className="mb-2 p-3 rounded-xl text-xs space-y-1"
+                  style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.18)' }}>
+                  <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                    📌 Katta video yuklashdan oldin:
+                  </p>
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    Supabase Dashboard → Project Settings → Storage → <strong style={{ color: 'var(--text-secondary)' }}>File upload size limit</strong> ni <strong style={{ color: 'var(--text-secondary)' }}>5000 MB (5GB)</strong> ga o&apos;zgartiring. Bu bir marta sozlanadi.
+                  </p>
+                  <p style={{ color: 'rgba(245,158,11,0.85)' }}>
+                    ⚠️ Supabase Storage odatiy holda fayl hajmini cheklaydi. Katta fayllar uchun Supabase Dashboard → Project Settings → Storage → File upload size limit ni 5GB gacha oshiring.
+                  </p>
+                </div>
+
+                {/* Show existing uploaded video */}
+                {modal.data.video_url && !videoFile ? (
+                  <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                    style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                    <Play size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                    <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--success)' }}>Yuklangan video mavjud</span>
+                    <button type="button" onClick={() => setModal(m => m ? { ...m, data: { ...m.data, video_url: '' } } : m)}
+                      className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                    style={{ border: `2px dashed ${videoFile ? 'var(--accent)' : 'var(--border)'}`, background: videoFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                    onClick={() => !saving && videoInputRef.current?.click()}>
+                    {videoFile ? (
+                      <>
+                        <Play size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{videoFile.name}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {videoFile.size >= 1024 * 1024 * 1024
+                              ? `${(videoFile.size / (1024 * 1024 * 1024)).toFixed(2)} GB`
+                              : `${(videoFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                          </p>
+                        </div>
+                        <button type="button"
+                          onClick={e => { e.stopPropagation(); setVideoFile(null); if (videoInputRef.current) videoInputRef.current.value = '' }}
+                          className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={14} /></button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 py-1">
+                        <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP4, WebM yoki MOV tanlang</span>
+                      </div>
+                    )}
+                    <input ref={videoInputRef} type="file" accept=".mp4,.webm,.mov,video/*" className="hidden"
+                      onChange={e => setVideoFile(e.target.files?.[0] ?? null)} />
+                  </div>
+                )}
+
+                {/* Upload progress */}
+                {saving && videoFile && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Video yuklanmoqda... {videoProgress}%</span>
+                      <button type="button" onClick={closeModal} className="text-xs hover:opacity-70" style={{ color: 'var(--error)' }}>
+                        Yuklashni bekor qilish
+                      </button>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                      <div className="h-full rounded-full transition-all duration-300" style={{ width: `${videoProgress}%`, background: 'var(--accent)' }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Poster */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Poster (ixtiyoriy — .jpg .png .webp, maks 5MB)
+              </label>
+
+              {(modal.data.thumbnail_url || posterFile) && (
+                <div className="mb-2 relative rounded-xl overflow-hidden" style={{ maxWidth: 200, border: '1px solid var(--border)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={posterFile ? URL.createObjectURL(posterFile) : modal.data.thumbnail_url!}
+                    alt="poster" style={{ width: '100%', display: 'block' }}
+                  />
+                  <button type="button"
+                    onClick={() => {
+                      setPosterFile(null)
+                      if (posterInputRef.current) posterInputRef.current.value = ''
+                      if (!posterFile) setModal(m => m ? { ...m, data: { ...m.data, thumbnail_url: null } } : m)
+                    }}
+                    className="absolute top-1 right-1 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                    <X size={11} /> O&apos;chirish
+                  </button>
+                </div>
+              )}
+
+              <div
+                className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                style={{ border: `2px dashed ${posterFile ? 'var(--accent)' : 'var(--border)'}`, background: posterFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                onClick={() => !saving && posterInputRef.current?.click()}>
+                <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {posterFile ? posterFile.name : (modal.data.thumbnail_url ? 'Posterni almashtirish' : 'Poster yuklash')}
+                </span>
+                <input ref={posterInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/*" className="hidden"
+                  onChange={e => setPosterFile(e.target.files?.[0] ?? null)} />
+              </div>
+
+              {saving && posterFile && (
+                <div className="mt-2 space-y-1">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Poster yuklanmoqda... {posterProgress}%</span>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${posterProgress}%`, background: '#10b981' }} />
+                  </div>
+                </div>
+              )}
+
+              {modal.data.video_source === 'youtube' && !modal.data.thumbnail_url && !posterFile && getYtId(modal.data.video_url) && (
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Bo&apos;sh qoldirilsa, YouTube thumbnali avtomatik ishlatiladi.
+                </p>
+              )}
+            </div>
+
+            {/* 5. Recommendation */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsiya (ixtiyoriy)</label>
+              <textarea className="input-field text-sm w-full resize-none" rows={3}
+                placeholder="Bu dars IELTS Writing uchun foydali, chunki..."
+                value={modal.data.recommendation}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, recommendation: e.target.value } } : m)} />
+            </div>
+
+            {/* 6–7. Checkboxes */}
+            <div className="flex items-center gap-6 pt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_premium}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
+                Premium
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_published}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_published: e.target.checked } } : m)} />
+                Nashr etilgan
+              </label>
+            </div>
+
+            {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+
+            {/* 8. Buttons */}
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSave} disabled={saving}
+                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" />
+                      {videoFile && videoProgress < 100 ? `Video ${videoProgress}%...` : posterFile && posterProgress < 100 ? `Poster ${posterProgress}%...` : 'Saqlanmoqda...'}</>
+                  : <><Plus size={14} /> {modal.mode === 'add' ? 'Qo\'shish' : 'Saqlash'}</>}
+              </button>
+              <button onClick={closeModal} disabled={saving} className="btn-outline text-sm disabled:opacity-50">
+                {saving ? 'Bekor qilish' : 'Yopish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Typing Essays tab ────────────────────────────────────────────────── */
+interface TypingEssay {
+  id: number
+  title: string
+  content: string
+  task_type: 'task1' | 'task2'
+  is_active: boolean
+  word_count: number
+  created_at: string
+}
+
+const TYPING_ESSAY_BLANK: Omit<TypingEssay, 'id' | 'created_at' | 'word_count'> = {
+  title: '', content: '', task_type: 'task1', is_active: true,
+}
+
+function TypingEssaysTab() {
+  const [essays,       setEssays]       = useState<TypingEssay[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [editing,      setEditing]      = useState<Partial<TypingEssay> | null>(null)
+  const [saving,       setSaving]       = useState(false)
+  const [formError,    setFormError]    = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<TypingEssay | null>(null)
+
+  async function load() {
+    setLoading(true)
+    const res = await fetch('/api/admin/typing-essays')
+    if (res.ok) setEssays(await res.json())
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const task1Essays = essays.filter(e => e.task_type === 'task1')
+  const task2Essays = essays.filter(e => e.task_type === 'task2')
+
+  function openAdd() {
+    setFormError('')
+    setEditing({ ...TYPING_ESSAY_BLANK })
+  }
+  function openEdit(e: TypingEssay) {
+    setFormError('')
+    setEditing({ ...e })
+  }
+
+  async function handleSave() {
+    if (!editing) return
+    const title = editing.title?.trim() ?? ''
+    const content = editing.content?.trim() ?? ''
+    const wc = content.split(/\s+/).filter(Boolean).length
+    if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+    if (wc < 50) { setFormError("Matn kamida 50 so'zdan iborat bo'lishi kerak"); return }
+    setSaving(true)
+    try {
+      const isEdit = !!(editing as TypingEssay).id
+      const payload = { title, content, task_type: editing.task_type ?? 'task1', is_active: editing.is_active ?? true }
+      const res = isEdit
+        ? await fetch(`/api/admin/typing-essays/${(editing as TypingEssay).id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+          })
+        : await fetch('/api/admin/typing-essays', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+          })
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setFormError(e.error ?? 'Xatolik yuz berdi'); return }
+      await load()
+      setEditing(null)
+    } finally { setSaving(false) }
+  }
+
+  async function handleToggle(e: TypingEssay) {
+    await fetch(`/api/admin/typing-essays/${e.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !e.is_active }),
+    })
+    setEssays(prev => prev.map(x => x.id === e.id ? { ...x, is_active: !x.is_active } : x))
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    await fetch(`/api/admin/typing-essays/${deleteTarget.id}`, { method: 'DELETE' })
+    await load()
+    setDeleteTarget(null)
+  }
+
+  const editWordCount = editing?.content ? editing.content.trim().split(/\s+/).filter(Boolean).length : 0
+
+  function renderSection(label: string, list: TypingEssay[]) {
+    return (
+      <div className="mb-8">
+        <h3 className="font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{label}</h3>
+        {list.length === 0 ? (
+          <p className="text-sm py-6 text-center rounded-xl" style={{ color: 'var(--text-muted)', background: 'var(--bg-secondary)' }}>
+            Hali essaylar yo&apos;q
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            {list.map(e => (
+              <div key={e.id} className="card p-4 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  {e.id}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate" style={{ color: 'var(--text-primary)' }}>{e.title}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {e.task_type === 'task1' ? 'Task 1' : 'Task 2'} · {e.word_count} so&apos;z
+                  </p>
+                </div>
+                <span
+                  className="text-xs px-2 py-1 rounded-full font-medium text-center shrink-0"
+                  style={{
+                    background: e.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)',
+                    color: e.is_active ? 'var(--success)' : 'var(--text-muted)',
+                  }}
+                >
+                  {e.is_active ? 'Faol' : "O'chiq"}
+                </span>
+                <div className="flex items-center gap-1.5 justify-end shrink-0">
+                  <button
+                    onClick={() => handleToggle(e)}
+                    title={e.is_active ? "O'chirish" : 'Yoqish'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: e.is_active ? 'rgba(34,197,94,0.1)' : 'var(--bg-secondary)', border: '1px solid var(--border)', color: e.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                    {e.is_active ? <ToggleRight size={12} /> : <ToggleLeft size={12} />}
+                  </button>
+                  <button
+                    onClick={() => openEdit(e)}
+                    title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(e)}
+                    title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (loading) {
+    return <div className="py-16 flex justify-center"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--text-muted)' }} /></div>
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Typing Essays</h2>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>Task 1 va Task 2 essaylarini boshqaring</p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          <Plus size={16} /> Yangi essay qo&apos;shish
+        </button>
+      </div>
+
+      {renderSection('Task 1 Essaylari', task1Essays)}
+      {renderSection('Task 2 Essaylari', task2Essays)}
+
+      {/* Add / Edit modal */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setEditing(null)} />
+          <div className="relative card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" style={{ zIndex: 51 }}>
+            <h2 className="text-lg font-bold mb-5" style={{ color: 'var(--text-primary)' }}>
+              {(editing as TypingEssay).id ? 'Essayni tahrirlash' : 'Yangi essay'}
+            </h2>
+
+            <div className="grid gap-4">
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Sarlavha *</label>
+                <input
+                  value={editing.title ?? ''}
+                  onChange={e => setEditing(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-muted)' }}>Task turi *</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input type="radio" checked={editing.task_type === 'task1'}
+                      onChange={() => setEditing(p => ({ ...p, task_type: 'task1' }))} className="w-3.5 h-3.5" />
+                    <span style={{ color: 'var(--text-primary)' }}>Task 1</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                    <input type="radio" checked={editing.task_type === 'task2'}
+                      onChange={() => setEditing(p => ({ ...p, task_type: 'task2' }))} className="w-3.5 h-3.5" />
+                    <span style={{ color: 'var(--text-primary)' }}>Task 2</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>Matn *</label>
+                  <span className="text-xs" style={{ color: editWordCount >= 50 ? '#10b981' : '#ef4444' }}>
+                    So&apos;zlar: {editWordCount}{editWordCount < 50 ? ' (min 50)' : ''}
+                  </span>
+                </div>
+                <textarea
+                  value={editing.content ?? ''}
+                  onChange={e => setEditing(p => ({ ...p, content: e.target.value }))}
+                  rows={16}
+                  style={{ minHeight: 400, background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+                  className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-y"
+                  placeholder="Essayning to'liq matnini yozing yoki yopishtiring"
+                />
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Tavsiya: Task 1 = 150-200 so&apos;z, Task 2 = 250-300 so&apos;z
+                </p>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={editing.is_active ?? true}
+                  onChange={e => setEditing(p => ({ ...p, is_active: e.target.checked }))}
+                  className="w-4 h-4 rounded"
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Faol</span>
+              </label>
+
+              {formError && (
+                <p className="text-sm" style={{ color: 'var(--error)' }}>{formError}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button onClick={handleSave} disabled={saving} className="btn-primary flex-1">
+                {saving ? 'Saqlanmoqda...' : 'Saqlash'}
+              </button>
+              <button onClick={() => setEditing(null)} className="btn-outline">Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteTarget(null)} />
+          <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              Essay &apos;{deleteTarget.title}&apos; o&apos;chirilsinmi?
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi.</p>
+            <div className="flex gap-3">
+              <button onClick={handleDelete} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Scripts (Script Practice) tab ────────────────────────────────── */
+interface AdminScript {
+  id: number
+  title: string
+  description: string | null
+  thumbnail_url: string | null
+  audio_url: string
+  transcript: string
+  duration_seconds: number | null
+  order_index: number
+  is_premium: boolean
+  is_active: boolean
+  created_at: string
+}
+
+const SCRIPT_BLANK: Omit<AdminScript, 'id' | 'created_at'> = {
+  title: '', description: '', thumbnail_url: null, audio_url: '',
+  transcript: '', duration_seconds: null, order_index: 1,
+  is_premium: false, is_active: true,
+}
+
+function ScriptsTab() {
+  const [scripts,        setScripts]        = useState<AdminScript[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [saving,         setSaving]         = useState(false)
+  const [deleting,       setDeleting]       = useState<number | null>(null)
+  const [formError,      setFormError]      = useState('')
+  const [modal,          setModal]          = useState<{ mode: 'add' | 'edit'; data: typeof SCRIPT_BLANK & { id?: number } } | null>(null)
+  const [audioFile,      setAudioFile]      = useState<File | null>(null)
+  const [thumbFile,      setThumbFile]      = useState<File | null>(null)
+  const [audioProgress,  setAudioProgress]  = useState(0)
+  const [thumbProgress,  setThumbProgress]  = useState(0)
+  const [transcriptMode, setTranscriptMode] = useState<'manual' | 'file'>('manual')
+  const [transcriptFileMsg, setTranscriptFileMsg] = useState<string | null>(null)
+  const [deleteTarget,   setDeleteTarget]   = useState<AdminScript | null>(null)
+  const audioXhrRef = useRef<XMLHttpRequest | null>(null)
+  const audioInputRef = useRef<HTMLInputElement>(null)
+  const thumbInputRef  = useRef<HTMLInputElement>(null)
+
+  async function load() {
+    setLoading(true)
+    const res = await fetch('/api/admin/script')
+    if (res.ok) { const d = await res.json(); setScripts(Array.isArray(d) ? d : []) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  function resetFiles() {
+    setAudioFile(null); setThumbFile(null); setAudioProgress(0); setThumbProgress(0)
+    setTranscriptMode('manual'); setTranscriptFileMsg(null)
+    if (audioInputRef.current) audioInputRef.current.value = ''
+    if (thumbInputRef.current) thumbInputRef.current.value = ''
+  }
+  function openAdd() {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'add', data: { ...SCRIPT_BLANK, order_index: scripts.length + 1 } })
+  }
+  function openEdit(s: AdminScript) {
+    setFormError(''); resetFiles()
+    setModal({ mode: 'edit', data: {
+      id: s.id, title: s.title, description: s.description ?? '',
+      thumbnail_url: s.thumbnail_url, audio_url: s.audio_url, transcript: s.transcript,
+      duration_seconds: s.duration_seconds, order_index: s.order_index,
+      is_premium: s.is_premium, is_active: s.is_active,
+    }})
+  }
+  function closeModal() {
+    if (audioXhrRef.current) { audioXhrRef.current.abort(); audioXhrRef.current = null }
+    setModal(null); setFormError(''); resetFiles()
+  }
+
+  async function uploadToStorage(file: File, type: 'audio' | 'thumbnail', onProgress: (p: number) => void): Promise<string> {
+    const urlRes = await fetch('/api/admin/script/upload', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, fileName: file.name }),
+    })
+    if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xatosi') }
+    const { signedUrl, publicUrl } = await urlRes.json()
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      if (type === 'audio') audioXhrRef.current = xhr
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100)) }
+      xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error(`HTTP ${xhr.status}`))
+      xhr.onerror = () => reject(new Error('Tarmoq xatosi'))
+      xhr.open('PUT', signedUrl)
+      xhr.setRequestHeader('Content-Type', file.type)
+      xhr.send(file)
+    })
+    return publicUrl
+  }
+
+  /** Reads local audio metadata (no upload needed) to auto-detect duration. */
+  function detectAudioDuration(file: File): Promise<number | null> {
+    return new Promise(resolve => {
+      const audio = document.createElement('audio')
+      const url = URL.createObjectURL(file)
+      audio.preload = 'metadata'
+      audio.onloadedmetadata = () => {
+        URL.revokeObjectURL(url)
+        resolve(Number.isFinite(audio.duration) ? Math.round(audio.duration) : null)
+      }
+      audio.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+      audio.src = url
+    })
+  }
+
+  async function handleAudioFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAudioFile(file)
+    const duration = await detectAudioDuration(file)
+    setModal(m => m ? { ...m, data: { ...m.data, duration_seconds: duration } } : m)
+  }
+
+  /** Parses a locally-selected transcript file (TXT/DOCX/PDF/RTF/HTML) into
+      plain text. Ported from the previous Dictation admin form, where this
+      exact PDF-extraction approach (pdfjs-dist, not a plain-text read) was
+      what fixed a real "binary garbage" bug. */
+  async function handleTranscriptFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !modal) return
+    if (file.size > 5 * 1024 * 1024) { setTranscriptFileMsg("Fayl juda katta (max 5 MB)"); return }
+    setTranscriptFileMsg(null)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    try {
+      let text = ''
+      if (ext === 'pdf') {
+        // @ts-expect-error pdfjs-dist ships no type declarations for this subpath
+        const pdfjsLib: any = await import('pdfjs-dist/build/pdf.mjs')
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        let fullText = ''
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i)
+          const content = await page.getTextContent()
+          const pageText = content.items.map((item: any) => item.str).join(' ')
+          fullText += pageText + '\n'
+        }
+        text = fullText.replace(/\s+/g, ' ').trim()
+      } else if (ext === 'docx') {
+        const mammoth = (await import('mammoth')).default
+        const arrayBuffer = await file.arrayBuffer()
+        const result = await mammoth.extractRawText({ arrayBuffer })
+        text = result.value
+      } else if (ext === 'doc') {
+        try {
+          const mammoth = (await import('mammoth')).default
+          const arrayBuffer = await file.arrayBuffer()
+          const result = await mammoth.extractRawText({ arrayBuffer })
+          text = result.value
+        } catch { text = await file.text() }
+      } else if (ext === 'html' || ext === 'htm') {
+        const raw = await file.text()
+        text = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      } else {
+        text = await file.text()
+        const nonPrintable = (text.match(/[\x00-\x08\x0E-\x1F�]/g) || []).length
+        if (nonPrintable > text.length * 0.05) {
+          setTranscriptFileMsg("Bu fayl matn emas. Boshqa fayl sinab ko'ring yoki qo'lda yozing.")
+          return
+        }
+      }
+      if (!text.trim()) { setTranscriptFileMsg("Fayldan matn olinmadi. Boshqa fayl tanlang yoki qo'lda yozing."); return }
+      setModal(m => m ? { ...m, data: { ...m.data, transcript: text.trim() } } : m)
+      const wc = text.trim().split(/\s+/).filter(Boolean).length
+      setTranscriptFileMsg(`Fayl yuklandi (${wc} so'z)`)
+    } catch (err) {
+      console.error('File parse error:', err)
+      setTranscriptFileMsg("Faylni o'qib bo'lmadi. Boshqa fayl sinab ko'ring.")
+    }
+  }
+
+  async function handleSave() {
+    if (!modal) return
+    const title = modal.data.title.trim()
+    const transcript = modal.data.transcript.trim()
+    const wordCount = transcript.split(/\s+/).filter(Boolean).length
+    if (title.length < 3 || title.length > 200) { setFormError("Sarlavha 3-200 belgidan iborat bo'lishi kerak"); return }
+    if (wordCount < 50) { setFormError("Transkript kamida 50 so'zdan iborat bo'lishi kerak"); return }
+    if (!audioFile && !modal.data.audio_url) { setFormError('Audio fayl yuklanishi shart'); return }
+    if (audioFile && audioFile.size > 100 * 1024 * 1024) { setFormError('Audio hajmi 100MB dan oshmasligi kerak'); return }
+    if (thumbFile && thumbFile.size > 5 * 1024 * 1024) { setFormError('Rasm hajmi 5MB dan oshmasligi kerak'); return }
+
+    setSaving(true); setFormError('')
+    let audioUrl = modal.data.audio_url
+    let thumbUrl = modal.data.thumbnail_url
+
+    try {
+      if (audioFile) {
+        setAudioProgress(0)
+        audioUrl = await uploadToStorage(audioFile, 'audio', p => setAudioProgress(p))
+      }
+      if (thumbFile) {
+        setThumbProgress(0)
+        thumbUrl = await uploadToStorage(thumbFile, 'thumbnail', p => setThumbProgress(p))
+      }
+
+      const body = {
+        title,
+        description: modal.data.description?.trim() || null,
+        thumbnail_url: thumbUrl || null,
+        audio_url: audioUrl.trim(),
+        transcript,
+        duration_seconds: modal.data.duration_seconds,
+        order_index: modal.data.order_index,
+        is_premium: modal.data.is_premium,
+        is_active: modal.data.is_active,
+      }
+      const res = modal.mode === 'add'
+        ? await fetch('/api/admin/script',                  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch(`/api/admin/script/${modal.data.id}`, { method: 'PUT',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json()
+      if (!res.ok) { setFormError(json.error || 'Xatolik'); setSaving(false); return }
+      if (modal.mode === 'add') setScripts(prev => [...prev, json].sort((a, b) => a.order_index - b.order_index))
+      else setScripts(prev => prev.map(s => s.id === modal.data.id ? json : s))
+      closeModal()
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Xatolik')
+    }
+    setSaving(false)
+  }
+
+  async function handleToggleActive(s: AdminScript) {
+    const res = await fetch(`/api/admin/script/${s.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !s.is_active }),
+    })
+    if (res.ok) setScripts(prev => prev.map(x => x.id === s.id ? { ...x, is_active: !s.is_active } : x))
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(deleteTarget.id)
+    const res = await fetch(`/api/admin/script/${deleteTarget.id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setScripts(prev => prev.filter(s => s.id !== deleteTarget.id))
+    setDeleting(null)
+    setDeleteTarget(null)
+  }
+
+  const wordCount = modal?.data.transcript ? modal.data.transcript.trim().split(/\s+/).filter(Boolean).length : 0
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{scripts.length} ta script</span>
+        <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> Yangi script qo&apos;shish
+        </button>
+      </div>
+
+      {scripts.length === 0 ? (
+        <div className="card p-16 text-center">
+          <div className="text-4xl mb-3">🎧</div>
+          <p style={{ color: 'var(--text-muted)' }}>Hali script qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ gridTemplateColumns: '48px 64px 1fr 70px 90px 70px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+            <span>#</span><span>Rasm</span><span>Sarlavha</span><span>Davomiylik</span><span>Turi</span><span>Holat</span><span className="text-right">Amal</span>
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {scripts.map(s => (
+              <div key={s.id} className="grid items-center px-4 py-3"
+                style={{ gridTemplateColumns: '48px 64px 1fr 70px 90px 70px 72px', gap: 8 }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{s.order_index}</span>
+                <div className="rounded-lg overflow-hidden shrink-0"
+                  style={{ width: 64, height: 36, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                  {s.thumbnail_url
+                    ? <img src={s.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <div className="w-full h-full flex items-center justify-center"><Headphones size={13} style={{ color: 'var(--text-muted)' }} /></div>}
+                </div>
+                <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{s.title}</p>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {s.duration_seconds != null ? formatTime(s.duration_seconds) : '—'}
+                </span>
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                  style={s.is_premium
+                    ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
+                    : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  {s.is_premium ? '👑 Premium' : 'Bepul'}
+                </span>
+                <button onClick={() => handleToggleActive(s)}
+                  className="text-xs px-2 py-1 rounded-lg font-medium text-center"
+                  style={s.is_active
+                    ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                    : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {s.is_active ? 'Faol' : 'O\'chiq'}
+                </button>
+                <div className="flex items-center gap-1.5 justify-end">
+                  <button onClick={() => openEdit(s)} title="Tahrirlash"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                    style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                    <Edit3 size={12} />
+                  </button>
+                  <button onClick={() => setDeleteTarget(s)} disabled={deleting === s.id} title="O'chirish"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                    {deleting === s.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit modal ───────────────────────────────────────────── */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                {modal.mode === 'add' ? '🎧 Yangi script qo\'shish' : '✏️ Scriptni tahrirlash'}
+              </h3>
+              <button onClick={closeModal} disabled={saving} className="p-1 rounded-lg hover:opacity-70"
+                style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="World Wide Web..."
+                value={modal.data.title}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsif (ixtiyoriy)</label>
+              <textarea className="input-field text-sm w-full resize-none" rows={2}
+                value={modal.data.description ?? ''}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, description: e.target.value } } : m)} />
+            </div>
+
+            {/* Order index */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib raqami *</label>
+              <input type="number" min={1} className="input-field text-sm w-full"
+                value={modal.data.order_index}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, order_index: Number(e.target.value) } } : m)} />
+            </div>
+
+            {/* Thumbnail */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Rasm (ixtiyoriy — .jpg .png .webp, maks 5MB)
+              </label>
+              {(modal.data.thumbnail_url || thumbFile) && (
+                <div className="mb-2 relative rounded-xl overflow-hidden" style={{ maxWidth: 200, border: '1px solid var(--border)' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbFile ? URL.createObjectURL(thumbFile) : modal.data.thumbnail_url!} alt="" style={{ width: '100%', display: 'block' }} />
+                  <button type="button"
+                    onClick={() => {
+                      setThumbFile(null)
+                      if (thumbInputRef.current) thumbInputRef.current.value = ''
+                      if (!thumbFile) setModal(m => m ? { ...m, data: { ...m.data, thumbnail_url: null } } : m)
+                    }}
+                    className="absolute top-1 right-1 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                    <X size={11} /> O&apos;chirish
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                style={{ border: `2px dashed ${thumbFile ? 'var(--accent)' : 'var(--border)'}`, background: thumbFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                onClick={() => !saving && thumbInputRef.current?.click()}>
+                <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {thumbFile ? thumbFile.name : (modal.data.thumbnail_url ? 'Rasmni almashtirish' : 'Rasm yuklash')}
+                </span>
+                <input ref={thumbInputRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/*" className="hidden" onChange={e => setThumbFile(e.target.files?.[0] ?? null)} />
+              </div>
+              {saving && thumbFile && (
+                <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                  <div className="h-full rounded-full transition-all duration-300" style={{ width: `${thumbProgress}%`, background: '#10b981' }} />
+                </div>
+              )}
+            </div>
+
+            {/* Audio */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Audio fayl * (.mp3, .m4a, .wav, .ogg, maks 100MB)
+              </label>
+              {modal.data.audio_url && !audioFile ? (
+                <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                  <Headphones size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                  <span className="text-xs font-medium flex-1 truncate" style={{ color: 'var(--success)' }}>
+                    Yuklangan audio mavjud{modal.data.duration_seconds != null ? ` — ${formatTime(modal.data.duration_seconds)}` : ''}
+                  </span>
+                  <button type="button" onClick={() => setModal(m => m ? { ...m, data: { ...m.data, audio_url: '' } } : m)}
+                    className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={12} /></button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 rounded-xl cursor-pointer"
+                  style={{ border: `2px dashed ${audioFile ? 'var(--accent)' : 'var(--border)'}`, background: audioFile ? 'rgba(99,102,241,0.05)' : 'var(--bg-secondary)' }}
+                  onClick={() => !saving && audioInputRef.current?.click()}>
+                  {audioFile ? (
+                    <>
+                      <Headphones size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{audioFile.name}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {(audioFile.size / (1024 * 1024)).toFixed(1)} MB
+                          {modal.data.duration_seconds != null ? ` · ${formatTime(modal.data.duration_seconds)}` : ''}
+                        </p>
+                      </div>
+                      <button type="button"
+                        onClick={e => { e.stopPropagation(); setAudioFile(null); if (audioInputRef.current) audioInputRef.current.value = '' }}
+                        className="p-1 rounded-lg hover:opacity-70" style={{ color: 'var(--text-muted)' }}><X size={14} /></button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1">
+                      <Upload size={16} style={{ color: 'var(--text-muted)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>MP3, M4A, WAV yoki OGG tanlang</span>
+                    </div>
+                  )}
+                  <input ref={audioInputRef} type="file" accept=".mp3,.m4a,.wav,.ogg,audio/*" className="hidden" onChange={handleAudioFile} />
+                </div>
+              )}
+              {saving && audioFile && (
+                <div className="mt-2 space-y-1">
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Audio yuklanmoqda... {audioProgress}%</span>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                    <div className="h-full rounded-full transition-all duration-300" style={{ width: `${audioProgress}%`, background: 'var(--accent)' }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Transcript */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Transkript *</label>
+                <span className="text-xs" style={{ color: wordCount >= 50 ? '#10b981' : '#ef4444' }}>
+                  {wordCount} so&apos;z{wordCount < 50 ? ' (min 50)' : ''}
+                </span>
+              </div>
+              <div className="flex gap-4 mb-3">
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                  <input type="radio" checked={transcriptMode === 'manual'}
+                    onChange={() => { setTranscriptMode('manual'); setTranscriptFileMsg(null) }} className="w-3 h-3" />
+                  <span style={{ color: 'var(--text-primary)' }}>Qo&apos;lda yozish</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs">
+                  <input type="radio" checked={transcriptMode === 'file'}
+                    onChange={() => { setTranscriptMode('file'); setTranscriptFileMsg(null) }} className="w-3 h-3" />
+                  <span style={{ color: 'var(--text-primary)' }}>Fayl yuklash</span>
+                </label>
+              </div>
+              {transcriptMode === 'file' && (
+                <div className="mb-3">
+                  <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer text-sm"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                    <FileText size={14} style={{ color: 'var(--accent)' }} />
+                    {transcriptFileMsg
+                      ? <span style={{ color: '#10b981' }}>✓ {transcriptFileMsg}</span>
+                      : <span style={{ color: 'var(--text-muted)' }}>Fayl tanlang (TXT, DOCX, PDF)</span>}
+                    <input type="file" accept=".txt,.docx,.doc,.pdf,.rtf,.md,.html,.htm,text/*" className="hidden" onChange={handleTranscriptFile} />
+                  </label>
+                </div>
+              )}
+              <textarea
+                value={modal.data.transcript}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, transcript: e.target.value } } : m)}
+                rows={12} className="w-full px-3 py-2 rounded-lg text-sm border resize-y"
+                style={{ minHeight: 300, background: 'var(--bg-secondary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }}
+                placeholder="Audiodagi to'liq matn..." />
+            </div>
+
+            {/* Toggles */}
+            <div className="flex items-center gap-6 pt-1">
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_premium}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_premium: e.target.checked } } : m)} />
+                Premium
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+                <input type="checkbox" className="rounded" checked={modal.data.is_active}
+                  onChange={e => setModal(m => m ? { ...m, data: { ...m.data, is_active: e.target.checked } } : m)} />
+                Faol
+              </label>
+            </div>
+
+            {formError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {formError}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSave} disabled={saving}
+                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+                {saving
+                  ? <><Loader2 size={14} className="animate-spin" />
+                      {audioFile && audioProgress < 100 ? `Audio ${audioProgress}%...` : thumbFile && thumbProgress < 100 ? `Rasm ${thumbProgress}%...` : 'Saqlanmoqda...'}</>
+                  : <><Plus size={14} /> {modal.mode === 'add' ? 'Qo\'shish' : 'Saqlash'}</>}
+              </button>
+              <button onClick={closeModal} disabled={saving} className="btn-outline text-sm disabled:opacity-50">
+                {saving ? 'Bekor qilish' : 'Yopish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.75)' }} onClick={() => setDeleteTarget(null)} />
+          <div className="relative card p-6 w-full max-w-sm text-center" style={{ zIndex: 51 }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              Script &apos;{deleteTarget.title}&apos; o&apos;chirilsinmi?
+            </p>
+            <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>Bu amalni qaytarib bo&apos;lmaydi (progress ham o&apos;chadi).</p>
+            <div className="flex gap-3">
+              <button onClick={handleDelete} className="flex-1 py-2 rounded-lg text-sm font-medium" style={{ background: '#ef4444', color: '#fff' }}>O&apos;chirish</button>
+              <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2 rounded-lg text-sm font-medium border" style={{ color: 'var(--text-primary)', borderColor: 'var(--border)' }}>Bekor</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const TABS = [
+  { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
+  { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
+  { id: 'listening',   label: 'Listening Tests',  Icon: Headphones },
+  { id: 'scripts',       label: 'Scripts',          Icon: FileText },
+  { id: 'mock',       label: 'Mock Test',        Icon: Calendar },
+  { id: 'results',   label: 'Natijalar',        Icon: BarChart2 },
+  { id: 'users',     label: 'Foydalanuvchilar', Icon: Users },
+  { id: 'promo',     label: 'Promo kodlar',     Icon: Tag },
+  { id: 'referrals', label: 'Referrallar',      Icon: Users },
+  { id: 'articles',  label: 'Maqolalar',         Icon: BookOpen },
+  { id: 'books',     label: 'Kitoblar',          Icon: BookOpen },
+  { id: 'music',     label: 'Musiqa',            Icon: Music },
+  { id: 'videos',        label: 'Video darslar',    Icon: Play },
+  { id: 'typing',        label: 'Typing',           Icon: Keyboard },
+  { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
+] as const
+type TabId = typeof TABS[number]['id']
+
+/* ── Main AdminClient ────────────────────────────────────────────────── */
+export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing }: Props) {
+  const [activeTab, setActiveTab] = useState<TabId>('payments')
+
+  // Admin ham heartbeat yuborsin -- aks holda o'zi "offline" ko'rinadi.
+  // Layout (dashboard) admin route'ni qamramaydi.
+  usePresenceHeartbeat()
+
+  const pendingCount = initialPayments.filter(p => p.status === 'pending').length
+  const readingTests = tests.filter(t => t.type === 'reading')
+  const listeningTests = tests.filter(t => t.type === 'listening')
+
+  return (
+    <div className="min-h-screen p-6 md:p-8" style={{ background: 'var(--bg-primary)' }}>
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Admin Panel</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          To&apos;lovlar va test content boshqaruvi
+        </p>
+      </div>
+
+      {/* Tab bar */}
+      <div
+        className="flex gap-1 mb-8 p-1 rounded-xl overflow-x-auto"
+        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', width: 'fit-content', maxWidth: '100%' }}
+      >
+        {TABS.map(({ id, label, Icon }) => {
+          const active = activeTab === id
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+              style={{
+                background: active ? 'var(--accent)' : 'transparent',
+                color: active ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              <Icon size={15} />
+              {label}
+              {id === 'payments' && pendingCount > 0 && (
+                <span
+                  className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
+                  style={{
+                    background: active ? 'rgba(255,255,255,0.25)' : 'rgba(245,158,11,0.2)',
+                    color: active ? 'white' : 'var(--warning)',
+                  }}
+                >
+                  {pendingCount}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'payments' && <PaymentsTab initialPayments={initialPayments} />}
+      {activeTab === 'reading' && (
+        <TestFileUploader type="reading" tests={readingTests} accept=".pdf,.docx,.zip" />
+      )}
+      {activeTab === 'listening' && (
+        <TestFileUploader type="listening" tests={listeningTests} accept=".mp3,.zip,.pdf" />
+      )}
+      {activeTab === 'scripts' && <ScriptsTab />}
+      {activeTab === 'mock' && (
+        <MockScheduleEditor initialSchedules={initialSchedules} />
+      )}
+      {activeTab === 'results' && (
+        <ResultsTab initialResults={initialResults} />
+      )}
+      {activeTab === 'users' && (
+        <UsersTab initialUsers={initialUsers} />
+      )}
+      {activeTab === 'promo' && (
+        <PromoCodesTab initialPromoCodes={initialPromoCodes} dbMissing={promoDbMissing} />
+      )}
+      {activeTab === 'referrals' && <ReferralsTab />}
+      {activeTab === 'articles' && <ArticlesTab />}
+      {activeTab === 'books'    && <BooksTab />}
+      {activeTab === 'music'         && <MusicTab />}
+      {activeTab === 'videos'               && <VideoLessonsTab />}
+      {activeTab === 'typing'               && <TypingEssaysTab />}
+      {activeTab === 'feedback'              && <FeedbackTab />}
+    </div>
+  )
+}

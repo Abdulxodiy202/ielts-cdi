@@ -1,0 +1,109 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { AdminClient } from './AdminClient'
+import type { MockSchedule } from '@/components/admin/MockScheduleEditor'
+
+import { isAdmin } from '@/lib/admin-config'
+
+interface Test {
+  id: string
+  type: string
+  title: string
+  order_number: number
+  file_url: string | null
+}
+
+interface PaymentRequest {
+  id: string
+  user_id: string
+  user_name: string
+  user_email: string
+  user_phone: string
+  type: 'premium' | 'mock_booking'
+  amount: number
+  receipt_url: string
+  status: 'pending' | 'approved' | 'rejected'
+  meta: { booking_date?: string; time_slot?: string } | null
+  admin_note: string | null
+  created_at: string
+  reviewed_at: string | null
+}
+
+export default function AdminPage() {
+  const router = useRouter()
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unauthorized'>('loading')
+  const [payments, setPayments] = useState<PaymentRequest[]>([])
+  const [tests, setTests] = useState<Test[]>([])
+  const [schedules, setSchedules] = useState<MockSchedule[]>([])
+  const [results, setResults] = useState<object[]>([])
+  const [users, setUsers] = useState<object[]>([])
+  const [promoCodes, setPromoCodes] = useState<object[]>([])
+  const [promoDbMissing, setPromoDbMissing] = useState(false)
+
+  useEffect(() => {
+    async function init() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) { router.replace('/login'); return }
+      if (!isAdmin(user.email)) { router.replace('/dashboard'); return }
+
+      // Fetch all admin data in parallel from API routes
+      const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes, promoRes] = await Promise.all([
+        fetch('/api/admin/payments'),
+        fetch('/api/admin/tests'),
+        fetch('/api/admin/mock-schedules'),
+        fetch('/api/admin/results'),
+        fetch('/api/admin/users'),
+        fetch('/api/admin/promo-codes'),
+      ])
+
+      setPayments(paymentsRes.ok ? await paymentsRes.json() : [])
+      setTests(testsRes.ok ? await testsRes.json() : [])
+      setSchedules(schedulesRes.ok ? await schedulesRes.json() : [])
+      setResults(resultsRes.ok ? await resultsRes.json() : [])
+      setUsers(usersRes.ok ? await usersRes.json() : [])
+      if (promoRes.status === 503) {
+        setPromoDbMissing(true)
+        setPromoCodes([])
+      } else {
+        setPromoCodes(promoRes.ok ? await promoRes.json() : [])
+      }
+      setStatus('ready')
+    }
+
+    init()
+  }, [router])
+
+  if (status === 'loading') {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: 'var(--bg-primary)' }}
+      >
+        <div className="text-center">
+          <div
+            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+            style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+          />
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <AdminClient
+      initialPayments={payments}
+      tests={tests}
+      initialSchedules={schedules}
+      initialResults={results as any}
+      initialUsers={users as any}
+      initialPromoCodes={promoCodes as any}
+      promoDbMissing={promoDbMissing}
+    />
+  )
+}
