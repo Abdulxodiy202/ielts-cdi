@@ -561,6 +561,7 @@
   "mockTest": {
     "seatsLeft": "{count} seats left",
     "full": "Full",
+    "hurryUp": "Only {count} spots left!",
     "fullMessage": "Sorry, this session is full. Please book another session."
   },
   "errorPage": {

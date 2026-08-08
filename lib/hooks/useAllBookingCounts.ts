@@ -10,14 +10,23 @@ import { createClient } from '@/lib/supabase/client'
 // server-side filters, and simpler than incrementing counts locally
 // (avoids drift on race conditions / missed events).
 //
-// Only counts pending+confirmed rows; cancelled/resigned/disqualified
-// bookings free their seat so capacity math treats them as if never
-// booked, matching the payment API's guard.
+// Why RPC instead of a direct SELECT:
+//   mock_bookings RLS ("Users can manage own bookings") only lets a
+//   caller see rows where auth.uid() = user_id. A browser-side COUNT
+//   therefore only reports the CURRENT user's bookings, which made the
+//   remaining-seats badge wrong the moment two different users booked
+//   the same session. The RPC is SECURITY DEFINER (migration 031), so
+//   it aggregates across all users while still keeping row contents
+//   invisible — only the total per schedule is returned.
 //
-// The dep key uses the sorted, joined id list so parent re-renders
-// don't force resubscription unless the actual set of schedules changed.
+// Only counts pending+confirmed rows; cancelled/resigned bookings free
+// their seat so capacity math treats them as if never booked, matching
+// the payment API's guard.
 
-const COUNTED_STATUSES = ['pending', 'confirmed'] as const
+interface BookedRow {
+  schedule_id: string
+  booked_count: number
+}
 
 export function useAllBookingCounts(scheduleIds: string[]): Record<string, number> {
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -32,20 +41,39 @@ export function useAllBookingCounts(scheduleIds: string[]): Record<string, numbe
     let cancelled = false
 
     const fetchAll = async () => {
-      const { data } = await supabase
-        .from('mock_bookings')
-        .select('schedule_id, status')
-        .in('schedule_id', scheduleIds)
-        .in('status', COUNTED_STATUSES as unknown as string[])
+      const { data, error } = await supabase.rpc('get_schedules_booked_counts', {
+        p_schedule_ids: scheduleIds,
+      })
 
       if (cancelled) return
+      if (error) {
+        // If the RPC doesn't exist yet (migration 031 not applied), fall
+        // back to a direct SELECT so the UI still works in dev — it'll
+        // just under-count until the migration lands. Log so it's not
+        // silently wrong forever.
+        // eslint-disable-next-line no-console
+        console.warn('[useAllBookingCounts] RPC failed, falling back:', error.message)
+        const fallback = await supabase
+          .from('mock_bookings')
+          .select('schedule_id, status')
+          .in('schedule_id', scheduleIds)
+          .in('status', ['pending', 'confirmed'])
+        const map: Record<string, number> = {}
+        for (const id of scheduleIds) map[id] = 0
+        for (const b of (fallback.data ?? [])) {
+          const sid = (b as { schedule_id: string }).schedule_id
+          if (sid in map) map[sid] += 1
+        }
+        setCounts(map)
+        return
+      }
+
       // Seed every id at 0 so consumers can freely read counts[id]
       // without null-checking; ids with no bookings stay 0.
       const map: Record<string, number> = {}
       for (const id of scheduleIds) map[id] = 0
-      for (const b of (data ?? [])) {
-        const sid = (b as { schedule_id: string }).schedule_id
-        if (sid in map) map[sid] += 1
+      for (const row of (data ?? []) as BookedRow[]) {
+        if (row.schedule_id in map) map[row.schedule_id] = row.booked_count
       }
       setCounts(map)
     }

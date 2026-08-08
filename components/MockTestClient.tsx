@@ -1,16 +1,17 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   Calendar, Clock, CheckCircle, CreditCard, BookOpen,
   Headphones, PenTool, AlertCircle, ArrowRight, Loader2,
-  RefreshCw, PartyPopper, XCircle, Ban, Users,
+  RefreshCw, PartyPopper, XCircle, Ban, Users, AlertTriangle,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useAllBookingCounts } from '@/lib/hooks/useAllBookingCounts'
+import { createClient } from '@/lib/supabase/client'
 
 export interface MockScheduleWithBooking {
   id: string
@@ -162,7 +163,7 @@ export function MockTestClient({ userId }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, schedules])
 
-  const load = async (silent = false) => {
+  const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true)
     try {
       const res = await fetch('/api/mock/schedules')
@@ -170,9 +171,27 @@ export function MockTestClient({ userId }: Props) {
     } finally {
       setLoading(false); setRefreshing(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [load])
+
+  // Realtime schedule updates. When an admin edits a schedule's time,
+  // section files, or capacity, the browser tab needs to re-fetch so the
+  // card reflects the change without a manual refresh. Uses the shared
+  // supabase-realtime publication added in migration 031. One channel
+  // per page, not per card — same pattern as the bookings subscription.
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('mock_schedules_page')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mock_schedules' },
+        () => { void load(true) },
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [load])
 
   if (loading) {
     return (
@@ -224,15 +243,22 @@ export function MockTestClient({ userId }: Props) {
           const hasWriting  = !!(s.writing_task1_topic || s.writing_task2_topic)
 
           // Capacity math: unlimited when capacity is null. Booked = live
-          // count from useAllBookingCounts (0 until the first fetch),
-          // remaining clamped to zero, "critical" once fewer than 11 seats
-          // remain (matches the amber styling the design brief specified).
+          // count from useAllBookingCounts (RPC-backed so it aggregates
+          // across all users, not just auth.uid()). Remaining clamped to
+          // zero. Three UI tiers:
+          //   full      → red, no pulse (nothing to hurry about)
+          //   urgent    → red, pulse ring, "Only N left!" copy (≤10)
+          //   warning   → amber, no pulse (11..20)
+          //   available → emerald (>20)
+          // The card is not shown at all unless a card should render, so
+          // these flags are safe to derive unconditionally.
           const capacity = s.capacity
           const isUnlimited = capacity === null || capacity === undefined
           const booked = bookingCounts[s.id] ?? 0
           const seatsRemaining = isUnlimited ? null : Math.max(0, (capacity as number) - booked)
           const isFull = !isUnlimited && seatsRemaining === 0
-          const isCritical = !isUnlimited && seatsRemaining !== null && seatsRemaining > 0 && seatsRemaining <= 10
+          const isUrgent = !isUnlimited && seatsRemaining !== null && seatsRemaining > 0 && seatsRemaining <= 10
+          const isWarning = !isUnlimited && seatsRemaining !== null && seatsRemaining > 10 && seatsRemaining <= 20
 
           return (
             <motion.div key={s.id}
@@ -246,6 +272,69 @@ export function MockTestClient({ userId }: Props) {
                     ? '1px solid rgba(34,197,94,0.35)'
                     : '1px solid var(--border)',
               }}>
+
+              {/* ── Seats-remaining banner — top of card, prominent.
+                  Hidden for unlimited sessions. Urgent tier (≤10) uses
+                  a red pill with a pulsing dot and an ⚠ prefix so
+                  users glance up and see it before anything else. */}
+              {!isUnlimited && (
+                <div className="px-5 pt-5">
+                  <span
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${isUrgent ? 'animate-pulse' : ''}`}
+                    style={{
+                      background: isFull
+                        ? 'rgba(239,68,68,0.15)'
+                        : isUrgent
+                          ? 'rgba(239,68,68,0.15)'
+                          : isWarning
+                            ? 'rgba(245,158,11,0.15)'
+                            : 'rgba(16,185,129,0.15)',
+                      color: isFull
+                        ? 'var(--error)'
+                        : isUrgent
+                          ? 'var(--error)'
+                          : isWarning
+                            ? 'var(--warning)'
+                            : 'var(--success)',
+                      border: `1px solid ${
+                        isFull ? 'rgba(239,68,68,0.4)'
+                        : isUrgent ? 'rgba(239,68,68,0.4)'
+                        : isWarning ? 'rgba(245,158,11,0.4)'
+                        : 'rgba(16,185,129,0.3)'
+                      }`,
+                      boxShadow: isUrgent ? '0 4px 20px rgba(239,68,68,0.15)' : undefined,
+                    }}
+                  >
+                    {/* Coloured dot + optional ping animation on the
+                        urgent tier so the eye catches the card. */}
+                    <span className="relative inline-flex w-2 h-2">
+                      {isUrgent && (
+                        <span
+                          className="absolute inline-flex h-full w-full rounded-full animate-ping"
+                          style={{ background: 'rgba(239,68,68,0.6)' }}
+                        />
+                      )}
+                      <span
+                        className="relative inline-flex rounded-full w-2 h-2"
+                        style={{
+                          background: isFull
+                            ? '#ef4444'
+                            : isUrgent
+                              ? '#ef4444'
+                              : isWarning
+                                ? '#f59e0b'
+                                : '#10b981',
+                        }}
+                      />
+                    </span>
+                    {isFull
+                      ? <><Users size={13} /> {t('mockTest.full')}</>
+                      : isUrgent
+                        ? <><AlertTriangle size={13} /> {t('mockTest.hurryUp', { count: seatsRemaining as number })}</>
+                        : <><Users size={13} /> {t('mockTest.seatsLeft', { count: seatsRemaining as number })}</>}
+                  </span>
+                </div>
+              )}
 
               <div className="p-5 flex flex-wrap items-start justify-between gap-4">
                 {/* ── Left: date badge + info ── */}
@@ -271,35 +360,6 @@ export function MockTestClient({ userId }: Props) {
                     <div className="flex items-center gap-1.5 text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
                       <Clock size={13} /> {formatTime(s.time)} &middot; {formatDisplayDate(s.date)}
                     </div>
-
-                    {/* Seats-left chip. Hidden for unlimited sessions —
-                        showing "∞ seats" is noise. Red when full, amber-
-                        pulsing when 1..10 seats left, green otherwise. */}
-                    {!isUnlimited && (
-                      <div className="mb-2">
-                        <span
-                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${isCritical ? 'animate-pulse' : ''}`}
-                          style={{
-                            background: isFull
-                              ? 'rgba(239,68,68,0.1)'
-                              : isCritical
-                                ? 'rgba(245,158,11,0.1)'
-                                : 'rgba(16,185,129,0.1)',
-                            color: isFull
-                              ? 'var(--error)'
-                              : isCritical
-                                ? 'var(--warning)'
-                                : 'var(--success)',
-                            border: `1px solid ${isFull ? 'rgba(239,68,68,0.3)' : isCritical ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
-                          }}
-                        >
-                          <Users size={11} />
-                          {isFull
-                            ? t('mockTest.full')
-                            : t('mockTest.seatsLeft', { count: seatsRemaining as number })}
-                        </span>
-                      </div>
-                    )}
 
                     {/* Section chips */}
                     <div className="flex flex-wrap gap-1.5">
