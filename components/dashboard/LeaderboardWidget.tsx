@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Trophy, Star, ChevronRight, Pencil } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { UsernameEditModal } from '@/components/UsernameEditModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+
+// Dynamic — modal opens only when the user clicks the edit pencil on
+// their own row. Keeps the dashboard first paint lighter.
+const UsernameEditModal = dynamic(() => import('@/components/UsernameEditModal').then(m => ({ default: m.UsernameEditModal })), { ssr: false })
 
 // Dashboard bento tile: top-5 leaderboard + the current user's own rank.
 // Fetches on mount and on window focus, throttled to one fetch per 30s
@@ -67,8 +72,19 @@ function RankBadge({ rank }: { rank: number }) {
 
 function Avatar({ url, name, size = 32 }: { url: string | null; name: string | null; size?: number }) {
   if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />
+    // next/image gives us automatic AVIF/WebP + responsive srcset for the
+    // Supabase avatar URLs. size is a fixed pixel width; we pass it as
+    // both width and height because the container is a perfect square.
+    return (
+      <Image
+        src={url}
+        alt=""
+        width={size}
+        height={size}
+        className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }}
+      />
+    )
   }
   return (
     <span
@@ -207,16 +223,18 @@ export function LeaderboardWidget() {
           </Link>
         </>
       )}
-      <UsernameEditModal
-        open={usernameEditOpen}
-        currentUsername={
-          (topUsers ?? []).find(u => u.user_id === myUserId)?.username
-          ?? myRank?.username
-          ?? null
-        }
-        onClose={() => setUsernameEditOpen(false)}
-        onSaved={() => { void load(true) }}
-      />
+      {usernameEditOpen && (
+        <UsernameEditModal
+          open
+          currentUsername={
+            (topUsers ?? []).find(u => u.user_id === myUserId)?.username
+            ?? myRank?.username
+            ?? null
+          }
+          onClose={() => setUsernameEditOpen(false)}
+          onSaved={() => { void load(true) }}
+        />
+      )}
     </div>
   )
 }

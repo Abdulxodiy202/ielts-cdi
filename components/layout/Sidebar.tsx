@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -16,11 +18,18 @@ import { useTheme } from '@/components/providers/ThemeProvider'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useSidebar } from '@/contexts/SidebarContext'
 import { createClient } from '@/lib/supabase/client'
-import { PaymentModal } from '@/components/PaymentModal'
 import { ToastContainer, type ToastData } from '@/components/ui/Toast'
-import { AvatarViewModal } from '@/components/AvatarViewModal'
-import { UsernameEditModal } from '@/components/UsernameEditModal'
 import { isActivePremium } from '@/lib/utils/premium'
+
+// Modals only ever open on user interaction (Upgrade button, avatar click,
+// username edit). Lazy-loading pulls PaymentModal (+ its payment form,
+// file upload, framer-motion overlays), AvatarViewModal, and
+// UsernameEditModal out of the initial sidebar bundle — every dashboard
+// page pays this cost otherwise. ssr:false because they render nothing
+// until opened and their internals use browser-only APIs.
+const PaymentModal      = dynamic(() => import('@/components/PaymentModal').then(m => ({ default: m.PaymentModal })),           { ssr: false })
+const AvatarViewModal   = dynamic(() => import('@/components/AvatarViewModal').then(m => ({ default: m.AvatarViewModal })),    { ssr: false })
+const UsernameEditModal = dynamic(() => import('@/components/UsernameEditModal').then(m => ({ default: m.UsernameEditModal })), { ssr: false })
 
 interface Profile {
   full_name: string | null
@@ -617,7 +626,13 @@ export function Sidebar() {
                           borderRadius: 4, overflow: 'hidden', cursor: 'pointer', padding: 0,
                           opacity: lang === code ? 1 : 0.45, transition: 'all 0.2s',
                         }}>
-                          <img src={`https://flagcdn.com/w80/${flag}.png`} alt={code} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <Image
+                            src={`https://flagcdn.com/w80/${flag}.png`}
+                            alt={code}
+                            width={80}
+                            height={54}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
                         </button>
                       ))}
                     </div>
@@ -859,29 +874,36 @@ export function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* Premium modal */}
-      <PaymentModal
-        isOpen={upgradeOpen}
-        onClose={() => setUpgradeOpen(false)}
-        onSuccess={() => { setUpgradeOpen(false) }}
-        type="premium"
-        amount={50000}
-        initialName={profile?.full_name ?? ''}
-      />
+      {/* Modals — conditionally mounted so their dynamic() imports don't
+          fire until the user actually opens them. */}
+      {upgradeOpen && (
+        <PaymentModal
+          isOpen
+          onClose={() => setUpgradeOpen(false)}
+          onSuccess={() => { setUpgradeOpen(false) }}
+          type="premium"
+          amount={50000}
+          initialName={profile?.full_name ?? ''}
+        />
+      )}
 
       {/* Instagram-style avatar viewer + username editor */}
-      <AvatarViewModal
-        open={avatarViewOpen}
-        onClose={() => setAvatarViewOpen(false)}
-        avatarUrl={avatarUrl}
-        displayName={displayName}
-      />
-      <UsernameEditModal
-        open={usernameEditOpen}
-        currentUsername={username}
-        onClose={() => setUsernameEditOpen(false)}
-        onSaved={(u) => setProfile(prev => prev ? { ...prev, username: u } : prev)}
-      />
+      {avatarViewOpen && (
+        <AvatarViewModal
+          open
+          onClose={() => setAvatarViewOpen(false)}
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+        />
+      )}
+      {usernameEditOpen && (
+        <UsernameEditModal
+          open
+          currentUsername={username}
+          onClose={() => setUsernameEditOpen(false)}
+          onSaved={(u) => setProfile(prev => prev ? { ...prev, username: u } : prev)}
+        />
+      )}
 
       <ToastContainer toasts={toasts} onClose={removeToast} />
     </>

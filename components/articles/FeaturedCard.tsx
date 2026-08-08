@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -44,7 +45,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Today's Picks'dagi katta karta (col-span-2, row-span-2). Chap
 // tarafda kategoriya rangida qalinroq accent chiziq, ichida keng
 // description + ajratuvchi + o'qish vaqti.
-export function FeaturedCard({ article, description, content, locked = false, delay = 0 }: FeaturedCardProps) {
+function FeaturedCardInner({ article, description, content, locked = false, delay = 0 }: FeaturedCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -145,3 +146,5 @@ export function FeaturedCard({ article, description, content, locked = false, de
     </motion.div>
   )
 }
+
+export const FeaturedCard = memo(FeaturedCardInner)

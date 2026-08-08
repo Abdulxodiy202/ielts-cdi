@@ -16,7 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [videoRes, profileRes] = await Promise.all([
     admin
       .from('video_lessons')
-      .select('*')
+      // Client renders these seven fields — everything else on the row
+      // (created_at, is_published, admin metadata) never reaches the UI.
+      .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, category')
       .eq('id', id)
       .eq('is_published', true)
       .single(),

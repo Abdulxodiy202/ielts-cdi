@@ -2,9 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { ChevronLeft, Lock } from 'lucide-react'
-import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+
+// PaymentModal only opens when a locked-video user clicks the upgrade CTA.
+// Dynamic import keeps it out of the initial video-page bundle.
+const PaymentModal = dynamic(() => import('@/components/PaymentModal').then(m => ({ default: m.PaymentModal })), { ssr: false })
 
 interface VideoLesson {
   id: string
@@ -132,8 +137,14 @@ export default function VideoDetailPage() {
         {locked ? (
           <>
             {thumbSrc && (
-              <img src={thumbSrc} alt={video.title}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(10px) brightness(0.25)' }} />
+              <Image
+                src={thumbSrc}
+                alt={video.title}
+                fill
+                sizes="100vw"
+                priority
+                style={{ objectFit: 'cover', filter: 'blur(10px) brightness(0.25)' }}
+              />
             )}
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 32 }}>
               <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -176,13 +187,15 @@ export default function VideoDetailPage() {
         ) : null}
       </div>
 
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onSuccess={() => setShowPaymentModal(false)}
-        type="premium"
-        amount={50000}
-      />
+      {showPaymentModal && (
+        <PaymentModal
+          isOpen
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => setShowPaymentModal(false)}
+          type="premium"
+          amount={50000}
+        />
+      )}
     </div>
   )
 }

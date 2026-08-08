@@ -8,7 +8,11 @@ import { X, Clock, ClipboardCheck } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
 import { PremiumGuard } from '@/components/PremiumGuard'
-import MusicPlayer from '@/components/MusicPlayer'
+import dynamic from 'next/dynamic'
+
+// MusicPlayer is 100% client (WebAudio + persistent volume/mute), only
+// appears while reading — dynamic keeps it out of the article shell.
+const MusicPlayer = dynamic(() => import('@/components/MusicPlayer'), { ssr: false })
 import { CATEGORY_COLOR, CATEGORY_LABEL, articleCategoryFor, articleReadMinutesFor } from '@/lib/utils/articleCategory'
 import { difficultyColor } from '@/lib/utils/articleDifficulty'
 import { useLanguage } from '@/lib/i18n/LanguageContext'

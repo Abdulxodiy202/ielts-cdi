@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, Trophy, Star, Info, X, Pencil } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { createClient } from '@/lib/supabase/client'
-import { UsernameEditModal } from '@/components/UsernameEditModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+
+// Modal opens only when the current user clicks the edit-pencil next to
+// their name — no need to ship it in the initial leaderboard bundle.
+const UsernameEditModal = dynamic(() => import('@/components/UsernameEditModal').then(m => ({ default: m.UsernameEditModal })), { ssr: false })
 
 // Full leaderboard: podium (top 3) + table (4..50) + sticky "your rank"
 // footer when the current user is outside the visible range.
@@ -61,8 +66,16 @@ function initials(name: string | null): string {
 
 function Avatar({ url, name, size }: { url: string | null; name: string | null; size: number }) {
   if (url) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt="" className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />
+    return (
+      <Image
+        src={url}
+        alt=""
+        width={size}
+        height={size}
+        className="rounded-full object-cover shrink-0"
+        style={{ width: size, height: size }}
+      />
+    )
   }
   return (
     <span
@@ -435,12 +448,14 @@ export default function LeaderboardPage() {
       )}
 
       <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
-      <UsernameEditModal
-        open={usernameEditOpen}
-        currentUsername={myCurrentUsername}
-        onClose={() => setUsernameEditOpen(false)}
-        onSaved={() => setReloadTick(t => t + 1)}
-      />
+      {usernameEditOpen && (
+        <UsernameEditModal
+          open
+          currentUsername={myCurrentUsername}
+          onClose={() => setUsernameEditOpen(false)}
+          onSaved={() => setReloadTick(t => t + 1)}
+        />
+      )}
     </div>
   )
 }

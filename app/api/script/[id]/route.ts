@@ -11,7 +11,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params
   const [scriptRes, profileRes] = await Promise.all([
-    supabase.from('scripts').select('*').eq('id', id).eq('is_active', true).single(),
+    supabase
+      .from('scripts')
+      // Fields the /listening/script/[id] client reads: id (for attempts),
+      // title, transcript, audio_url, order_index. is_premium powers the
+      // paywall gate below and stays on the response payload.
+      .select('id, title, transcript, audio_url, order_index, is_premium')
+      .eq('id', id).eq('is_active', true).single(),
     supabase.from('profiles').select('is_premium, premium_until').eq('id', user.id).single(),
   ])
 

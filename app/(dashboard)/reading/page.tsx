@@ -15,9 +15,12 @@ import { isActivePremium } from '@/lib/utils/premium'
 const getCachedReadingTests = unstable_cache(
   async () => {
     const supabase = createAdminClient()
+    // Only fields the downstream TestListClient uses -- narrows the row
+     // payload (tests table has body/answers/audio columns we never render
+     // in the list view).
     const { data } = await supabase
       .from('tests')
-      .select('*')
+      .select('id, title, description, is_premium, order_number')
       .eq('type', 'reading')
       .eq('is_published', true)
       .order('order_number')

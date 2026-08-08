@@ -19,7 +19,10 @@ export default async function ReadingTestPage({ params }: Props) {
   const [testRes, profileRes] = await Promise.all([
     supabase
       .from('tests')
-      .select('*, passages(*), questions(*)')
+      // Only what ReadingTestClient reads off the row (id/title/file_url)
+      // plus its two join tables. `is_premium` is needed for the paywall
+      // check below.
+      .select('id, title, file_url, is_premium, passages(*), questions(*)')
       .eq('id', testId)
       .eq('is_published', true)
       .single(),

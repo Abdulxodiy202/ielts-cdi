@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -23,7 +24,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Library ArticleCard'idan kichikroq -- kichik badge'lar, kam
 // padding, 140px min balandlik. Chap accent chiziq (kategoriya
 // rangida) mavjud.
-export function SmallCard({ article, locked = false, delay = 0 }: SmallCardProps) {
+function SmallCardInner({ article, locked = false, delay = 0 }: SmallCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -108,3 +109,7 @@ export function SmallCard({ article, locked = false, delay = 0 }: SmallCardProps
     </motion.div>
   )
 }
+
+// memo — same rationale as ArticleCard: Today's Picks re-renders when
+// unrelated hub state changes, and each card's props are stable arrays.
+export const SmallCard = memo(SmallCardInner)

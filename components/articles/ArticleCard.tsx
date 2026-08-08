@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import Link from 'next/link'
 import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -29,8 +30,11 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 
 // Library grid'i uchun kichik karta. Chap tarafda kategoriya rangida
 // 4px'lik accent chiziq (spec 3-bo'lim). Sarlavha 2 qatorgacha
-// clamp qilinadi.
-export function ArticleCard({ article, locked = false, delay = 0 }: ArticleCardProps) {
+// clamp qilinadi. memo -- parent (Articles list) has many cards and
+// re-renders whenever any card-independent state changes (filter,
+// search); article rows themselves don't change between renders, so
+// memo skips the whole subtree.
+function ArticleCardInner({ article, locked = false, delay = 0 }: ArticleCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -108,3 +112,5 @@ export function ArticleCard({ article, locked = false, delay = 0 }: ArticleCardP
     </motion.div>
   )
 }
+
+export const ArticleCard = memo(ArticleCardInner)

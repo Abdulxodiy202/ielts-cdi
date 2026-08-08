@@ -18,7 +18,9 @@ export default async function ListeningTestPage({ params }: Props) {
   const [testRes, profileRes] = await Promise.all([
     supabase
       .from('tests')
-      .select('*, questions(*)')
+      // Only what ListeningTestClient reads (id/title/file_url) plus its
+      // one join table. `is_premium` powers the paywall check below.
+      .select('id, title, file_url, is_premium, questions(*)')
       .eq('id', testId)
       .eq('is_published', true)
       .single(),

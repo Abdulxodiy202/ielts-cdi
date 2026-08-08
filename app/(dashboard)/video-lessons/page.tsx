@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Lock, Play, ClipboardCheck } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -179,10 +180,14 @@ export default function VideoLessonsPage() {
                   <div style={{ position: 'relative', width: 180, flexShrink: 0 }}>
                     <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
                       {thumbSrc ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumbSrc} alt={v.title}
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
-                            filter: locked ? 'blur(3px) brightness(0.5)' : undefined }} />
+                        <Image
+                          src={thumbSrc}
+                          alt={v.title}
+                          fill
+                          sizes="180px"
+                          style={{ objectFit: 'cover',
+                            filter: locked ? 'blur(3px) brightness(0.5)' : undefined }}
+                        />
                       ) : (
                         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                           background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))' }}>

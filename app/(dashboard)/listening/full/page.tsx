@@ -20,7 +20,7 @@ const getCachedFullListeningTests = unstable_cache(
     const supabase = createAdminClient()
     const { data } = await supabase
       .from('tests')
-      .select('*')
+      .select('id, title, description, is_premium, order_number')
       .eq('type', 'listening')
       .eq('is_published', true)
       .lt('order_number', 1000)

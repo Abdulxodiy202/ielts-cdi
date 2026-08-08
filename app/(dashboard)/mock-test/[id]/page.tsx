@@ -44,7 +44,8 @@ export default async function MockTestTakePage({ params }: Props) {
   }
   const { data: rawSchedule, error } = await admin
     .from('mock_schedules')
-    .select('*')
+    // Matches the MockSchedule shape MockTestFlow consumes below.
+    .select('id, date, time, status, reading_file_url, listening_file_url, writing_task1_image_url, writing_task1_topic, writing_task2_topic')
     .eq('id', id)
     .single()
 
