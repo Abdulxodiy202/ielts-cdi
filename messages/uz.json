@@ -552,6 +552,17 @@
     "rate2": "1★ = 2 ball",
     "rate1": "1★ = 1 ball"
   },
+  "admin": {
+    "mockTest": {
+      "capacity": "Joylar soni",
+      "unlimited": "Cheksiz"
+    }
+  },
+  "mockTest": {
+    "seatsLeft": "{count} joy qoldi",
+    "full": "Joylar to'ldi",
+    "fullMessage": "Uzr, bu seansda joylar to'ldi. Boshqa seansni tanlang."
+  },
   "errorPage": {
     "somethingWentWrong": "Nimadir noto'g'ri ketdi",
     "tryAgain": "Qayta urinib ko'ring",

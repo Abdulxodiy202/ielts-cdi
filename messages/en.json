@@ -552,6 +552,17 @@
     "rate2": "1★ = 2 points",
     "rate1": "1★ = 1 point"
   },
+  "admin": {
+    "mockTest": {
+      "capacity": "Capacity",
+      "unlimited": "Unlimited"
+    }
+  },
+  "mockTest": {
+    "seatsLeft": "{count} seats left",
+    "full": "Full",
+    "fullMessage": "Sorry, this session is full. Please book another session."
+  },
   "errorPage": {
     "somethingWentWrong": "Something went wrong",
     "tryAgain": "Try again",

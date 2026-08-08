@@ -144,7 +144,15 @@ export function PaymentModal({
       const res = await fetch('/api/payment', { method: 'POST', body: formData })
       const json = await res.json()
       if (!res.ok) {
-        setError(json.error || t('payment.genericError'))
+        // The payment API returns { error: 'session_full', message: '...' }
+        // when a mock session's capacity is exhausted (migration 030).
+        // Map that error code to the localized copy so users see a real
+        // sentence instead of "session_full"; fall through to `message`
+        // then `error` for everything else.
+        const localized =
+          json.error === 'session_full' ? t('mockTest.fullMessage')
+          : json.message || json.error || t('payment.genericError')
+        setError(localized)
         setLoading(false)
         return
       }

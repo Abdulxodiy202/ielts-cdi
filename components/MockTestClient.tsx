@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   Calendar, Clock, CheckCircle, CreditCard, BookOpen,
   Headphones, PenTool, AlertCircle, ArrowRight, Loader2,
-  RefreshCw, PartyPopper, XCircle, Ban,
+  RefreshCw, PartyPopper, XCircle, Ban, Users,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
+import { useAllBookingCounts } from '@/lib/hooks/useAllBookingCounts'
 
 export interface MockScheduleWithBooking {
   id: string
@@ -21,6 +22,8 @@ export interface MockScheduleWithBooking {
   writing_task1_image_url: string | null
   writing_task1_topic: string | null
   writing_task2_topic: string | null
+  /** NULL = unlimited seats; integer ≥ 1 = hard cap (migration 030). */
+  capacity: number | null
   userBooking:      { id: string; status: string; payment_status: string } | null
   isSubmitted:      boolean
   submissionStatus: string | null
@@ -109,6 +112,13 @@ export function MockTestClient({ userId }: Props) {
   const [loading,       setLoading]       = useState(true)
   const [refreshing,    setRefreshing]    = useState(false)
   const [modalSchedule, setModalSchedule] = useState<MockScheduleWithBooking | null>(null)
+
+  // Realtime booking counts for every schedule on the page — one shared
+  // channel, refetched on any mock_bookings change. `useMemo` stops the
+  // hook's dep key from churning when React returns a fresh array each
+  // render even if the ids didn't change.
+  const scheduleIds = useMemo(() => schedules.map(s => s.id), [schedules])
+  const bookingCounts = useAllBookingCounts(scheduleIds)
 
   // 1-second tick to keep countdowns live
   const [tick, setTick] = useState(0)
@@ -213,6 +223,17 @@ export function MockTestClient({ userId }: Props) {
           const hasListening = !!s.listening_file_url
           const hasWriting  = !!(s.writing_task1_topic || s.writing_task2_topic)
 
+          // Capacity math: unlimited when capacity is null. Booked = live
+          // count from useAllBookingCounts (0 until the first fetch),
+          // remaining clamped to zero, "critical" once fewer than 11 seats
+          // remain (matches the amber styling the design brief specified).
+          const capacity = s.capacity
+          const isUnlimited = capacity === null || capacity === undefined
+          const booked = bookingCounts[s.id] ?? 0
+          const seatsRemaining = isUnlimited ? null : Math.max(0, (capacity as number) - booked)
+          const isFull = !isUnlimited && seatsRemaining === 0
+          const isCritical = !isUnlimited && seatsRemaining !== null && seatsRemaining > 0 && seatsRemaining <= 10
+
           return (
             <motion.div key={s.id}
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
@@ -250,6 +271,35 @@ export function MockTestClient({ userId }: Props) {
                     <div className="flex items-center gap-1.5 text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
                       <Clock size={13} /> {formatTime(s.time)} &middot; {formatDisplayDate(s.date)}
                     </div>
+
+                    {/* Seats-left chip. Hidden for unlimited sessions —
+                        showing "∞ seats" is noise. Red when full, amber-
+                        pulsing when 1..10 seats left, green otherwise. */}
+                    {!isUnlimited && (
+                      <div className="mb-2">
+                        <span
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${isCritical ? 'animate-pulse' : ''}`}
+                          style={{
+                            background: isFull
+                              ? 'rgba(239,68,68,0.1)'
+                              : isCritical
+                                ? 'rgba(245,158,11,0.1)'
+                                : 'rgba(16,185,129,0.1)',
+                            color: isFull
+                              ? 'var(--error)'
+                              : isCritical
+                                ? 'var(--warning)'
+                                : 'var(--success)',
+                            border: `1px solid ${isFull ? 'rgba(239,68,68,0.3)' : isCritical ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                          }}
+                        >
+                          <Users size={11} />
+                          {isFull
+                            ? t('mockTest.full')
+                            : t('mockTest.seatsLeft', { count: seatsRemaining as number })}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Section chips */}
                     <div className="flex flex-wrap gap-1.5">
@@ -366,7 +416,14 @@ export function MockTestClient({ userId }: Props) {
                       {t('mock.timePassed')}
                     </div>
 
-                  /* ⑨ No booking → Book button */
+                  /* ⑨ No booking, session full → disabled label */
+                  ) : !s.userBooking && isFull ? (
+                    <div className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg text-center font-semibold"
+                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <Users size={12} /> {t('mockTest.full')}
+                    </div>
+
+                  /* ⑩ No booking → Book button */
                   ) : !s.userBooking ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"

@@ -103,6 +103,39 @@ export async function POST(request: NextRequest) {
   // Try with schedule_id first (migration 007); if the column doesn't exist yet
   // (error code 42703), fall back to inserting without it so the flow still works.
   if (type === 'mock_booking' && meta?.booking_date && meta?.time_slot) {
+    // Capacity guard (migration 030). If the schedule has a hard cap,
+    // reject when the current pending+confirmed booking count already
+    // meets or exceeds it — the payment_request row was already
+    // created above, but we haven't taken money yet and Telegram
+    // approval won't fire on 409, so this is a safe abort point.
+    // NULL capacity or missing column → skip (unlimited / pre-migration).
+    if (meta.schedule_id) {
+      const capAdmin = createAdminClient()
+      const { data: schedule } = await capAdmin
+        .from('mock_schedules')
+        .select('capacity')
+        .eq('id', meta.schedule_id)
+        .maybeSingle()
+      const cap = (schedule as { capacity?: number | null } | null)?.capacity ?? null
+      if (cap !== null && Number.isInteger(cap)) {
+        const { count } = await capAdmin
+          .from('mock_bookings')
+          .select('id', { count: 'exact', head: true })
+          .eq('schedule_id', meta.schedule_id)
+          .in('status', ['pending', 'confirmed'])
+        if ((count ?? 0) >= cap) {
+          return Response.json(
+            {
+              error: 'session_full',
+              message:
+                'Uzr, bu seansda joylar to\'ldi. Boshqa seansni tanlang.',
+            },
+            { status: 409 },
+          )
+        }
+      }
+    }
+
     const baseRow = {
       user_id: user.id,
       booking_date: meta.booking_date,

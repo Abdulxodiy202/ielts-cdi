@@ -19,6 +19,8 @@ export interface MockSchedule {
   writing_task1_image_url: string | null
   writing_task1_topic:     string | null
   writing_task2_topic:     string | null
+  /** NULL = unlimited seats; integer ≥ 1 = hard cap. */
+  capacity:                number | null
   created_at: string
 }
 
@@ -63,6 +65,10 @@ interface FormState {
   writing_task1_image_url: string | null
   writing_task1_topic:     string
   writing_task2_topic:     string
+  /** UI carries capacity as a string so the input can be blank; save
+      converts blank → null (unlimited) and numeric strings → integer. */
+  capacity:                string
+  unlimitedCapacity:       boolean
 }
 
 /* ─────────────────────────── Helpers ───────────────────────────────── */
@@ -77,6 +83,8 @@ function makeEmpty(): FormState {
     writing_task1_image_url: null,
     writing_task1_topic:     '',
     writing_task2_topic:     '',
+    capacity:                '',
+    unlimitedCapacity:       true,
   }
 }
 
@@ -91,6 +99,10 @@ function scheduleToForm(s: MockSchedule): FormState {
     writing_task1_image_url: s.writing_task1_image_url,
     writing_task1_topic:     s.writing_task1_topic ?? '',
     writing_task2_topic:     s.writing_task2_topic ?? '',
+    // capacity=null ⇒ show the "Unlimited" checkbox on and the input empty;
+    // an integer ⇒ prefill the number and let the admin edit it.
+    capacity:                s.capacity !== null && s.capacity !== undefined ? String(s.capacity) : '',
+    unlimitedCapacity:       s.capacity === null || s.capacity === undefined,
   }
 }
 
@@ -1018,12 +1030,34 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
     if (!form.date || !form.time) {
       setMessage({ ok: false, text: 'Sana va vaqt kiritilishi shart' }); return
     }
+    // Convert the UI's string-based capacity into what the API expects:
+    // null when Unlimited is checked or the input is blank; positive
+    // integer otherwise. Reject non-integers or <1 with a friendly toast
+    // so the DB check constraint never fires.
+    let capacityToSend: number | null = null
+    if (!form.unlimitedCapacity) {
+      const raw = form.capacity.trim()
+      if (raw === '') {
+        capacityToSend = null
+      } else {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || n < 1) {
+          setMessage({ ok: false, text: 'Joylar soni musbat butun son bo\'lishi kerak' })
+          return
+        }
+        capacityToSend = n
+      }
+    }
+
     setSaving(true); setMessage(null)
     try {
+      const { capacity: _c, unlimitedCapacity: _u, ...rest } = form
+      void _c; void _u
+      const payload = { ...rest, capacity: capacityToSend }
       const res = await fetch('/api/admin/mock-schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Xatolik')
@@ -1120,6 +1154,50 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                 <option value="active">Faol</option>
                 <option value="completed">Yakunlangan</option>
               </select>
+            </div>
+          </div>
+
+          {/* ── Capacity + Unlimited row ─────────────────────────────────
+              Admin picks a hard cap (integer) or ticks "Cheksiz" to leave
+              capacity=NULL. Booking API rejects the (N+1)th booking when
+              cap is set, and the user card shows "N seats left" or
+              "Full" based on realtime bookings count. */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5"
+                style={{ color: 'var(--text-muted)' }}>
+                <Users size={12} /> Joylar soni
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={10000}
+                disabled={form.unlimitedCapacity}
+                value={form.unlimitedCapacity ? '' : form.capacity}
+                onChange={e => setForm(p => ({ ...p, capacity: e.target.value }))}
+                placeholder="50"
+                className="input-field disabled:opacity-40"
+              />
+            </div>
+            <div className="flex flex-col justify-end">
+              <label
+                className="flex items-center gap-2.5 cursor-pointer px-3 py-2.5 rounded-xl transition-colors"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: `1px solid ${form.unlimitedCapacity ? 'rgba(168,85,247,0.5)' : 'var(--border)'}`,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.unlimitedCapacity}
+                  onChange={e => setForm(p => ({ ...p, unlimitedCapacity: e.target.checked }))}
+                  className="w-4 h-4"
+                  style={{ accentColor: 'var(--accent)' }}
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  Cheksiz
+                </span>
+              </label>
             </div>
           </div>
 

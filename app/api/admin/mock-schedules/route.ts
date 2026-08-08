@@ -45,10 +45,23 @@ export async function POST(request: NextRequest) {
     writing_task1_image_url,
     writing_task1_topic,
     writing_task2_topic,
+    capacity,
   } = body
 
   if (!date || !time) {
     return Response.json({ error: 'date va time kerak' }, { status: 400 })
+  }
+
+  // capacity: null = unlimited; positive integer = hard cap. Reject
+  // anything else early so an admin typo doesn't hit the DB check
+  // constraint with a confusing error.
+  let normalizedCapacity: number | null = null
+  if (capacity !== undefined && capacity !== null && capacity !== '') {
+    const n = Number(capacity)
+    if (!Number.isInteger(n) || n < 1) {
+      return Response.json({ error: 'capacity must be null or a positive integer' }, { status: 400 })
+    }
+    normalizedCapacity = n
   }
 
   const admin = createAdminClient()
@@ -63,6 +76,7 @@ export async function POST(request: NextRequest) {
     writing_task1_image_url: writing_task1_image_url ?? null,
     writing_task1_topic:     writing_task1_topic     ?? null,
     writing_task2_topic:     writing_task2_topic     ?? null,
+    capacity:                normalizedCapacity,
   }
 
   const { data, error } = await admin
