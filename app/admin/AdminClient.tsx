@@ -2486,7 +2486,10 @@ interface BookItem {
   source_type: BookSourceType | null
   pdf_url: string | null
   cover_image_url: string | null
+  /** @deprecated Kept for pre-migration rows; new writes go to _uz/_en. */
   recommendation: string | null
+  recommendation_uz: string | null
+  recommendation_en: string | null
   category: BookCategory
   is_premium: boolean
   is_published: boolean
@@ -2542,7 +2545,8 @@ function BooksTab() {
   const [editTitle, setEditTitle]                   = useState('')
   const [editAuthor, setEditAuthor]                 = useState('')
   const [editUrl, setEditUrl]                       = useState('')
-  const [editRecommendation, setEditRecommendation] = useState('')
+  const [editRecommendationUz, setEditRecommendationUz] = useState('')
+  const [editRecommendationEn, setEditRecommendationEn] = useState('')
   const [editCategory, setEditCategory]             = useState<BookCategory>(DEFAULT_BOOK_CATEGORY)
   const [editSourceType, setEditSourceType]         = useState<BookSourceType>('heyzine')
   const [editPdfFile, setEditPdfFile]               = useState<File | null>(null)
@@ -2590,7 +2594,12 @@ function BooksTab() {
     setEditTitle(b?.title ?? '')
     setEditAuthor(b?.author ?? '')
     setEditUrl(b?.heyzine_url ?? '')
-    setEditRecommendation(b?.recommendation ?? '')
+    // Pre-fill _uz from the legacy `recommendation` for books that predate
+    // the bilingual migration so admins don't lose the original copy when
+    // opening an old row for the first time. _en stays empty until they
+    // fill it in.
+    setEditRecommendationUz(b?.recommendation_uz ?? b?.recommendation ?? '')
+    setEditRecommendationEn(b?.recommendation_en ?? '')
     setEditCategory(b?.category ?? DEFAULT_BOOK_CATEGORY)
     // source_type + pdf state prefill. Eski qatorlarda source_type
     // null bo'lsa 'heyzine' default -- backward compat.
@@ -2655,9 +2664,16 @@ function BooksTab() {
 
   async function handleSave() {
     if (!selectedId || !selectedBook) return
-    const titleChanged          = editTitle.trim() && editTitle.trim()          !== selectedBook.title
-    const authorChanged         = editAuthor.trim()         !== (selectedBook.author         ?? '')
-    const recommendationChanged = editRecommendation.trim() !== (selectedBook.recommendation ?? '')
+    const titleChanged          = editTitle.trim() && editTitle.trim() !== selectedBook.title
+    const authorChanged         = editAuthor.trim() !== (selectedBook.author ?? '')
+    // Track each language separately. The legacy _uz-fallback pre-fill
+    // above means an admin loading an old book sees the original copy in
+    // the _uz slot; leaving it untouched keeps it equal to `recommendation`,
+    // so the "changed" check compares against the same fallback source.
+    const recUzBaseline = selectedBook.recommendation_uz ?? selectedBook.recommendation ?? ''
+    const recEnBaseline = selectedBook.recommendation_en ?? ''
+    const recommendationUzChanged = editRecommendationUz.trim() !== recUzBaseline.trim()
+    const recommendationEnChanged = editRecommendationEn.trim() !== recEnBaseline.trim()
     const categoryChanged       = editCategory !== (selectedBook.category ?? DEFAULT_BOOK_CATEGORY)
     const sourceTypeChanged     = editSourceType !== (selectedBook.source_type ?? 'heyzine')
     const heyzineChanged        = editSourceType === 'heyzine'
@@ -2665,7 +2681,7 @@ function BooksTab() {
       && editUrl.trim() !== (selectedBook.heyzine_url ?? '')
     const hasNewPdf             = editSourceType === 'pdf' && editPdfFile !== null
 
-    if (!titleChanged && !authorChanged && !recommendationChanged
+    if (!titleChanged && !authorChanged && !recommendationUzChanged && !recommendationEnChanged
       && !categoryChanged && !sourceTypeChanged && !heyzineChanged && !hasNewPdf) return
 
     // Manba turi ma'lumoti mavjudligini tasdiqlash -- bo'sh bo'lsa xato.
@@ -2688,10 +2704,11 @@ function BooksTab() {
       }
 
       const body: Record<string, unknown> = {}
-      if (titleChanged)          body.title          = editTitle.trim()
-      if (authorChanged)         body.author         = editAuthor.trim()
-      if (recommendationChanged) body.recommendation = editRecommendation.trim()
-      if (categoryChanged)       body.category       = editCategory
+      if (titleChanged)              body.title             = editTitle.trim()
+      if (authorChanged)             body.author            = editAuthor.trim()
+      if (recommendationUzChanged)   body.recommendation_uz = editRecommendationUz.trim() || null
+      if (recommendationEnChanged)   body.recommendation_en = editRecommendationEn.trim() || null
+      if (categoryChanged)           body.category          = editCategory
       if (sourceTypeChanged)     body.source_type    = editSourceType
       // Manba maydonlari: turga qarab bittasi to'ldiriladi, ikkinchisi
       // null'ga tushiriladi -- eski qiymat qolib ketmasin.
@@ -2994,15 +3011,34 @@ function BooksTab() {
                 )}
               </div>
             )}
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Tavsiya (nima uchun o&apos;qish kerak)</label>
-              <textarea
-                value={editRecommendation}
-                onChange={e => setEditRecommendation(e.target.value)}
-                placeholder="Bu kitob IELTS Reading uchun ideal, chunki..."
-                rows={3}
-                className="input-field w-full text-sm resize-none"
-              />
+            {/* Bilingual recommendation. Two textareas so admins can supply
+                the pitch in each language; UI falls back to _uz when _en
+                is empty, so filling _en is optional but recommended. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Tavsiya (O&apos;zbek) *
+                </label>
+                <textarea
+                  value={editRecommendationUz}
+                  onChange={e => setEditRecommendationUz(e.target.value)}
+                  placeholder="Bu kitob IELTS Reading uchun ideal, chunki..."
+                  rows={3}
+                  className="input-field w-full text-sm resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Recommendation (English) *
+                </label>
+                <textarea
+                  value={editRecommendationEn}
+                  onChange={e => setEditRecommendationEn(e.target.value)}
+                  placeholder="This book is ideal for IELTS Reading because..."
+                  rows={3}
+                  className="input-field w-full text-sm resize-none"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>Kategoriya *</label>

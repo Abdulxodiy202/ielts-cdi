@@ -681,6 +681,9 @@
     "bookCount": "{count} books",
     "open": "Open",
     "back": "Back",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "premiumBadge": "PRO",
     "emptyCategory": "No {category} books yet. Check back later!",
     "categories": {
       "grammar": "Grammar",

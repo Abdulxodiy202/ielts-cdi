@@ -681,6 +681,9 @@
     "bookCount": "{count} ta kitob",
     "open": "Ochish",
     "back": "Orqaga",
+    "showMore": "Ko'proq",
+    "showLess": "Yashirish",
+    "premiumBadge": "PRO",
     "emptyCategory": "Hali {category} kitoblari yo'q. Keyinroq qayta tekshiring!",
     "categories": {
       "grammar": "Grammatika",

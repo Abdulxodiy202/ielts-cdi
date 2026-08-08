@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { isAdmin } from '@/lib/admin-config'
 import { isBookCategory, DEFAULT_BOOK_CATEGORY } from '@/lib/utils/bookCategories'
 
-const SELECT = 'id, title, author, heyzine_url, source_type, pdf_url, cover_image_url, recommendation, category, is_premium, is_published, created_at'
+const SELECT = 'id, title, author, heyzine_url, source_type, pdf_url, cover_image_url, recommendation, recommendation_uz, recommendation_en, category, is_premium, is_published, created_at'
 
 export async function GET(req: NextRequest) {
   try {
