@@ -28,17 +28,48 @@ export async function GET() {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  const today = new Date().toISOString().split('T')[0]
 
-  // Upcoming schedules
-  const { data: schedules, error } = await admin
+  // Compute today's date + current time in Asia/Tashkent (UTC+5) so the
+  // date/time filter matches what the schedule was authored in. Using the
+  // server's UTC would drop today's evening sessions the moment UTC rolls
+  // past midnight — Uzbekistan users would lose the last 5 hours of the
+  // day for no reason.
+  const nowTashkent = new Date(Date.now() + 5 * 60 * 60 * 1000) // shift to UTC+5
+  const today = nowTashkent.toISOString().split('T')[0]           // YYYY-MM-DD (Tashkent)
+
+  // Upcoming schedules: (date > today) OR (date = today AND time >= now-5min).
+  // The 5-min grace is the same window the client uses for "you can still
+  // start" — filtering server-side more aggressively would remove sessions
+  // the user is legitimately about to enter. Anything older than that is
+  // silently dropped so past cards don't clutter the list.
+  //
+  // If Supabase rejects the OR shape (e.g. quoting quirks), the outer
+  // catch below falls back to the date-only filter so the page never
+  // 500s just because a filter refactor misfired.
+  type ScheduleRow = { id: string; date: string; time: string; [k: string]: unknown }
+  const graceMs = 5 * 60 * 1000
+  const cutoffTashkent = new Date(nowTashkent.getTime() - graceMs).toISOString().slice(11, 19)
+  const primaryRes = await admin
     .from('mock_schedules')
     .select('*')
-    .gte('date', today)
+    .or(`date.gt.${today},and(date.eq.${today},time.gte.${cutoffTashkent})`)
     .order('date', { ascending: true })
     .order('time', { ascending: true })
+  let schedules = primaryRes.data as ScheduleRow[] | null
+  let fetchError = primaryRes.error
+  if (fetchError) {
+    console.warn('[mock/schedules] OR filter failed, falling back to date-only:', fetchError.message)
+    const fallbackRes = await admin
+      .from('mock_schedules')
+      .select('*')
+      .gte('date', today)
+      .order('date', { ascending: true })
+      .order('time', { ascending: true })
+    schedules = fallbackRes.data as ScheduleRow[] | null
+    fetchError = fallbackRes.error
+  }
 
-  if (error) return Response.json({ error: error.message }, { status: 500 })
+  if (fetchError) return Response.json({ error: fetchError.message }, { status: 500 })
   if (!schedules?.length) return Response.json([])
 
   const ids = schedules.map(s => s.id)

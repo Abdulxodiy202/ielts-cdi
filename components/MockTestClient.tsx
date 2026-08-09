@@ -177,14 +177,29 @@ export function MockTestClient({ userId }: Props) {
   // per page, not per card — same pattern as the bookings subscription.
   useEffect(() => {
     const supabase = createClient()
+    // Debug logs mirror the useMyBookings hook. If the deleted-schedule
+    // ghost appears again, check DevTools for:
+    //   '[mock_schedules] subscribe status: SUBSCRIBED'
+    //   '[mock_schedules] event DELETE ...'
+    // No 'SUBSCRIBED' → mock_schedules not on supabase_realtime
+    // publication (fix: migration 033 or 031). No DELETE event on admin
+    // delete → publication is on but the row wasn't in the current page's
+    // filter (unlikely — no filter on this subscription).
     const channel = supabase
       .channel('mock_schedules_page')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'mock_schedules' },
-        () => { void load(true) },
+        (payload) => {
+          // eslint-disable-next-line no-console
+          console.log('[mock_schedules] event', payload.eventType, payload.new ?? payload.old)
+          void load(true)
+        },
       )
-      .subscribe()
+      .subscribe((status) => {
+        // eslint-disable-next-line no-console
+        console.log('[mock_schedules] subscribe status:', status)
+      })
     return () => { supabase.removeChannel(channel) }
   }, [load])
 

@@ -92,22 +92,34 @@ export async function POST(request: NextRequest) {
       // stays "held" in the old (pre-032) counting, and the user's
       // 5-minute cooldown never starts. updated_at → new.updated_at()
       // via trigger; the client reads that as the cooldown anchor.
+      //
+      // Logs are shipped to Vercel functions output so the "rejection
+      // notification doesn't reach the user" bug can be diagnosed
+      // without adding client-side telemetry. Look for:
+      //   [telegram-webhook] rejecting booking user=X schedule=Y
+      //   [telegram-webhook] reject result: {data, error, count}
+      // If error is set (e.g. code 23514 = CHECK violation), migration
+      // 033 hasn't run and 'rejected' is not in the status allowlist.
       if (payment.type === 'mock_booking' && payment.meta?.schedule_id) {
-        const { error: mbErr } = await admin
+        console.log('[telegram-webhook] rejecting booking user=', payment.user_id, 'schedule=', payment.meta.schedule_id)
+        const { data: mbData, error: mbErr, count: mbCount } = await admin
           .from('mock_bookings')
           .update({ status: 'rejected', payment_status: 'failed' })
           .eq('user_id', payment.user_id)
           .eq('schedule_id', payment.meta.schedule_id)
           .eq('status', 'pending')
+          .select()
+        console.log('[telegram-webhook] reject result:', { data: mbData, error: mbErr, count: mbCount })
         if (mbErr?.code === '42703' && payment.meta?.booking_date && payment.meta?.time_slot) {
           // Pre-migration-007 fallback: no schedule_id column yet.
-          await admin
+          const { error: fbErr } = await admin
             .from('mock_bookings')
             .update({ status: 'rejected', payment_status: 'failed' })
             .eq('user_id', payment.user_id)
             .eq('booking_date', payment.meta.booking_date)
             .eq('time_slot', payment.meta.time_slot)
             .eq('status', 'pending')
+          console.log('[telegram-webhook] reject fallback error:', fbErr)
         }
       }
 
