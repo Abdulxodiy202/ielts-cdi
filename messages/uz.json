@@ -561,8 +561,9 @@
   "mockTest": {
     "seatsLeft": "{count} joy qoldi",
     "full": "Joylar to'ldi",
+    "fullTitle": "Joylar to'ldi",
     "hurryUp": "Faqat {count} joy qoldi!",
-    "fullMessage": "Uzr, bu seansda joylar to'ldi. Boshqa seansni tanlang.",
+    "fullMessage": "Bu seansda joylar tugagan. Boshqa seansni tanlang.",
     "requestRejected": "So'rovingiz rad etildi",
     "rejectedMessage": "Admin sizning so'rovingizni rad etdi. Yangi so'rov yuborish uchun quyidagi vaqt kutib turing.",
     "cooldownRemaining": "Qolgan vaqt",

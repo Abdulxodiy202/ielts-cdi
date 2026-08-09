@@ -65,6 +65,17 @@ export function useMyBookings(
     // both a perf win (server only pushes our rows) and a correctness
     // one (avoids reacting to other users' events we couldn't read
     // anyway). Any change refetches the batch.
+    //
+    // The two console.log calls exist to diagnose the "admin rejected
+    // but user's tab never updates" report:
+    //   • '[useMyBookings] subscribe status' — should print 'SUBSCRIBED'
+    //     within ~1s. If it prints 'CHANNEL_ERROR' or 'TIMED_OUT' the
+    //     mock_bookings table isn't on supabase_realtime yet (fix:
+    //     migration 033).
+    //   • '[useMyBookings] event' — should print each time admin flips
+    //     the row (UPDATE with new.status='rejected'). If admin clicks
+    //     Reject and this doesn't print, the Telegram webhook isn't
+    //     actually writing to mock_bookings; check its error log.
     const channel = supabase
       .channel(`my_bookings_${userId}`)
       .on(
@@ -75,9 +86,16 @@ export function useMyBookings(
           table: 'mock_bookings',
           filter: `user_id=eq.${userId}`,
         },
-        () => { void fetchAll() },
+        (payload) => {
+          // eslint-disable-next-line no-console
+          console.log('[useMyBookings] event', payload.eventType, payload.new ?? payload.old)
+          void fetchAll()
+        },
       )
-      .subscribe()
+      .subscribe((status) => {
+        // eslint-disable-next-line no-console
+        console.log('[useMyBookings] subscribe status:', status)
+      })
 
     return () => {
       cancelled = true

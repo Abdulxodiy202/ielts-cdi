@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   Calendar, Clock, CheckCircle, CreditCard, BookOpen,
   Headphones, PenTool, ArrowRight, Loader2,
-  RefreshCw, PartyPopper, XCircle, Ban, Users, AlertTriangle,
+  RefreshCw, PartyPopper, XCircle, Ban, Users,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -307,65 +307,30 @@ export function MockTestClient({ userId }: Props) {
                     : '1px solid var(--border)',
               }}>
 
-              {/* ── Seats-remaining banner — top of card, prominent.
-                  Hidden for unlimited sessions. Urgent tier (≤10) uses
-                  a red pill with a pulsing dot and an ⚠ prefix so
-                  users glance up and see it before anything else. */}
-              {!isUnlimited && (
+              {/* ── Seats-remaining pill — ONLY visible when full. ────
+                  Product decision: users don't need to see "N seats
+                  left" while capacity still has room. Showing the
+                  countdown made booking feel like a race and leaked
+                  admin-facing data (capacity numbers). Only the "Full"
+                  state surfaces here; everything else is silent and the
+                  card looks like a plain schedule until seats run out.
+                  The urgent/warning tier calc below is kept unused for
+                  now so re-enabling the counter is a one-line flip. */}
+              {isFull && (
                 <div className="px-5 pt-5">
                   <span
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${isUrgent ? 'animate-pulse' : ''}`}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"
                     style={{
-                      background: isFull
-                        ? 'rgba(239,68,68,0.15)'
-                        : isUrgent
-                          ? 'rgba(239,68,68,0.15)'
-                          : isWarning
-                            ? 'rgba(245,158,11,0.15)'
-                            : 'rgba(16,185,129,0.15)',
-                      color: isFull
-                        ? 'var(--error)'
-                        : isUrgent
-                          ? 'var(--error)'
-                          : isWarning
-                            ? 'var(--warning)'
-                            : 'var(--success)',
-                      border: `1px solid ${
-                        isFull ? 'rgba(239,68,68,0.4)'
-                        : isUrgent ? 'rgba(239,68,68,0.4)'
-                        : isWarning ? 'rgba(245,158,11,0.4)'
-                        : 'rgba(16,185,129,0.3)'
-                      }`,
-                      boxShadow: isUrgent ? '0 4px 20px rgba(239,68,68,0.15)' : undefined,
+                      background: 'rgba(239,68,68,0.15)',
+                      color: 'var(--error)',
+                      border: '1px solid rgba(239,68,68,0.4)',
                     }}
                   >
-                    {/* Coloured dot + optional ping animation on the
-                        urgent tier so the eye catches the card. */}
-                    <span className="relative inline-flex w-2 h-2">
-                      {isUrgent && (
-                        <span
-                          className="absolute inline-flex h-full w-full rounded-full animate-ping"
-                          style={{ background: 'rgba(239,68,68,0.6)' }}
-                        />
-                      )}
-                      <span
-                        className="relative inline-flex rounded-full w-2 h-2"
-                        style={{
-                          background: isFull
-                            ? '#ef4444'
-                            : isUrgent
-                              ? '#ef4444'
-                              : isWarning
-                                ? '#f59e0b'
-                                : '#10b981',
-                        }}
-                      />
-                    </span>
-                    {isFull
-                      ? <><Users size={13} /> {t('mockTest.full')}</>
-                      : isUrgent
-                        ? <><AlertTriangle size={13} /> {t('mockTest.hurryUp', { count: seatsRemaining as number })}</>
-                        : <><Users size={13} /> {t('mockTest.seatsLeft', { count: seatsRemaining as number })}</>}
+                    <span
+                      className="inline-flex rounded-full w-2 h-2"
+                      style={{ background: '#ef4444' }}
+                    />
+                    <Users size={13} /> {t('mockTest.full')}
                   </span>
                 </div>
               )}
@@ -487,12 +452,11 @@ export function MockTestClient({ userId }: Props) {
                       style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
                       {t('mock.timePassed')}
                     </div>
-                  ) : !hasActiveBooking && isFull ? (
-                    <div className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg text-center font-semibold"
-                      style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
-                      <Users size={12} /> {t('mockTest.full')}
-                    </div>
-                  ) : !hasActiveBooking ? (
+                  /* Full state deliberately falls through the action
+                     column — the full-width "Joylar to'ldi" banner
+                     below owns the entire message so users can't tap
+                     an invisible Book button. */
+                  ) : !hasActiveBooking && !isFull ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                       style={{ background: 'var(--accent)' }}>
@@ -605,6 +569,33 @@ export function MockTestClient({ userId }: Props) {
                         {cooldownTimeStr}
                       </span>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Full-session banner — only when capacity is exhausted
+                  AND the user isn't already booked (a booked user's
+                  own banner takes priority since it's their own state,
+                  not a shared-resource state). Book button is gated
+                  above so the two can't coexist. */}
+              {isFull && !hasActiveBooking && (
+                <div className="px-5 pb-5">
+                  <div
+                    className="rounded-2xl p-4 space-y-1"
+                    style={{
+                      background: 'rgba(239,68,68,0.08)',
+                      border: '1px solid rgba(239,68,68,0.35)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <XCircle size={20} style={{ color: 'var(--error)' }} />
+                      <h4 className="font-bold text-base" style={{ color: 'var(--error)' }}>
+                        {t('mockTest.fullTitle')}
+                      </h4>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {t('mockTest.fullMessage')}
+                    </p>
                   </div>
                 </div>
               )}

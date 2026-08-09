@@ -561,8 +561,9 @@
   "mockTest": {
     "seatsLeft": "{count} seats left",
     "full": "Full",
+    "fullTitle": "All spots filled",
     "hurryUp": "Only {count} spots left!",
-    "fullMessage": "Sorry, this session is full. Please book another session.",
+    "fullMessage": "This session is full. Please choose another session.",
     "requestRejected": "Your request was rejected",
     "rejectedMessage": "The admin rejected your booking request. Please wait for the cooldown to end before submitting a new one.",
     "cooldownRemaining": "Time remaining",
