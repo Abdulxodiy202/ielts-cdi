@@ -11,7 +11,13 @@ import {
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useAllBookingCounts } from '@/lib/hooks/useAllBookingCounts'
+import { useMyBookings } from '@/lib/hooks/useMyBookings'
 import { createClient } from '@/lib/supabase/client'
+
+/** How long the user must wait after admin rejects a booking before
+ *  submitting a new one for the same schedule. Matches the server-side
+ *  guard in /api/payment. */
+const REJECT_COOLDOWN_MS = 5 * 60 * 1000
 
 export interface MockScheduleWithBooking {
   id: string
@@ -120,6 +126,12 @@ export function MockTestClient({ userId }: Props) {
   // render even if the ids didn't change.
   const scheduleIds = useMemo(() => schedules.map(s => s.id), [schedules])
   const bookingCounts = useAllBookingCounts(scheduleIds)
+
+  // My-own bookings, keyed by schedule_id, updated in realtime — used
+  // to overlay a "Rejected" banner + 5-minute cooldown timer when admin
+  // hits Reject in Telegram. Falls back to `s.userBooking` from the
+  // server payload when the hook hasn't populated yet.
+  const myBookings = useMyBookings(scheduleIds, userId)
 
   // 1-second tick to keep countdowns live
   const [tick, setTick] = useState(0)
@@ -231,9 +243,48 @@ export function MockTestClient({ userId }: Props) {
       {/* Schedule cards */}
       <AnimatePresence>
         {schedules.map((s, i) => {
-          const confirmed     = s.userBooking?.status === 'confirmed'
-          const pending       = s.userBooking?.status === 'pending'
-          const resigned      = s.userBooking?.status === 'resigned'
+          // Prefer the realtime `my_bookings` row when present — it's
+          // fresher than the initial server payload's `s.userBooking`
+          // (which won't reflect an admin approve/reject that landed
+          // after the page loaded). Server payload is the fallback for
+          // the first render before the hook's fetch resolves.
+          const liveBooking = myBookings[s.id]
+          const bookingStatus =
+            liveBooking?.status ?? s.userBooking?.status ?? null
+          const bookingUpdatedAt = liveBooking?.updated_at ?? null
+
+          const confirmed     = bookingStatus === 'confirmed'
+          const pending       = bookingStatus === 'pending'
+          const resigned      = bookingStatus === 'resigned'
+          const rejected      = bookingStatus === 'rejected' || bookingStatus === 'cancelled'
+
+          // Cooldown after rejection: 5-minute window anchored to
+          // updated_at (set by the trigger in migration 032 the moment
+          // status flipped). msLeft ticks down thanks to the parent
+          // `tick` state; when it hits 0 the banner disappears and the
+          // Book button becomes clickable again.
+          const rejectedAtMs = rejected && bookingUpdatedAt
+            ? new Date(bookingUpdatedAt).getTime()
+            : null
+          const cooldownEndMs = rejectedAtMs !== null ? rejectedAtMs + REJECT_COOLDOWN_MS : 0
+          const cooldownRemainingMs = rejected && cooldownEndMs
+            ? Math.max(0, cooldownEndMs - Date.now())
+            : 0
+          const inCooldown = cooldownRemainingMs > 0
+          const cooldownMm = Math.floor(cooldownRemainingMs / 60000)
+          const cooldownSs = Math.floor((cooldownRemainingMs % 60000) / 1000)
+          const cooldownTimeStr = `${cooldownMm}:${String(cooldownSs).padStart(2, '0')}`
+          void tick // ensure re-render every second while cooldown is live
+
+          // "Has an active booking" for the action-column state machine:
+          // pending/confirmed/resigned always count; rejected/cancelled
+          // only count while the cooldown is still ticking, after which
+          // the user can submit a new request and the row is treated as
+          // if it never existed.
+          const hasActiveBooking =
+            (bookingStatus !== null && bookingStatus !== 'rejected' && bookingStatus !== 'cancelled')
+            || (rejected && inCooldown)
+
           const disqualified  = s.submissionStatus === 'disqualified'
           const live          = isTestLive(s)
           const msLeft        = msUntilTest(s)          // ms to test start
@@ -384,7 +435,11 @@ export function MockTestClient({ userId }: Props) {
 
                 {/* ── Right: status + action ── */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <BookingBadge booking={s.userBooking} />
+                  {/* Pass live status through so the badge flips as soon
+                      as admin approves/rejects — server payload can be
+                      minutes stale. Hide badge entirely when the row is
+                      rejected (banner below takes over the whole story). */}
+                  <BookingBadge booking={rejected ? null : { id: s.userBooking?.id ?? '', status: bookingStatus ?? '', payment_status: s.userBooking?.payment_status ?? '' }} />
 
                   {/* ① Disqualified — permanently blocked */}
                   {disqualified ? (
@@ -459,32 +514,73 @@ export function MockTestClient({ userId }: Props) {
                   ) : pending ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
                       style={{ background: 'rgba(245,158,11,0.08)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <AlertCircle size={12} /> {t('mock.waitingAdmin')}
+                      <AlertCircle size={12} /> {t('mockTest.pendingApproval')}
                     </div>
 
-                  /* ⑦ Resigned — did not show up; BookingBadge already shows "Resigned" */
+                  /* ⑦ Rejected + cooldown active → full-width banner with
+                       explanation + live MM:SS countdown. When cooldown
+                       expires the branch falls through to the "no active
+                       booking" cases below and the user can retry. */
+                  ) : rejected && inCooldown ? (
+                    <div
+                      className="rounded-2xl p-4 space-y-3 max-w-[280px]"
+                      style={{
+                        background: 'rgba(239,68,68,0.08)',
+                        border: '1px solid rgba(239,68,68,0.35)',
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <XCircle size={18} style={{ color: 'var(--error)' }} />
+                        <h4 className="font-bold text-sm" style={{ color: 'var(--error)' }}>
+                          {t('mockTest.requestRejected')}
+                        </h4>
+                      </div>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                        {t('mockTest.rejectedMessage')}
+                      </p>
+                      <div
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                        style={{
+                          background: 'rgba(239,68,68,0.05)',
+                          border: '1px solid rgba(239,68,68,0.2)',
+                        }}
+                      >
+                        <Clock size={13} style={{ color: 'var(--error)' }} />
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {t('mockTest.cooldownRemaining')}:
+                        </span>
+                        <span
+                          className="font-mono font-bold text-base tabular-nums ml-auto"
+                          style={{ color: 'var(--error)' }}
+                        >
+                          {cooldownTimeStr}
+                        </span>
+                      </div>
+                    </div>
+
+                  /* ⑧ Resigned — did not show up; BookingBadge already shows "Resigned" */
                   ) : resigned ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
                       {t('mock.autoResigned')}
                     </p>
 
-                  /* ⑧ No booking + too late → show message */
-                  ) : !s.userBooking && tooLateToBook ? (
+                  /* ⑨ No active booking + too late → show message */
+                  ) : !hasActiveBooking && tooLateToBook ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-center"
                       style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
                       {t('mock.timePassed')}
                     </div>
 
-                  /* ⑨ No booking, session full → disabled label */
-                  ) : !s.userBooking && isFull ? (
+                  /* ⑩ No active booking, session full → disabled label */
+                  ) : !hasActiveBooking && isFull ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg text-center font-semibold"
                       style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
                       <Users size={12} /> {t('mockTest.full')}
                     </div>
 
-                  /* ⑩ No booking → Book button */
-                  ) : !s.userBooking ? (
+                  /* ⑪ No active booking → Book button */
+                  ) : !hasActiveBooking ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                       style={{ background: 'var(--accent)' }}>

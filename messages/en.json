@@ -562,7 +562,12 @@
     "seatsLeft": "{count} seats left",
     "full": "Full",
     "hurryUp": "Only {count} spots left!",
-    "fullMessage": "Sorry, this session is full. Please book another session."
+    "fullMessage": "Sorry, this session is full. Please book another session.",
+    "requestRejected": "Your request was rejected",
+    "rejectedMessage": "The admin rejected your booking request. Please wait for the cooldown to end before submitting a new one.",
+    "cooldownRemaining": "Time remaining",
+    "tryAgainIn": "Try again in {time}",
+    "pendingApproval": "Waiting for admin approval"
   },
   "errorPage": {
     "somethingWentWrong": "Something went wrong",

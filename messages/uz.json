@@ -562,7 +562,12 @@
     "seatsLeft": "{count} joy qoldi",
     "full": "Joylar to'ldi",
     "hurryUp": "Faqat {count} joy qoldi!",
-    "fullMessage": "Uzr, bu seansda joylar to'ldi. Boshqa seansni tanlang."
+    "fullMessage": "Uzr, bu seansda joylar to'ldi. Boshqa seansni tanlang.",
+    "requestRejected": "So'rovingiz rad etildi",
+    "rejectedMessage": "Admin sizning so'rovingizni rad etdi. Yangi so'rov yuborish uchun quyidagi vaqt kutib turing.",
+    "cooldownRemaining": "Qolgan vaqt",
+    "tryAgainIn": "Qayta urinish: {time}",
+    "pendingApproval": "Admin tasdiqlashini kuting"
   },
   "errorPage": {
     "somethingWentWrong": "Nimadir noto'g'ri ketdi",

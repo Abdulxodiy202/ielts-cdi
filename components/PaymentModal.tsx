@@ -144,14 +144,24 @@ export function PaymentModal({
       const res = await fetch('/api/payment', { method: 'POST', body: formData })
       const json = await res.json()
       if (!res.ok) {
-        // The payment API returns { error: 'session_full', message: '...' }
-        // when a mock session's capacity is exhausted (migration 030).
-        // Map that error code to the localized copy so users see a real
-        // sentence instead of "session_full"; fall through to `message`
-        // then `error` for everything else.
-        const localized =
-          json.error === 'session_full' ? t('mockTest.fullMessage')
-          : json.message || json.error || t('payment.genericError')
+        // Map API error codes to localized copy so the user sees a
+        // real sentence, not a snake_case slug. Falls through to
+        // `message` then `error` for anything the switch doesn't catch.
+        //   • session_full (409): capacity exhausted (migration 030)
+        //   • cooldown    (429): user has a rejected booking within
+        //                        the last 5 min (migration 032).
+        //                        remainingSec drives the MM:SS suffix
+        //                        so the toast is actionable.
+        let localized: string
+        if (json.error === 'session_full') {
+          localized = t('mockTest.fullMessage')
+        } else if (json.error === 'cooldown' && typeof json.remainingSec === 'number') {
+          const mm = Math.floor(json.remainingSec / 60)
+          const ss = Math.floor(json.remainingSec % 60).toString().padStart(2, '0')
+          localized = t('mockTest.tryAgainIn', { time: `${mm}:${ss}` })
+        } else {
+          localized = json.message || json.error || t('payment.genericError')
+        }
         setError(localized)
         setLoading(false)
         return

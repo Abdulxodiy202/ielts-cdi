@@ -86,6 +86,31 @@ export async function POST(request: NextRequest) {
         .update({ status: 'rejected', reviewed_at: new Date().toISOString() })
         .eq('id', paymentId)
 
+      // Mock bookings: when a mock_booking payment request is rejected,
+      // the corresponding pending booking row must also flip to
+      // 'rejected'. Otherwise the row stays pending forever, the seat
+      // stays "held" in the old (pre-032) counting, and the user's
+      // 5-minute cooldown never starts. updated_at → new.updated_at()
+      // via trigger; the client reads that as the cooldown anchor.
+      if (payment.type === 'mock_booking' && payment.meta?.schedule_id) {
+        const { error: mbErr } = await admin
+          .from('mock_bookings')
+          .update({ status: 'rejected', payment_status: 'failed' })
+          .eq('user_id', payment.user_id)
+          .eq('schedule_id', payment.meta.schedule_id)
+          .eq('status', 'pending')
+        if (mbErr?.code === '42703' && payment.meta?.booking_date && payment.meta?.time_slot) {
+          // Pre-migration-007 fallback: no schedule_id column yet.
+          await admin
+            .from('mock_bookings')
+            .update({ status: 'rejected', payment_status: 'failed' })
+            .eq('user_id', payment.user_id)
+            .eq('booking_date', payment.meta.booking_date)
+            .eq('time_slot', payment.meta.time_slot)
+            .eq('status', 'pending')
+        }
+      }
+
       await sendTelegramNotification(
         `❌ <b>To'lov rad etildi</b>\n👤 ${payment.user_name}\n💳 ${payment.type}\n💵 ${payment.amount} UZS\n🔧 Admin: ${adminName}`
       )

@@ -30,6 +30,44 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'Maydonlar to\'ldirilishi shart' }, { status: 400 })
   }
 
+  // Cooldown guard for mock bookings — checked BEFORE the receipt upload
+  // so a rejected user isn't wasting an image round-trip on every
+  // attempt. If the user has a rejected/cancelled booking for the same
+  // schedule within the last 5 minutes, block the new request and tell
+  // the client how many seconds are left. Uses the admin client so RLS
+  // ("Users can manage own bookings") doesn't get in the way of the
+  // updated_at read — though the caller is the same user here, so
+  // regular RLS would work too.
+  const COOLDOWN_MS = 5 * 60 * 1000
+  if (type === 'mock_booking' && meta?.schedule_id) {
+    const cdAdmin = createAdminClient()
+    const { data: lastRejected } = await cdAdmin
+      .from('mock_bookings')
+      .select('updated_at')
+      .eq('user_id', user.id)
+      .eq('schedule_id', meta.schedule_id)
+      .in('status', ['rejected', 'cancelled'])
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const rejectedAt = (lastRejected as { updated_at?: string } | null)?.updated_at
+    if (rejectedAt) {
+      const cooldownEnd = new Date(rejectedAt).getTime() + COOLDOWN_MS
+      const remainingMs = cooldownEnd - Date.now()
+      if (remainingMs > 0) {
+        return Response.json(
+          {
+            error: 'cooldown',
+            remainingSec: Math.ceil(remainingMs / 1000),
+            message:
+              'So\'rov rad etilgan. Yangi urinishga vaqt qoldi.',
+          },
+          { status: 429 },
+        )
+      }
+    }
+  }
+
   // Upload receipt image to Supabase Storage
   const fileExt = (receipt.name.split('.').pop() || 'jpg').toLowerCase()
   const fileName = `${user.id}-${Date.now()}.${fileExt}`
@@ -103,12 +141,12 @@ export async function POST(request: NextRequest) {
   // Try with schedule_id first (migration 007); if the column doesn't exist yet
   // (error code 42703), fall back to inserting without it so the flow still works.
   if (type === 'mock_booking' && meta?.booking_date && meta?.time_slot) {
-    // Capacity guard (migration 030). If the schedule has a hard cap,
-    // reject when the current pending+confirmed booking count already
-    // meets or exceeds it — the payment_request row was already
-    // created above, but we haven't taken money yet and Telegram
-    // approval won't fire on 409, so this is a safe abort point.
-    // NULL capacity or missing column → skip (unlimited / pre-migration).
+    // Capacity guard (migration 030, tightened by 032). If the schedule
+    // has a hard cap, reject when the CONFIRMED booking count already
+    // meets or exceeds it. Only 'confirmed' counts here — a pending row
+    // hasn't been approved by admin yet and is treated as "trying to
+    // book" rather than "holding a seat". This matches the RPC used by
+    // the user-facing card counter so client and server agree.
     if (meta.schedule_id) {
       const capAdmin = createAdminClient()
       const { data: schedule } = await capAdmin
@@ -122,7 +160,7 @@ export async function POST(request: NextRequest) {
           .from('mock_bookings')
           .select('id', { count: 'exact', head: true })
           .eq('schedule_id', meta.schedule_id)
-          .in('status', ['pending', 'confirmed'])
+          .eq('status', 'confirmed')
         if ((count ?? 0) >= cap) {
           return Response.json(
             {
