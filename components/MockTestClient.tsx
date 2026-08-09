@@ -416,35 +416,32 @@ export function MockTestClient({ userId }: Props) {
                   </div>
                 </div>
 
-                {/* ── Right: status + action ──
-                    One clear indicator per state. The old small
-                    BookingBadge (pending/confirmed/resigned pill) was
-                    removed because it duplicated the full banners
-                    (case ⑥ pending, case ⑦ rejected, case ④ confirmed)
-                    — a user with a pending booking used to see both a
-                    "Kutilmoqda" pill AND a "Bron qilish" button, which
-                    made no sense. Now each branch renders exactly one
-                    UI element; the case chain below is exhaustive. */}
+                {/* ── Right: action-only column ──
+                    Layout responsibility split from the state message:
+                    the right column now carries only WHAT THE USER CAN
+                    DO (Start Test, Book, disabled Full label). The
+                    ambient state ("pending", "confirmed", "rejected")
+                    lives in the full-width banner section below, so a
+                    user can't get a small badge and a contradictory
+                    button side by side any more. */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  {/* ① Disqualified — permanently blocked */}
                   {disqualified ? (
                     <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
                       style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
                       <Ban size={13} className="shrink-0 mt-0.5" />
                       {t('mock.disqualified')}
                     </div>
-
-                  /* ② Submitted — test successfully done */
                   ) : s.isSubmitted ? (
                     <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
                       <PartyPopper size={14} /> {t('mock.submitted')}
                     </div>
-
-                  /* ③ Confirmed + test is live → warning banner + Start button */
                   ) : confirmed && live ? (
                     <>
-                      {/* 5-minute countdown warning */}
+                      {/* Inline 5-min warning stays adjacent to the Start
+                          Test button — it's actionable context (hurry!),
+                          not an ambient status message, so it belongs
+                          next to the CTA rather than in the body banner. */}
                       {(() => {
                         const minsElapsed = Math.max(0, Math.floor(-msLeft / 60_000))
                         return (
@@ -475,155 +472,142 @@ export function MockTestClient({ userId }: Props) {
                         <ArrowRight size={14} /> {t('mock.startMockTest')}
                       </Link>
                     </>
-
-                  /* ④ Confirmed + countdown active (test not yet started).
-                       Green banner makes it obvious the booking IS
-                       secured — without it, the bare countdown numbers
-                       looked identical to the pre-booking "time until
-                       test" indicator and users kept asking whether
-                       they were confirmed. Countdown timer stays,
-                       nested below the banner header. */
-                  ) : confirmed && msLeft > 0 ? (
-                    <div
-                      className="rounded-2xl p-4 space-y-3 max-w-[280px]"
-                      style={{
-                        background: 'rgba(34,197,94,0.08)',
-                        border: '1px solid rgba(34,197,94,0.35)',
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <CheckCircle size={18} style={{ color: 'var(--success)' }} />
-                        <h4 className="font-bold text-sm" style={{ color: 'var(--success)' }}>
-                          {t('mockTest.confirmedTitle')}
-                        </h4>
-                      </div>
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        {t('mockTest.confirmedMessage')}
-                      </p>
-                      <div
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{
-                          background: 'rgba(34,197,94,0.05)',
-                          border: '1px solid rgba(34,197,94,0.2)',
-                        }}
-                      >
-                        <Clock size={13} style={{ color: 'var(--success)' }} />
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {t('mock.timeUntilTest')}
-                        </span>
-                        <span
-                          className="font-mono font-bold text-base tabular-nums ml-auto"
-                          style={{ color: 'var(--success)' }}
-                        >
-                          {fmtHms(msLeft)}
-                        </span>
-                      </div>
-                    </div>
-
-                  /* ⑤ Confirmed + late (>5 min past start, no submission) — auto-resign pending */
                   ) : confirmed && tooLateToBook && !live ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
                       {t('mock.autoResigned')}
                     </p>
-
-                  /* ⑥ Pending (awaiting admin approval) — full banner,
-                       matches the rejected banner's shape so the two
-                       "wait for admin" states look consistent. Explicit
-                       title + explanation replaces the tiny pill that
-                       used to sit here and got mistaken for a mere tag. */
-                  ) : pending ? (
-                    <div
-                      className="rounded-2xl p-4 space-y-2 max-w-[280px]"
-                      style={{
-                        background: 'rgba(245,158,11,0.08)',
-                        border: '1px solid rgba(245,158,11,0.35)',
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Clock size={18} style={{ color: 'var(--warning)' }} />
-                        <h4 className="font-bold text-sm" style={{ color: 'var(--warning)' }}>
-                          {t('mockTest.pendingTitle')}
-                        </h4>
-                      </div>
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        {t('mockTest.pendingMessage')}
-                      </p>
-                    </div>
-
-                  /* ⑦ Rejected + cooldown active → full-width banner with
-                       explanation + live MM:SS countdown. When cooldown
-                       expires the branch falls through to the "no active
-                       booking" cases below and the user can retry. */
-                  ) : rejected && inCooldown ? (
-                    <div
-                      className="rounded-2xl p-4 space-y-3 max-w-[280px]"
-                      style={{
-                        background: 'rgba(239,68,68,0.08)',
-                        border: '1px solid rgba(239,68,68,0.35)',
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <XCircle size={18} style={{ color: 'var(--error)' }} />
-                        <h4 className="font-bold text-sm" style={{ color: 'var(--error)' }}>
-                          {t('mockTest.requestRejected')}
-                        </h4>
-                      </div>
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        {t('mockTest.rejectedMessage')}
-                      </p>
-                      <div
-                        className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                        style={{
-                          background: 'rgba(239,68,68,0.05)',
-                          border: '1px solid rgba(239,68,68,0.2)',
-                        }}
-                      >
-                        <Clock size={13} style={{ color: 'var(--error)' }} />
-                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {t('mockTest.cooldownRemaining')}:
-                        </span>
-                        <span
-                          className="font-mono font-bold text-base tabular-nums ml-auto"
-                          style={{ color: 'var(--error)' }}
-                        >
-                          {cooldownTimeStr}
-                        </span>
-                      </div>
-                    </div>
-
-                  /* ⑧ Resigned — did not show up; BookingBadge already shows "Resigned" */
                   ) : resigned ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
                       {t('mock.autoResigned')}
                     </p>
-
-                  /* ⑨ No active booking + too late → show message */
                   ) : !hasActiveBooking && tooLateToBook ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg text-center"
                       style={{ background: 'rgba(100,116,139,0.08)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }}>
                       {t('mock.timePassed')}
                     </div>
-
-                  /* ⑩ No active booking, session full → disabled label */
                   ) : !hasActiveBooking && isFull ? (
                     <div className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg text-center font-semibold"
                       style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.2)' }}>
                       <Users size={12} /> {t('mockTest.full')}
                     </div>
-
-                  /* ⑪ No active booking → Book button */
                   ) : !hasActiveBooking ? (
                     <button type="button" onClick={() => setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                       style={{ background: 'var(--accent)' }}>
                       <CreditCard size={14} /> {t('mock.bookSession')}
                     </button>
-
                   ) : null}
                 </div>
               </div>
+
+              {/* ── Full-width state banner ────────────────────────────
+                  Sits outside the main flex row so it spans the whole
+                  card. Exactly one banner renders at a time; the outer
+                  card only pays vertical space when there's actually
+                  a banner to show. */}
+              {pending && (
+                <div className="px-5 pb-5">
+                  <div
+                    className="rounded-2xl p-4 space-y-2"
+                    style={{
+                      background: 'rgba(245,158,11,0.08)',
+                      border: '1px solid rgba(245,158,11,0.35)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Clock size={20} style={{ color: 'var(--warning)' }} />
+                      <h4 className="font-bold text-base" style={{ color: 'var(--warning)' }}>
+                        {t('mockTest.pendingTitle')}
+                      </h4>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {t('mockTest.pendingMessage')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {confirmed && msLeft > 0 && !live && (
+                <div className="px-5 pb-5">
+                  <div
+                    className="rounded-2xl p-4 space-y-3"
+                    style={{
+                      background: 'rgba(34,197,94,0.08)',
+                      border: '1px solid rgba(34,197,94,0.35)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={20} style={{ color: 'var(--success)' }} />
+                      <h4 className="font-bold text-base" style={{ color: 'var(--success)' }}>
+                        {t('mockTest.confirmedTitle')}
+                      </h4>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {t('mockTest.confirmedMessage')}
+                    </p>
+                    <div
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+                      style={{
+                        background: 'rgba(34,197,94,0.05)',
+                        border: '1px solid rgba(34,197,94,0.2)',
+                      }}
+                    >
+                      <Clock size={14} style={{ color: 'var(--success)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {t('mock.timeUntilTest')}
+                      </span>
+                      <span
+                        className="font-mono font-bold text-lg tabular-nums ml-auto"
+                        style={{ color: 'var(--success)' }}
+                      >
+                        {fmtHms(msLeft)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {rejected && inCooldown && (
+                <div className="px-5 pb-5">
+                  <div
+                    className="rounded-2xl p-4 space-y-3"
+                    style={{
+                      background: 'rgba(239,68,68,0.08)',
+                      border: '1px solid rgba(239,68,68,0.35)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <XCircle size={20} style={{ color: 'var(--error)' }} />
+                      <h4 className="font-bold text-base" style={{ color: 'var(--error)' }}>
+                        {t('mockTest.requestRejected')}
+                      </h4>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {t('mockTest.rejectedMessage')}
+                    </p>
+                    <div
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+                      style={{
+                        background: 'rgba(239,68,68,0.05)',
+                        border: '1px solid rgba(239,68,68,0.2)',
+                      }}
+                    >
+                      <Clock size={14} style={{ color: 'var(--error)' }} />
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {t('mockTest.cooldownRemaining')}:
+                      </span>
+                      <span
+                        className="font-mono font-bold text-lg tabular-nums ml-auto"
+                        style={{ color: 'var(--error)' }}
+                      >
+                        {cooldownTimeStr}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )
         })}
