@@ -567,7 +567,11 @@
     "rejectedMessage": "The admin rejected your booking request. Please wait for the cooldown to end before submitting a new one.",
     "cooldownRemaining": "Time remaining",
     "tryAgainIn": "Try again in {time}",
-    "pendingApproval": "Waiting for admin approval"
+    "pendingApproval": "Waiting for admin approval",
+    "pendingTitle": "Waiting for admin approval",
+    "pendingMessage": "Your request is being reviewed. Usually answered within 24 hours.",
+    "confirmedTitle": "Booked — See you there",
+    "confirmedMessage": "Return to this page at test time and click \"Start Mock Test\"."
   },
   "errorPage": {
     "somethingWentWrong": "Something went wrong",

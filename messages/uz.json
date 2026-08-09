@@ -567,7 +567,11 @@
     "rejectedMessage": "Admin sizning so'rovingizni rad etdi. Yangi so'rov yuborish uchun quyidagi vaqt kutib turing.",
     "cooldownRemaining": "Qolgan vaqt",
     "tryAgainIn": "Qayta urinish: {time}",
-    "pendingApproval": "Admin tasdiqlashini kuting"
+    "pendingApproval": "Admin tasdiqlashini kuting",
+    "pendingTitle": "Admin tasdiqlashini kuting",
+    "pendingMessage": "Sizning so'rovingiz ko'rib chiqilmoqda. Odatda 24 soat ichida javob beriladi.",
+    "confirmedTitle": "Bron qilingan — Sizni kutamiz",
+    "confirmedMessage": "Test vaqtida shu sahifaga qaytib \"Mock Test boshlash\" tugmasini bosing."
   },
   "errorPage": {
     "somethingWentWrong": "Nimadir noto'g'ri ketdi",
