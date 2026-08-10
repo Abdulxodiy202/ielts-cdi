@@ -310,7 +310,11 @@ function WritingSection({
           }} />
       </div>
 
-      {/* Task 1 */}
+      {/* Task 1 — polished layout with fixed IELTS instructions, an
+          explicit "Task description" label around the admin-entered
+          prompt so the two blocks are distinguishable, and an always-
+          visible enlarge affordance on the image (hover-only was
+          getting missed by users). */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
@@ -318,7 +322,15 @@ function WritingSection({
           <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 1</h3>
         </div>
 
-        {/* Task 1 image — click to open fullscreen */}
+        {/* Fixed IELTS-format instructions (independent of admin prompt) */}
+        <div className="p-3 rounded-xl text-xs leading-relaxed"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+          {t('mockFlow.task1Instructions')}
+        </div>
+
+        {/* Task 1 image — click to open fullscreen. Enlarge chip is
+            always visible (top-right) so users don't have to hover
+            to discover the interaction — matters on touch. */}
         {schedule.writing_task1_image_url && (
           <div className="group relative rounded-xl overflow-hidden" style={{ cursor: 'zoom-in' }}
             onClick={() => setLightboxUrl(schedule.writing_task1_image_url)}>
@@ -329,10 +341,10 @@ function WritingSection({
               className="w-full max-h-72 object-contain transition-transform duration-200 group-hover:scale-[1.02]"
               style={{ background: 'var(--bg-secondary)' }}
             />
-            <div className="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              <span className="text-xs px-2 py-1 rounded-lg font-medium"
-                style={{ background: 'rgba(0,0,0,0.65)', color: '#fff' }}>
-                {t('mockFlow.clickToZoom2')}
+            <div className="absolute top-2 right-2 pointer-events-none">
+              <span className="text-xs px-2.5 py-1 rounded-lg font-medium inline-flex items-center gap-1.5"
+                style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', backdropFilter: 'blur(4px)' }}>
+                <ImageIcon size={11} /> {t('mockFlow.clickToZoom2')}
               </span>
             </div>
           </div>
@@ -344,11 +356,16 @@ function WritingSection({
           </div>
         )}
 
-        {/* Task 1 prompt */}
+        {/* Task 1 prompt (admin's own text) */}
         {schedule.writing_task1_topic && (
-          <div className="p-4 rounded-xl text-sm leading-relaxed"
-            style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', color: 'var(--text-secondary)' }}>
-            {schedule.writing_task1_topic}
+          <div>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--warning)' }}>
+              {t('mockFlow.taskDescription')}
+            </p>
+            <div className="p-4 rounded-xl text-sm leading-relaxed"
+              style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.25)', color: 'var(--text-primary)' }}>
+              {schedule.writing_task1_topic}
+            </div>
           </div>
         )}
 
@@ -358,12 +375,12 @@ function WritingSection({
             <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
               {t('mockFlow.yourAnswerLabel')}
             </label>
-            <span className="text-xs" style={{ color: wordCount(task1) >= 150 ? 'var(--success)' : 'var(--warning)' }}>
+            <span className="text-xs font-mono" style={{ color: wordCount(task1) >= 150 ? 'var(--success)' : 'var(--warning)' }}>
               {t('mockFlow.wordsMinLabel', { count: wordCount(task1), min: 150 })}
             </span>
           </div>
           <textarea
-            className="input-field text-sm resize-none leading-relaxed"
+            className="input-field text-sm resize-y leading-relaxed"
             rows={10}
             placeholder={t('mockFlow.task1Placeholder2')}
             value={task1}
@@ -372,7 +389,7 @@ function WritingSection({
         </div>
       </div>
 
-      {/* Task 2 */}
+      {/* Task 2 — same shape as Task 1 for consistency */}
       <div className="card p-5 space-y-4">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
@@ -380,10 +397,20 @@ function WritingSection({
           <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Writing Task 2</h3>
         </div>
 
+        <div className="p-3 rounded-xl text-xs leading-relaxed"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+          {t('mockFlow.task2Instructions')}
+        </div>
+
         {schedule.writing_task2_topic && (
-          <div className="p-4 rounded-xl text-sm leading-relaxed"
-            style={{ background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', color: 'var(--text-secondary)' }}>
-            {schedule.writing_task2_topic}
+          <div>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: '#a855f7' }}>
+              {t('mockFlow.taskDescription')}
+            </p>
+            <div className="p-4 rounded-xl text-sm leading-relaxed"
+              style={{ background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.25)', color: 'var(--text-primary)' }}>
+              {schedule.writing_task2_topic}
+            </div>
           </div>
         )}
 
@@ -392,12 +419,12 @@ function WritingSection({
             <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
               {t('mockFlow.yourAnswerLabel')}
             </label>
-            <span className="text-xs" style={{ color: wordCount(task2) >= 250 ? 'var(--success)' : 'var(--warning)' }}>
+            <span className="text-xs font-mono" style={{ color: wordCount(task2) >= 250 ? 'var(--success)' : 'var(--warning)' }}>
               {t('mockFlow.wordsMinLabel', { count: wordCount(task2), min: 250 })}
             </span>
           </div>
           <textarea
-            className="input-field text-sm resize-none leading-relaxed"
+            className="input-field text-sm resize-y leading-relaxed"
             rows={14}
             placeholder={t('mockFlow.task2Placeholder2')}
             value={task2}

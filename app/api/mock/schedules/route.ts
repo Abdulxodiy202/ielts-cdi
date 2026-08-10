@@ -145,6 +145,42 @@ export async function GET() {
     }
   }
 
+  // ── Auto-reactivate: resigned bookings whose schedule was later
+  //    edited to a still-in-the-future (or within 5-min grace) time.
+  //    Without this, an admin pushing a session from 03:15 → 03:20
+  //    after the user was auto-resigned leaves the user permanently
+  //    stuck on the "you were late" banner while the countdown to
+  //    the new time ticks in the same card. Idempotent — resigned
+  //    rows past the new time+grace stay resigned. ── */
+  const reactivateScheduleIds: string[] = []
+  for (const s of schedules) {
+    const booking = bookingMap[s.id]
+    if (!booking || booking.status !== 'resigned') continue
+    // Skip rows the user has already submitted for — reactivation
+    // shouldn't overwrite a real attempt.
+    if (anySubmissionSet.has(s.id)) continue
+    const startMs = tashkentMs(s.date, s.time)
+    if (now < startMs + 5 * 60 * 1000) {
+      reactivateScheduleIds.push(s.id)
+    }
+  }
+
+  if (reactivateScheduleIds.length > 0) {
+    const { error: reErr } = await admin
+      .from('mock_bookings')
+      .update({ status: 'confirmed' })
+      .eq('user_id', user.id)
+      .in('schedule_id', reactivateScheduleIds)
+      .eq('status', 'resigned')
+    if (reErr) {
+      console.error('[mock/schedules] reactivate error:', reErr.message)
+    } else {
+      for (const schedId of reactivateScheduleIds) {
+        if (bookingMap[schedId]) bookingMap[schedId] = { ...bookingMap[schedId], status: 'confirmed' }
+      }
+    }
+  }
+
   return Response.json(
     schedules.map(s => ({
       ...s,
