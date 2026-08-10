@@ -26,6 +26,13 @@ export interface MyBookingRow {
   status: string
   updated_at: string | null
   created_at: string
+  /** Set by /api/mock/disqualify when the user is caught cheating; the
+   *  MockTestClient banner reads this and hides the Book button so the
+   *  disqualified user can't rebook the same schedule. Nullable in
+   *  older projects that predate migration 035 — treat null as false. */
+  disqualified: boolean | null
+  disqualified_at: string | null
+  disqualified_reason: string | null
 }
 
 export function useMyBookings(
@@ -42,15 +49,37 @@ export function useMyBookings(
     let cancelled = false
 
     const fetchAll = async () => {
-      const { data } = await supabase
+      // If migration 035 hasn't been applied yet the disqualified* columns
+      // don't exist and Supabase returns 42703. On that error we fall
+      // back to the pre-035 column set so the page keeps working —
+      // disqualified data just stays null (treated as false client-side).
+      const preferredCols = 'id, schedule_id, status, updated_at, created_at, disqualified, disqualified_at, disqualified_reason'
+      const legacyCols    = 'id, schedule_id, status, updated_at, created_at'
+      let { data, error } = await supabase
         .from('mock_bookings')
-        .select('id, schedule_id, status, updated_at, created_at')
+        .select(preferredCols)
         .eq('user_id', userId)
         .in('schedule_id', scheduleIds)
-        // Newest first so the reduce below keeps the freshest row per
-        // schedule when the user has multiple attempts on one session.
         .order('updated_at', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: false })
+      if (error?.code === '42703') {
+        const fallback = await supabase
+          .from('mock_bookings')
+          .select(legacyCols)
+          .eq('user_id', userId)
+          .in('schedule_id', scheduleIds)
+          .order('updated_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+        // Legacy rows lack the disqualified* columns; synthesize them
+        // as null so the shape matches MyBookingRow and the client's
+        // `Boolean(disqualified)` check evaluates to false.
+        data = (fallback.data ?? []).map(r => ({
+          ...(r as Record<string, unknown>),
+          disqualified: null,
+          disqualified_at: null,
+          disqualified_reason: null,
+        })) as typeof data
+      }
 
       if (cancelled) return
       const map: Record<string, MyBookingRow> = {}

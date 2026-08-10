@@ -274,16 +274,27 @@ export function MockTestClient({ userId }: Props) {
           const cooldownTimeStr = `${cooldownMm}:${String(cooldownSs).padStart(2, '0')}`
           void tick // ensure re-render every second while cooldown is live
 
+          // Disqualification is a permanent per-booking flag (migration
+          // 035). Once set, no Book button ever renders for this
+          // schedule for this user, even after cooldowns and rejections
+          // clear — cheating shouldn't get a second attempt on the
+          // same session. Falls back to the submission-status check
+          // for backward compat with pre-035 rows.
+          const bookingDisqualified = Boolean(liveBooking?.disqualified)
+
           // "Has an active booking" for the action-column state machine:
           // pending/confirmed/resigned always count; rejected/cancelled
           // only count while the cooldown is still ticking, after which
           // the user can submit a new request and the row is treated as
-          // if it never existed.
+          // if it never existed. Disqualified is always "active" (it's
+          // terminal) so the state machine keeps the card in a
+          // non-actionable state.
           const hasActiveBooking =
-            (bookingStatus !== null && bookingStatus !== 'rejected' && bookingStatus !== 'cancelled')
+            bookingDisqualified
+            || (bookingStatus !== null && bookingStatus !== 'rejected' && bookingStatus !== 'cancelled')
             || (rejected && inCooldown)
 
-          const disqualified  = s.submissionStatus === 'disqualified'
+          const disqualified  = s.submissionStatus === 'disqualified' || bookingDisqualified
           const live          = isTestLive(s)
           const msLeft        = msUntilTest(s)          // ms to test start
           const tooLateToBook = msLeft < 5 * 60 * 1000 // < 5 min until start (or already started)
@@ -405,13 +416,10 @@ export function MockTestClient({ userId }: Props) {
                     user can't get a small badge and a contradictory
                     button side by side any more. */}
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  {disqualified ? (
-                    <div className="flex items-start gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold max-w-[200px] text-right"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--error)', border: '1px solid rgba(239,68,68,0.3)' }}>
-                      <Ban size={13} className="shrink-0 mt-0.5" />
-                      {t('mock.disqualified')}
-                    </div>
-                  ) : s.isSubmitted ? (
+                  {/* Disqualified state renders nothing in the right column —
+                      the full-width banner below is the whole story. Keeps
+                      the case chain from double-showing the same message. */}
+                  {disqualified ? null : s.isSubmitted ? (
                     <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
                       style={{ background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.3)' }}>
                       <PartyPopper size={14} /> {t('mock.submitted')}
@@ -486,6 +494,33 @@ export function MockTestClient({ userId }: Props) {
                   card. Exactly one banner renders at a time; the outer
                   card only pays vertical space when there's actually
                   a banner to show. */}
+              {/* Disqualified banner — highest priority, mutually
+                  exclusive with every other banner. Once set on a
+                  booking (migration 035), the user can't rebook this
+                  schedule, can't submit, can't do anything with it.
+                  Payment is non-refundable per the info panel. */}
+              {disqualified && (
+                <div className="px-5 pb-5">
+                  <div
+                    className="rounded-2xl p-4 space-y-2"
+                    style={{
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.45)',
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Ban size={20} style={{ color: 'var(--error)' }} />
+                      <h4 className="font-bold text-base" style={{ color: 'var(--error)' }}>
+                        {t('mockTest.disqualifiedTitle')}
+                      </h4>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {t('mockTest.disqualifiedMessage')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {pending && (
                 <div className="px-5 pb-5">
                   <div

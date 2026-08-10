@@ -16,22 +16,34 @@ export default async function MockTestTakePage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Verify the user has a confirmed booking for this schedule
-  const { data: booking } = await supabase
+  // Verify the user has a confirmed booking for this schedule and hasn't
+  // been disqualified (migration 035). The `disqualified` column is
+  // pulled first-class here so a cheating user can't just paste the URL
+  // to reopen the test after the client-side violation counter closed
+  // it. `.maybeSingle()` on a missing column would still populate the
+  // rest of the row, so we tolerate a legacy schema where 035 hasn't
+  // run yet by falling back to the mock_test_submissions check below.
+  const bookingRes = await supabase
     .from('mock_bookings')
-    .select('id, status')
+    .select('id, status, disqualified')
     .eq('user_id', user.id)
     .eq('schedule_id', id)
     .maybeSingle()
+  const booking = bookingRes.data as { id: string; status: string; disqualified?: boolean | null } | null
 
   if (!booking || booking.status !== 'confirmed') {
+    redirect('/mock-test')
+  }
+  if (booking.disqualified === true) {
     redirect('/mock-test')
   }
 
   // Load the schedule details + check for existing disqualified submission
   const admin = createAdminClient()
 
-  // Block disqualified users from retaking the test
+  // Legacy safety net: pre-035 rows carry disqualified status on the
+  // submissions row instead of the booking. Keep the redirect for
+  // those too.
   const { data: existingSub } = await admin
     .from('mock_test_submissions')
     .select('status')

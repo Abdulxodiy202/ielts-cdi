@@ -2523,7 +2523,7 @@ const BOOK_CATEGORY_LABELS: Record<BookCategory, string> = {
   grammar: 'Grammatika',
   ielts: 'IELTS',
   vocabulary: "Lug'at",
-  fun_reads: 'Qiziqarli kitoblar',
+  fun_reads: "O'z-o'zini rivojlantirish",
 }
 
 function CategoryBadge({ category }: { category: BookCategory }) {

@@ -572,7 +572,9 @@
     "pendingTitle": "Admin tasdiqlashini kuting",
     "pendingMessage": "Sizning so'rovingiz ko'rib chiqilmoqda. Odatda 24 soat ichida javob beriladi.",
     "confirmedTitle": "Bron qilingan — Sizni kutamiz",
-    "confirmedMessage": "Test vaqtida shu sahifaga qaytib \"Mock Test boshlash\" tugmasini bosing."
+    "confirmedMessage": "Test vaqtida shu sahifaga qaytib \"Mock Test boshlash\" tugmasini bosing.",
+    "disqualifiedTitle": "Siz bu seansdan chetlatildingiz",
+    "disqualifiedMessage": "Test paytida qoidalar 3 marta buzildi. Ushbu seans uchun to'lov qaytarib berilmaydi. Boshqa seanslarda qatnashishingiz mumkin."
   },
   "errorPage": {
     "somethingWentWrong": "Nimadir noto'g'ri ketdi",
@@ -711,13 +713,13 @@
       "grammar": "Grammatika",
       "ielts": "IELTS",
       "vocabulary": "Lug'at",
-      "fun_reads": "Qiziqarli kitoblar"
+      "fun_reads": "O'z-o'zini rivojlantirish"
     },
     "categoryDescs": {
       "grammar": "IELTS uchun ingliz tili grammatikasi qoidalari va tuzilmalarini o'rganing.",
       "ielts": "Rasmiy IELTS tayyorlov kitoblari va Band 9 namunali javoblari.",
       "vocabulary": "Mavzuli lug'at kitoblari bilan so'z boyligingizni oshiring.",
-      "fun_reads": "O'qish ravonligini oshirish uchun qiziqarli inglizcha kitoblar."
+      "fun_reads": "Ingliz tilida o'z-o'zini rivojlantirish uchun tanlangan kitoblar."
     }
   },
   "articles": {
