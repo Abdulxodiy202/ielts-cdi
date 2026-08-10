@@ -188,12 +188,29 @@ const BookCard = memo(function BookCard({
         )}
 
         {/* Tavsiya — truncated to 2 lines by default with expand toggle
-            when it's actually longer than the clamp fits. */}
+            when it's actually longer than the clamp fits. Inline
+            -webkit-line-clamp is used instead of Tailwind's
+            `line-clamp-2` utility so the effect can't be dropped by a
+            missing Tailwind config or a global reset — this component
+            was previously letting the full text bleed through on
+            neighbour cards when one card expanded, and the underlying
+            grid stretch made those neighbours grow to match. */}
         {recommendation && (
           <div className="pt-1">
             <p
-              className={expanded ? '' : 'line-clamp-2'}
-              style={{ fontSize: 11.5, color: '#f59e0b', lineHeight: 1.5 }}
+              style={
+                expanded
+                  ? { fontSize: 11.5, color: '#f59e0b', lineHeight: 1.5 }
+                  : {
+                      fontSize: 11.5,
+                      color: '#f59e0b',
+                      lineHeight: 1.5,
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }
+              }
             >
               💡 {recommendation}
             </p>
@@ -315,7 +332,12 @@ export default function CategoryBooksView({ category }: { category: BookCategory
         ) : (
           // Denser grid than before: 2 columns on mobile, 5 on xl. Cards
           // are self-contained so a lone book still looks intentional.
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+          // items-start disables the CSS grid default of align-items:
+          // stretch — without it, expanding one card's recommendation
+          // pushes every neighbour in the same row to the same height,
+          // even though their line-clamp keeps the text short (extra
+          // padding at the bottom). Cards now grow independently.
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 items-start">
             {books.map(book => {
               const locked = book.is_premium && !isPremium
               const gradient = bookColor(book.id, COVER_GRADIENTS)
