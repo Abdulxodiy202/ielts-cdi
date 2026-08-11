@@ -45,14 +45,20 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'file, scheduleId va fileType kerak' }, { status: 400 })
   }
 
-  if (!['reading', 'listening', 'writing_task1'].includes(fileType)) {
+  // 'writing' is the new HTML/ZIP writing test upload (migration 036),
+  // replacing the old per-task image + text form. Kept alongside
+  // 'writing_task1' so unmigrated schedules can still swap the legacy
+  // Task 1 image if needed.
+  if (!['reading', 'listening', 'writing_task1', 'writing'].includes(fileType)) {
     return Response.json({ error: 'Noto\'g\'ri fileType' }, { status: 400 })
   }
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'bin'
   const contentType = CONTENT_TYPES[ext] ?? file.type ?? 'application/octet-stream'
 
-  // Store in the existing "tests" bucket under mock/ subdirectory
+  // Store in the existing "tests" bucket under mock/ subdirectory.
+  // Same convention as reading/listening — the client just points its
+  // iframe at the returned public URL.
   const storagePath = `mock/${fileType}/${scheduleId}.${ext}`
   const bytes = await file.arrayBuffer()
 

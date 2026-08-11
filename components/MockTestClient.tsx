@@ -29,6 +29,8 @@ export interface MockScheduleWithBooking {
   writing_task1_image_url: string | null
   writing_task1_topic: string | null
   writing_task2_topic: string | null
+  /** New (migration 036): HTML/ZIP writing test uploaded like reading/listening. */
+  writing_file_url: string | null
   /** NULL = unlimited seats; integer ≥ 1 = hard cap (migration 030). */
   capacity: number | null
   userBooking:      { id: string; status: string; payment_status: string } | null

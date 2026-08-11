@@ -57,7 +57,7 @@ export default async function MockTestTakePage({ params }: Props) {
   const { data: rawSchedule, error } = await admin
     .from('mock_schedules')
     // Matches the MockSchedule shape MockTestFlow consumes below.
-    .select('id, date, time, status, reading_file_url, listening_file_url, writing_task1_image_url, writing_task1_topic, writing_task2_topic')
+    .select('id, date, time, status, reading_file_url, listening_file_url, writing_task1_image_url, writing_task1_topic, writing_task2_topic, writing_file_url')
     .eq('id', id)
     .single()
 
@@ -73,6 +73,7 @@ export default async function MockTestTakePage({ params }: Props) {
     writing_task1_image_url: string | null
     writing_task1_topic: string | null
     writing_task2_topic: string | null
+    writing_file_url: string | null
   }
 
   // NOTE: We intentionally do NOT enforce the time window here on the server.

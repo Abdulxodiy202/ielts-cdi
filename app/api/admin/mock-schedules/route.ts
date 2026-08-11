@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     writing_task1_image_url,
     writing_task1_topic,
     writing_task2_topic,
+    writing_file_url,
     capacity,
   } = body
 
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
     writing_task1_image_url: writing_task1_image_url ?? null,
     writing_task1_topic:     writing_task1_topic     ?? null,
     writing_task2_topic:     writing_task2_topic     ?? null,
+    writing_file_url:        writing_file_url        ?? null,
     capacity:                normalizedCapacity,
   }
 

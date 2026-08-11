@@ -16,15 +16,18 @@ export interface MockSchedule {
   status: 'scheduled' | 'active' | 'completed'
   reading_file_url:        string | null
   listening_file_url:      string | null
+  /** Legacy — kept in the type until unused schedules are migrated. */
   writing_task1_image_url: string | null
   writing_task1_topic:     string | null
   writing_task2_topic:     string | null
+  /** New (migration 036): HTML/ZIP writing test uploaded like reading/listening. */
+  writing_file_url:        string | null
   /** NULL = unlimited seats; integer ≥ 1 = hard cap. */
   capacity:                number | null
   created_at: string
 }
 
-type FileField = 'reading' | 'listening' | 'writing_task1'
+type FileField = 'reading' | 'listening' | 'writing'
 
 interface MockSubmission {
   id: string
@@ -62,9 +65,7 @@ interface FormState {
   status: 'scheduled' | 'active' | 'completed'
   reading_file_url:        string | null
   listening_file_url:      string | null
-  writing_task1_image_url: string | null
-  writing_task1_topic:     string
-  writing_task2_topic:     string
+  writing_file_url:        string | null
   /** UI carries capacity as a string so the input can be blank; save
       converts blank → null (unlimited) and numeric strings → integer. */
   capacity:                string
@@ -80,9 +81,7 @@ function makeEmpty(): FormState {
     status:                  'scheduled',
     reading_file_url:        null,
     listening_file_url:      null,
-    writing_task1_image_url: null,
-    writing_task1_topic:     '',
-    writing_task2_topic:     '',
+    writing_file_url:        null,
     capacity:                '',
     unlimitedCapacity:       true,
   }
@@ -96,9 +95,7 @@ function scheduleToForm(s: MockSchedule): FormState {
     status:                  s.status,
     reading_file_url:        s.reading_file_url,
     listening_file_url:      s.listening_file_url,
-    writing_task1_image_url: s.writing_task1_image_url,
-    writing_task1_topic:     s.writing_task1_topic ?? '',
-    writing_task2_topic:     s.writing_task2_topic ?? '',
+    writing_file_url:        s.writing_file_url,
     // capacity=null ⇒ show the "Unlimited" checkbox on and the input empty;
     // an integer ⇒ prefill the number and let the admin edit it.
     capacity:                s.capacity !== null && s.capacity !== undefined ? String(s.capacity) : '',
@@ -1008,7 +1005,7 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
         const { url } = await res.json() as { url: string }
         const key = field === 'reading' ? 'reading_file_url'
                   : field === 'listening' ? 'listening_file_url'
-                  : 'writing_task1_image_url'
+                  : 'writing_file_url'
         setForm(prev => ({ ...prev, [key]: url }))
       } else {
         const err = await res.json()
@@ -1021,7 +1018,7 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
   const clearFile = (field: FileField) => {
     const key = field === 'reading' ? 'reading_file_url'
               : field === 'listening' ? 'listening_file_url'
-              : 'writing_task1_image_url'
+              : 'writing_file_url'
     setForm(prev => ({ ...prev, [key]: null }))
   }
 
@@ -1221,50 +1218,24 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
             </div>
           </div>
 
-          {/* ── Writing section ── */}
-          <div className="rounded-xl p-4 space-y-4"
+          {/* ── Writing section — single file upload (migration 036).
+              Reading and Listening already ship as HTML/ZIP that the
+              user's iframe renders + posts CDI_SUBMIT from; Writing now
+              follows the same shape so the admin flow is one form and
+              the take-flow is one iframe branch. The old task1 image
+              + per-task text prompts are removed here (schema columns
+              stay in the DB for legacy sessions). */}
+          <div className="rounded-xl p-4 space-y-3"
             style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
             <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
               Writing bo&apos;limi
             </p>
-
-            {/* Task 1 */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                <PenTool size={12} /> Task 1
-              </p>
-              <FileUploadField
-                label="Rasm (JPG / PNG / WEBP)" icon={<ImageIcon size={12} />}
-                accept=".jpg,.jpeg,.png,.webp,.gif"
-                currentUrl={form.writing_task1_image_url} uploading={!!uploading.writing_task1}
-                onFile={f => handleFileUpload(f, 'writing_task1')} onClear={() => clearFile('writing_task1')}
-              />
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Task 1 topshirig&apos;i (matn)
-                </label>
-                <textarea className="input-field text-sm resize-none" rows={3}
-                  placeholder="The chart below shows… Describe what you see."
-                  value={form.writing_task1_topic}
-                  onChange={e => setForm(p => ({ ...p, writing_task1_topic: e.target.value }))} />
-              </div>
-            </div>
-
-            {/* Task 2 */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-secondary)' }}>
-                <PenTool size={12} /> Task 2
-              </p>
-              <div>
-                <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                  Task 2 topshirig&apos;i (matn)
-                </label>
-                <textarea className="input-field text-sm resize-none" rows={4}
-                  placeholder="Some people believe that… To what extent do you agree or disagree?"
-                  value={form.writing_task2_topic}
-                  onChange={e => setForm(p => ({ ...p, writing_task2_topic: e.target.value }))} />
-              </div>
-            </div>
+            <FileUploadField
+              label="Writing (HTML / ZIP)" icon={<PenTool size={12} />}
+              accept=".html,.htm,.zip"
+              currentUrl={form.writing_file_url} uploading={!!uploading.writing}
+              onFile={f => handleFileUpload(f, 'writing')} onClear={() => clearFile('writing')}
+            />
           </div>
 
           {/* Message */}
@@ -1354,7 +1325,7 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                           <Headphones size={10} /> Listening
                         </span>
                       )}
-                      {(s.writing_task1_topic || s.writing_task2_topic) && (
+                      {(s.writing_file_url || s.writing_task1_topic || s.writing_task2_topic) && (
                         <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
                           style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--warning)', border: '1px solid rgba(245,158,11,0.2)' }}>
                           <PenTool size={10} /> Writing

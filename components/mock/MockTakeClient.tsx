@@ -16,9 +16,13 @@ export interface MockSchedule {
   status: string
   reading_file_url: string | null
   listening_file_url: string | null
+  /** Legacy — pre-036 sessions used this per-task image. */
   writing_task1_image_url: string | null
+  /** Legacy — pre-036 sessions used these text prompts. */
   writing_task1_topic: string | null
   writing_task2_topic: string | null
+  /** New (migration 036): HTML/ZIP writing test uploaded like reading/listening. */
+  writing_file_url: string | null
 }
 
 type Tab = 'reading' | 'listening' | 'writing'
@@ -510,7 +514,7 @@ export function MockTakeClient({ schedule }: { schedule: MockSchedule }) {
   const tabs = [
     { id: 'reading'   as Tab, label: 'Reading',   Icon: BookOpen,    available: !!schedule.reading_file_url },
     { id: 'listening' as Tab, label: 'Listening', Icon: Headphones,  available: !!schedule.listening_file_url },
-    { id: 'writing'   as Tab, label: 'Writing',   Icon: PenTool,     available: !!(schedule.writing_task1_topic || schedule.writing_task2_topic) },
+    { id: 'writing'   as Tab, label: 'Writing',   Icon: PenTool,     available: !!(schedule.writing_file_url || schedule.writing_task1_topic || schedule.writing_task2_topic) },
   ]
 
   const handleWritingSubmit = async (t1: string, t2: string, timeTaken: number) => {
@@ -588,11 +592,28 @@ export function MockTakeClient({ schedule }: { schedule: MockSchedule }) {
             onCDISubmit={answers => saveHtmlAnswers('listening', answers)}
           />
         )}
+        {/* Writing: prefer the new HTML-file iframe when the admin
+             uploaded one (migration 036). Falls back to the legacy
+             React WritingSection for sessions still using per-task
+             text prompts + image, so nothing regresses for admins who
+             haven't re-authored those sessions yet. */}
         {activeTab === 'writing' && (writingStarted || submitDone) && (
-          <WritingSection
-            schedule={schedule}
-            onSubmit={handleWritingSubmit}
-          />
+          schedule.writing_file_url ? (
+            <CdiSection
+              fileUrl={schedule.writing_file_url}
+              onCDISubmit={answers => {
+                // Persist as writing answers via the existing submit
+                // flow (task1/task2 fields become the whole payload
+                // JSON so downstream analytics keep working).
+                handleWritingSubmit(JSON.stringify(answers), '', 0).catch(() => null)
+              }}
+            />
+          ) : (
+            <WritingSection
+              schedule={schedule}
+              onSubmit={handleWritingSubmit}
+            />
+          )
         )}
         {activeTab === 'writing' && !writingStarted && !submitDone && (
           <div className="flex flex-col items-center justify-center py-20 gap-5">
