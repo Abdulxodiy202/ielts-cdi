@@ -342,6 +342,15 @@ export function MockTestClient({ userId }: Props) {
                   card looks like a plain schedule until seats run out.
                   The urgent/warning tier calc below is kept unused for
                   now so re-enabling the counter is a one-line flip. */}
+              {/* Full pill — deliberately rendered for EVERY user on a
+                  full session, not just those without a booking. A
+                  booked user still benefits from seeing that further
+                  seats are gone (context for anyone watching over their
+                  shoulder / choosing whether to reschedule). The
+                  matching full-width "Joylar to'ldi" banner below is
+                  the one guarded by !hasActiveBooking, so a booked
+                  user gets pill + their own state banner (pending /
+                  confirmed / rejected) rather than a duplicate. */}
               {isFull && (
                 <div className="px-5 pt-5">
                   <span
@@ -350,6 +359,7 @@ export function MockTestClient({ userId }: Props) {
                       background: 'rgba(239,68,68,0.15)',
                       color: 'var(--error)',
                       border: '1px solid rgba(239,68,68,0.4)',
+                      boxShadow: '0 4px 16px rgba(239,68,68,0.12)',
                     }}
                   >
                     <span
