@@ -595,7 +595,7 @@ export function MockTestClient({ userId }: Props) {
                 </div>
               )}
 
-              {rejected && inCooldown && (
+              {rejected && inCooldown && !disqualified && (
                 <div className="px-5 pb-5">
                   <div
                     className="rounded-2xl p-4 space-y-3"
