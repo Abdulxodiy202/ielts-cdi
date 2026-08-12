@@ -577,7 +577,9 @@
     "confirmedTitle": "Bron qilingan — Sizni kutamiz",
     "confirmedMessage": "Test vaqtida shu sahifaga qaytib \"Mock Test boshlash\" tugmasini bosing.",
     "disqualifiedTitle": "Siz bu seansdan chetlatildingiz",
-    "disqualifiedMessage": "Test paytida qoidalar 3 marta buzildi. Ushbu seans uchun to'lov qaytarib berilmaydi. Boshqa seanslarda qatnashishingiz mumkin."
+    "disqualifiedMessage": "Test paytida qoidalar 3 marta buzildi. Ushbu seans uchun to'lov qaytarib berilmaydi. Boshqa seanslarda qatnashishingiz mumkin.",
+    "daysLeft": "{days} kun qoldi",
+    "daysHoursLeft": "{days} kun {hours} soat qoldi"
   },
   "errorPage": {
     "somethingWentWrong": "Nimadir noto'g'ri ketdi",

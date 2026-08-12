@@ -79,13 +79,36 @@ function isTestLive(s: MockScheduleWithBooking): boolean {
   return now >= start && now <= end
 }
 
-/** Format ms as HH:MM:SS (hours may be > 24 for multi-day). */
+/** Format ms as HH:MM:SS (hours may be > 24 for multi-day). Kept for
+ *  callers that want a raw fixed-width clock; the schedule-card
+ *  countdown uses formatCountdownLabel below which switches to a
+ *  human "N days M hours left" once the test is more than a day out. */
 function fmtHms(ms: number): string {
   const totalSec = Math.max(0, Math.ceil(ms / 1000))
   const h   = Math.floor(totalSec / 3600)
   const m   = Math.floor((totalSec % 3600) / 60)
   const sec = totalSec % 60
   return [h, m, sec].map(n => String(n).padStart(2, '0')).join(':')
+}
+
+/** Human-friendly countdown label for a schedule card.
+ *  - >= 24h  → "6 days 2 hours left" / "6 kun 2 soat qoldi" (statik,
+ *              minute-level precision — the per-second tick still fires
+ *              but the visible string only changes once per minute).
+ *  - <  24h  → HH:MM:SS live countdown (fmtHms). */
+function formatCountdownLabel(
+  msLeft: number,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  if (msLeft <= 0) return fmtHms(0)
+  const totalSeconds = Math.floor(msLeft / 1000)
+  const days  = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  if (days >= 1) {
+    if (hours === 0) return t('mockTest.daysLeft', { days })
+    return t('mockTest.daysHoursLeft', { days, hours })
+  }
+  return fmtHms(msLeft)
 }
 
 // BookingBadge removed: the small pending/confirmed/resigned pill used
@@ -597,12 +620,25 @@ export function MockTestClient({ userId }: Props) {
                       <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                         {t('mock.timeUntilTest')}
                       </span>
-                      <span
-                        className="font-mono font-bold text-lg tabular-nums ml-auto"
-                        style={{ color: 'var(--success)' }}
-                      >
-                        {fmtHms(msLeft)}
-                      </span>
+                      {/* formatCountdownLabel switches to "N days M
+                          hours left" when the test is > 24h away so
+                          users see a meaningful window instead of the
+                          "178:00:47" hours-crammed reading; drops back
+                          to HH:MM:SS inside the last day. Uses tabular-
+                          nums only when the string is a live clock so
+                          the day-label doesn't get letter-spaced. */}
+                      {(() => {
+                        const label = formatCountdownLabel(msLeft, t)
+                        const isClock = /^\d{2}:\d{2}:\d{2}$/.test(label)
+                        return (
+                          <span
+                            className={`font-bold ml-auto ${isClock ? 'font-mono text-lg tabular-nums' : 'text-base'}`}
+                            style={{ color: 'var(--success)' }}
+                          >
+                            {label}
+                          </span>
+                        )
+                      })()}
                     </div>
                   </div>
                 </div>

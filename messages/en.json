@@ -577,7 +577,9 @@
     "confirmedTitle": "Booked — See you there",
     "confirmedMessage": "Return to this page at test time and click \"Start Mock Test\".",
     "disqualifiedTitle": "You've been disqualified from this session",
-    "disqualifiedMessage": "Rules were violated 3 times during the test. Payment for this session is non-refundable. You can participate in other sessions."
+    "disqualifiedMessage": "Rules were violated 3 times during the test. Payment for this session is non-refundable. You can participate in other sessions.",
+    "daysLeft": "{days} days left",
+    "daysHoursLeft": "{days} days {hours} hours left"
   },
   "errorPage": {
     "somethingWentWrong": "Something went wrong",
