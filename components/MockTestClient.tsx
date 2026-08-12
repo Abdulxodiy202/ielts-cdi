@@ -472,7 +472,20 @@ export function MockTestClient({ userId }: Props) {
                         <ArrowRight size={14} /> {t('mock.startMockTest')}
                       </Link>
                     </>
-                  ) : confirmed && tooLateToBook && !live ? (
+                  /* Auto-resigned label — only when the session is
+                     ACTUALLY over, not merely within the 5-min pre-
+                     start window that shares the tooLateToBook flag.
+                     Old condition (`tooLateToBook && !live`) triggered
+                     a false positive right after admin edited a
+                     schedule forward: msLeft flipped from very-negative
+                     to positive-but-small, live went false, and the
+                     "you missed the test" message painted over the
+                     freshly-reactivated countdown card. Guard with
+                     msLeft < 0 so the message only appears once the
+                     start time has actually passed (server-side auto-
+                     resign will kick the status over to 'resigned'
+                     shortly after and the branch below takes over). */
+                  ) : confirmed && msLeft < 0 && !live ? (
                     <p className="text-xs leading-snug max-w-[200px] text-right"
                       style={{ color: 'var(--text-muted)' }}>
                       {t('mock.autoResigned')}
