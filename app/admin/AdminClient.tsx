@@ -8,8 +8,9 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Play, Keyboard,
+  Loader2, Upload, FileText, X, Music, Play, Keyboard, AlertTriangle,
 } from 'lucide-react'
+import { ADMIN_EMAILS } from '@/lib/admin-config'
 import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
 import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
 import { createClient as createBrowserClient } from '@/lib/supabase/client'
@@ -5229,6 +5230,187 @@ function ScriptsTab() {
   )
 }
 
+/* ── Danger Zone tab ──────────────────────────────────────────────────
+   Nuclear self-delete for the admin's own account, used to rehearse the
+   fresh-signup flow. Gated three ways: this component early-returns for
+   non-admin emails (belt), the tab entry is filtered out of the bar
+   below (suspenders), and the API endpoint re-checks the allowlist
+   server-side (belt again). The confirmation input has to literally
+   read "DELETE" — no soft cancel here. */
+function DangerZoneTab() {
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmation, setConfirmation] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    createBrowserClient().auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? null)
+    })
+  }, [])
+
+  // Client-side guard — the tab itself is only rendered for admins,
+  // but if some future refactor exposes the component, the render
+  // returns null so nothing dangerous leaks into the DOM.
+  if (userEmail !== null && !(ADMIN_EMAILS as readonly string[]).includes(userEmail)) {
+    return null
+  }
+
+  async function handleDelete() {
+    if (confirmation !== 'DELETE') return
+    setDeleting(true)
+    setMessage(null)
+    try {
+      const res = await fetch('/api/admin/self-destruct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMessage({ ok: false, text: data.message ?? data.error ?? 'Delete failed' })
+        setDeleting(false)
+        return
+      }
+      // Success — sign out and bounce to /login so the auth cookie
+      // doesn't linger and confuse the next signup flow.
+      setMessage({ ok: true, text: 'Account deleted. Redirecting to login…' })
+      await createBrowserClient().auth.signOut().catch(() => null)
+      setTimeout(() => { window.location.href = '/login' }, 1500)
+    } catch (err) {
+      setMessage({
+        ok: false,
+        text: err instanceof Error ? err.message : 'Network error',
+      })
+      setDeleting(false)
+    }
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <div
+        className="rounded-2xl p-6 space-y-4"
+        style={{
+          background: 'rgba(239,68,68,0.06)',
+          border: '2px solid rgba(239,68,68,0.35)',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <AlertTriangle size={24} style={{ color: 'var(--error)' }} />
+          <h2 className="text-xl font-bold" style={{ color: 'var(--error)' }}>
+            Danger Zone
+          </h2>
+        </div>
+
+        <div
+          className="rounded-xl p-4 text-sm space-y-2"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <p className="font-semibold" style={{ color: 'var(--error)' }}>
+            ⚠️ Butun akkountingizni butunlay o&apos;chirish
+          </p>
+          <p>Bu quyidagilarni bir yo&apos;la o&apos;chiradi:</p>
+          <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+            <li>Auth akkount ({userEmail ?? '…'})</li>
+            <li>Profile, booking&apos;lar, mock test natijalar</li>
+            <li>Yulduzchalar, referrals, quiz natijalar, vocabulary</li>
+            <li>Barcha bog&apos;liq ma&apos;lumotlar (FK CASCADE orqali)</li>
+          </ul>
+          <p style={{ color: 'var(--error)' }} className="font-medium">
+            Bu amalni <b>QAYTARIB BO&apos;LMAYDI</b>. Bir marta bosgach — orqaga yo&apos;l yo&apos;q.
+          </p>
+        </div>
+
+        {!showConfirm ? (
+          <button
+            type="button"
+            onClick={() => setShowConfirm(true)}
+            className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+            style={{
+              background: 'rgba(239,68,68,0.15)',
+              color: 'var(--error)',
+              border: '1px solid rgba(239,68,68,0.4)',
+            }}
+          >
+            <Trash2 size={15} /> Akkountni o&apos;chirishga urinish
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>
+                Tasdiqlash uchun katta harflar bilan <span className="font-mono" style={{ color: 'var(--error)' }}>DELETE</span> yozing:
+              </label>
+              <input
+                autoFocus
+                type="text"
+                value={confirmation}
+                onChange={e => setConfirmation(e.target.value)}
+                placeholder="DELETE"
+                disabled={deleting}
+                className="w-full px-4 py-3 rounded-xl font-mono outline-none transition-colors"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: `1px solid ${confirmation === 'DELETE' ? 'rgba(239,68,68,0.6)' : 'var(--border)'}`,
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </div>
+
+            {message && (
+              <div
+                className="p-3 rounded-xl text-sm font-medium"
+                style={{
+                  background: message.ok ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                  color: message.ok ? 'var(--success)' : 'var(--error)',
+                  border: `1px solid ${message.ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                }}
+              >
+                {message.ok ? '✅' : '❌'} {message.text}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setShowConfirm(false); setConfirmation(''); setMessage(null) }}
+                disabled={deleting}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                Bekor qilish
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={confirmation !== 'DELETE' || deleting}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-opacity"
+                style={{
+                  background: '#dc2626',
+                  opacity: confirmation === 'DELETE' && !deleting ? 1 : 0.5,
+                  cursor: confirmation === 'DELETE' && !deleting ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {deleting
+                  ? <><Loader2 size={15} className="animate-spin" /> O&apos;chirilmoqda…</>
+                  : <><Trash2 size={15} /> Butunlay o&apos;chirish</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -5245,6 +5427,7 @@ const TABS = [
   { id: 'videos',        label: 'Video darslar',    Icon: Play },
   { id: 'typing',        label: 'Typing',           Icon: Keyboard },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
+  { id: 'danger',        label: 'Danger Zone',      Icon: AlertTriangle },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -5256,9 +5439,23 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
   // Layout (dashboard) admin route'ni qamramaydi.
   usePresenceHeartbeat()
 
+  // Track the current admin's email so we can hide the Danger Zone tab
+  // for anyone who isn't in ADMIN_EMAILS. The list currently only has
+  // two entries, both of which reach this page, but the guard is cheap
+  // and future-proofs against adding read-only admins.
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null)
+  useEffect(() => {
+    createBrowserClient().auth.getUser().then(({ data }) => {
+      setCurrentEmail(data.user?.email ?? null)
+    })
+  }, [])
+  const canSelfDestruct = currentEmail !== null && (ADMIN_EMAILS as readonly string[]).includes(currentEmail)
+
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
   const readingTests = tests.filter(t => t.type === 'reading')
   const listeningTests = tests.filter(t => t.type === 'listening')
+
+  const visibleTabs = TABS.filter(t => t.id !== 'danger' || canSelfDestruct)
 
   return (
     <div className="min-h-screen p-6 md:p-8" style={{ background: 'var(--bg-primary)' }}>
@@ -5275,7 +5472,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
         className="flex gap-1 mb-8 p-1 rounded-xl overflow-x-auto"
         style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', width: 'fit-content', maxWidth: '100%' }}
       >
-        {TABS.map(({ id, label, Icon }) => {
+        {visibleTabs.map(({ id, label, Icon }) => {
           const active = activeTab === id
           return (
             <button
@@ -5333,6 +5530,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'videos'               && <VideoLessonsTab />}
       {activeTab === 'typing'               && <TypingEssaysTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
+      {activeTab === 'danger' && canSelfDestruct && <DangerZoneTab />}
     </div>
   )
 }
