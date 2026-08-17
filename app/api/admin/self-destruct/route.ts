@@ -74,17 +74,46 @@ export async function POST(req: Request) {
   const userId = user.id
   const userEmail = user.email ?? '(unknown)'
 
+  console.log('[self-destruct] Started, user:', userId, 'email:', userEmail)
+
   // 4. Manual cleanup for tables missing ON DELETE CASCADE.
   //    Swallow errors per-table so one missing/absent table doesn't
   //    abort the whole wipe — a legacy schema without a table just
-  //    means there's nothing to delete there.
+  //    means there's nothing to delete there. Row counts logged so
+  //    Vercel Functions output shows the actual damage per table.
   for (const table of MANUAL_CLEANUP_TABLES) {
-    const { error } = await admin.from(table).delete().eq('user_id', userId)
-    if (error && error.code !== '42P01') {
-      // 42P01 = undefined_table (table doesn't exist in this env)
-      console.warn(`[self-destruct] Failed to clean ${table}:`, error.message)
+    console.log(`[self-destruct] Cleaning ${table}...`)
+    const { error, count } = await admin
+      .from(table)
+      .delete({ count: 'exact' })
+      .eq('user_id', userId)
+    if (error) {
+      if (error.code === '42P01') {
+        // 42P01 = undefined_table (table doesn't exist in this env)
+        console.log(`[self-destruct] ${table}: table missing, skipped`)
+      } else {
+        console.error(`[self-destruct] Failed ${table}:`, error.message, error.code)
+      }
+    } else {
+      console.log(`[self-destruct] ${table} deleted: ${count ?? 0} rows`)
     }
   }
+
+  // 4b. Best-effort explicit profile delete. Not strictly necessary
+  //     because auth.users → profiles is CASCADE, but logging the
+  //     result surfaces "profiles row wasn't there" vs "cascade never
+  //     fired" as separate diagnostics if auth.deleteUser later fails.
+  console.log('[self-destruct] Deleting profile...')
+  const { error: profErr, count: profCount } = await admin
+    .from('profiles')
+    .delete({ count: 'exact' })
+    .eq('id', userId)
+  console.log(
+    `[self-destruct] Profile result:`,
+    profErr
+      ? `ERROR ${profErr.code}: ${profErr.message}`
+      : `ok, ${profCount ?? 0} rows`,
+  )
 
   // 5. auth.users delete — cascades to profiles, mock_bookings, test_*,
   //    subscriptions, mock_writing_answers, mock_test_submissions,
@@ -92,11 +121,24 @@ export async function POST(req: Request) {
   //    article_test_results, script_attempts, video_test_results, and
   //    through profiles to promo_code_usage, vocab_collections,
   //    vocab_words, referrals. All via existing FK CASCADE.
-  const { error: authError } = await admin.auth.admin.deleteUser(userId)
+  console.log('[self-destruct] Deleting auth user...')
+  const { data: authRes, error: authError } = await admin.auth.admin.deleteUser(userId)
+  console.log(
+    '[self-destruct] Auth result:',
+    authError
+      ? `ERROR: ${authError.message} (status=${authError.status ?? 'n/a'})`
+      : 'ok',
+    'data:',
+    JSON.stringify(authRes),
+  )
   if (authError) {
-    console.error('[self-destruct] auth deleteUser failed:', authError)
     return Response.json(
-      { error: 'auth_delete_failed', message: authError.message },
+      {
+        error: 'auth_delete_failed',
+        message: authError.message,
+        status: authError.status,
+        fullError: JSON.stringify(authError),
+      },
       { status: 500 },
     )
   }
