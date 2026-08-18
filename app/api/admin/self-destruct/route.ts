@@ -76,73 +76,96 @@ export async function POST(req: Request) {
 
   console.log('[self-destruct] Started, user:', userId, 'email:', userEmail)
 
-  // 4. Manual cleanup for tables missing ON DELETE CASCADE.
-  //    Swallow errors per-table so one missing/absent table doesn't
-  //    abort the whole wipe — a legacy schema without a table just
-  //    means there's nothing to delete there. Row counts logged so
-  //    Vercel Functions output shows the actual damage per table.
-  for (const table of MANUAL_CLEANUP_TABLES) {
-    console.log(`[self-destruct] Cleaning ${table}...`)
-    const { error, count } = await admin
-      .from(table)
-      .delete({ count: 'exact' })
-      .eq('user_id', userId)
-    if (error) {
-      if (error.code === '42P01') {
-        // 42P01 = undefined_table (table doesn't exist in this env)
-        console.log(`[self-destruct] ${table}: table missing, skipped`)
+  // 4. Single-shot atomic purge via SECURITY DEFINER RPC (migration
+  //    037). The RPC cleans auth.identities/sessions/refresh_tokens/
+  //    mfa_*/one_time_tokens (all reasons Supabase's own
+  //    auth.admin.deleteUser fails with "Database error deleting
+  //    user"), then payment_requests (no CASCADE on migration 002),
+  //    then profiles (CASCADE fans out to the rest), then auth.users
+  //    itself — inside one transaction, so a partial failure rolls
+  //    everything back rather than leaving a half-nuked account.
+  //
+  //    We keep MANUAL_CLEANUP_TABLES as a fallback: if the migration
+  //    hasn't been applied yet (RPC returns 42883 = undefined_function),
+  //    we walk through them from the app tier so the endpoint still
+  //    does *something* useful. That fallback also runs the classic
+  //    auth.admin.deleteUser, which will surface the pre-migration
+  //    "Database error" if any FK still blocks.
+  console.log('[self-destruct] Calling admin_purge_user RPC...')
+  const { error: rpcError } = await admin.rpc('admin_purge_user', { p_user_id: userId })
+
+  if (!rpcError) {
+    console.log(`[self-destruct] Deleted admin account ${userEmail} (id=${userId}) via RPC`)
+    return Response.json({ ok: true })
+  }
+
+  // RPC not present yet — fall back to the multi-step flow so a
+  // dev database without migration 037 still gets partial cleanup.
+  if (rpcError.code === '42883' || /function .* does not exist/i.test(rpcError.message)) {
+    console.warn('[self-destruct] admin_purge_user RPC missing, falling back to multi-step')
+
+    for (const table of MANUAL_CLEANUP_TABLES) {
+      console.log(`[self-destruct] Cleaning ${table}...`)
+      const { error, count } = await admin
+        .from(table)
+        .delete({ count: 'exact' })
+        .eq('user_id', userId)
+      if (error) {
+        if (error.code === '42P01') {
+          console.log(`[self-destruct] ${table}: table missing, skipped`)
+        } else {
+          console.error(`[self-destruct] Failed ${table}:`, error.message, error.code)
+        }
       } else {
-        console.error(`[self-destruct] Failed ${table}:`, error.message, error.code)
+        console.log(`[self-destruct] ${table} deleted: ${count ?? 0} rows`)
       }
-    } else {
-      console.log(`[self-destruct] ${table} deleted: ${count ?? 0} rows`)
     }
-  }
 
-  // 4b. Best-effort explicit profile delete. Not strictly necessary
-  //     because auth.users → profiles is CASCADE, but logging the
-  //     result surfaces "profiles row wasn't there" vs "cascade never
-  //     fired" as separate diagnostics if auth.deleteUser later fails.
-  console.log('[self-destruct] Deleting profile...')
-  const { error: profErr, count: profCount } = await admin
-    .from('profiles')
-    .delete({ count: 'exact' })
-    .eq('id', userId)
-  console.log(
-    `[self-destruct] Profile result:`,
-    profErr
-      ? `ERROR ${profErr.code}: ${profErr.message}`
-      : `ok, ${profCount ?? 0} rows`,
-  )
-
-  // 5. auth.users delete — cascades to profiles, mock_bookings, test_*,
-  //    subscriptions, mock_writing_answers, mock_test_submissions,
-  //    user_saved_reading_words, user_daily_unlocks, script_progress,
-  //    article_test_results, script_attempts, video_test_results, and
-  //    through profiles to promo_code_usage, vocab_collections,
-  //    vocab_words, referrals. All via existing FK CASCADE.
-  console.log('[self-destruct] Deleting auth user...')
-  const { data: authRes, error: authError } = await admin.auth.admin.deleteUser(userId)
-  console.log(
-    '[self-destruct] Auth result:',
-    authError
-      ? `ERROR: ${authError.message} (status=${authError.status ?? 'n/a'})`
-      : 'ok',
-    'data:',
-    JSON.stringify(authRes),
-  )
-  if (authError) {
-    return Response.json(
-      {
-        error: 'auth_delete_failed',
-        message: authError.message,
-        status: authError.status,
-        fullError: JSON.stringify(authError),
-      },
-      { status: 500 },
+    console.log('[self-destruct] Deleting profile...')
+    const { error: profErr, count: profCount } = await admin
+      .from('profiles')
+      .delete({ count: 'exact' })
+      .eq('id', userId)
+    console.log(
+      '[self-destruct] Profile result:',
+      profErr ? `ERROR ${profErr.code}: ${profErr.message}` : `ok, ${profCount ?? 0} rows`,
     )
+
+    console.log('[self-destruct] Deleting auth user (fallback)...')
+    const { data: authRes, error: authError } = await admin.auth.admin.deleteUser(userId)
+    console.log(
+      '[self-destruct] Auth result:',
+      authError
+        ? `ERROR: ${authError.message} (status=${authError.status ?? 'n/a'})`
+        : 'ok',
+      'data:',
+      JSON.stringify(authRes),
+    )
+    if (authError) {
+      return Response.json(
+        {
+          error: 'auth_delete_failed',
+          message: authError.message,
+          status: authError.status,
+          fullError: JSON.stringify(authError),
+          hint: 'apply migration 037_admin_purge_user_helper.sql to enable transactional purge',
+        },
+        { status: 500 },
+      )
+    }
+    console.log(`[self-destruct] Deleted admin account ${userEmail} (id=${userId}) via fallback`)
+    return Response.json({ ok: true })
   }
 
-  console.log(`[self-destruct] Deleted admin account ${userEmail} (id=${userId})`)
-  return Response.json({ ok: true })
+  console.error('[self-destruct] RPC purge failed:', rpcError)
+  return Response.json(
+    {
+      error: 'purge_failed',
+      message: rpcError.message,
+      code: rpcError.code,
+      details: rpcError.details,
+      hint: rpcError.hint,
+    },
+    { status: 500 },
+  )
 }
