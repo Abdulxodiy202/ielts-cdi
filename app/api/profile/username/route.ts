@@ -64,11 +64,26 @@ export async function PATCH(request: Request) {
     .maybeSingle()
   if (taken) return NextResponse.json({ error: 'Username taken' }, { status: 409 })
 
-  const { error } = await supabase
+  // `.select().maybeSingle()` on an UPDATE returns the row that was
+  // actually written -- or NULL when RLS filtered every candidate out.
+  // Without this the endpoint would happily return "ok" even when the
+  // policy blocked the update, and the client would show a bogus success
+  // toast while the DB stayed unchanged. Any null-row response now
+  // surfaces as a 500 with a diagnostic instead of a silent no-op.
+  const { data: updated, error } = await supabase
     .from('profiles')
     .update({ username: raw, updated_at: new Date().toISOString() })
     .eq('id', user.id)
+    .select('id, username')
+    .maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!updated) {
+    console.error('[profile/username] update returned 0 rows -- RLS or missing profile row', user.id)
+    return NextResponse.json(
+      { error: 'Profile row not updated (RLS block or missing profile)' },
+      { status: 500 },
+    )
+  }
 
-  return NextResponse.json({ ok: true, username: raw })
+  return NextResponse.json({ ok: true, username: updated.username ?? raw })
 }
