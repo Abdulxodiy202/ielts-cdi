@@ -44,9 +44,16 @@ function truncateName(name: string | null): string {
 }
 
 // Prefer the immutable-ish username handle when the RPC returns one,
-// otherwise fall back to the free-form display name.
-function displayLabel(row: { username?: string | null; display_name: string | null }): string {
-  return truncateName(row.username || row.display_name)
+// then the free-form display name, then the email local-part fallback
+// (used for the current user when both name fields are still NULL --
+// old profiles without a username/full_name would otherwise render as
+// the bare "User" placeholder).
+function displayLabel(
+  row: { username?: string | null; display_name: string | null },
+  emailFallback?: string | null,
+): string {
+  const raw = row.username || row.display_name || (emailFallback ? emailFallback.split('@')[0] : null)
+  return truncateName(raw)
 }
 
 function initials(name: string | null): string {
@@ -101,6 +108,7 @@ export function LeaderboardWidget() {
   const [topUsers, setTopUsers] = useState<LeaderRow[] | null>(null)
   const [myRank, setMyRank] = useState<MyRank | null>(null)
   const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [myEmail, setMyEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [usernameEditOpen, setUsernameEditOpen] = useState(false)
   const lastFetchRef = useRef(0)
@@ -119,6 +127,7 @@ export function LeaderboardWidget() {
     ])
 
     setMyUserId(user?.id ?? null)
+    setMyEmail(user?.email ?? null)
     setTopUsers(Array.isArray(topRes.data) ? (topRes.data as LeaderRow[]) : [])
     const rankRow = Array.isArray(rankRes.data) ? rankRes.data[0] : rankRes.data
     setMyRank((rankRow as MyRank | null) ?? null)
@@ -167,9 +176,12 @@ export function LeaderboardWidget() {
                 style={isMe ? { background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)' } : undefined}
               >
                 <RankBadge rank={u.rank} />
-                <Avatar url={u.avatar_url} name={u.username || u.display_name} />
+                <Avatar
+                  url={u.avatar_url}
+                  name={u.username || u.display_name || (isMe ? myEmail : null)}
+                />
                 <span className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                  {displayLabel(u)}{isMe ? ` ${t('leaderboardWidget.you')}` : ''}
+                  {displayLabel(u, isMe ? myEmail : null)}{isMe ? ` ${t('leaderboardWidget.you')}` : ''}
                 </span>
                 {isMe && (
                   <button

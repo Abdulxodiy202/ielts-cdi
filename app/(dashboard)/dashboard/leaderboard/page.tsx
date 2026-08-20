@@ -52,9 +52,15 @@ function truncateName(name: string | null): string {
   return n.length > 15 ? n.slice(0, 15) + '…' : n
 }
 
-// Prefer @username when available; falls back to display_name.
-function labelFor(row: { username?: string | null; display_name: string | null }): string {
-  return truncateName(row.username || row.display_name)
+// Prefer @username when available, then free-form display_name, then the
+// email local-part (only meaningful for the current user -- other rows
+// won't have an email fallback available client-side).
+function labelFor(
+  row: { username?: string | null; display_name: string | null },
+  emailFallback?: string | null,
+): string {
+  const raw = row.username || row.display_name || (emailFallback ? emailFallback.split('@')[0] : null)
+  return truncateName(raw)
 }
 
 function initials(name: string | null): string {
@@ -116,7 +122,7 @@ function CategoryChips({ row }: { row: LeaderRow }) {
   )
 }
 
-function PodiumCard({ row, place }: { row: LeaderRow; place: 1 | 2 | 3 }) {
+function PodiumCard({ row, place, emailFallback }: { row: LeaderRow; place: 1 | 2 | 3; emailFallback?: string | null }) {
   const { t } = useLanguage()
   const border =
     place === 1 ? '2px solid #f59e0b' :
@@ -135,9 +141,13 @@ function PodiumCard({ row, place }: { row: LeaderRow; place: 1 | 2 | 3 }) {
       }}
     >
       <div className="text-2xl mb-2">{medal}</div>
-      <Avatar url={row.avatar_url} name={row.username || row.display_name} size={64} />
+      <Avatar
+        url={row.avatar_url}
+        name={row.username || row.display_name || emailFallback || null}
+        size={64}
+      />
       <p className="font-bold mt-2 text-sm truncate max-w-full" style={{ color: 'var(--text-primary)' }}>
-        {labelFor(row)}
+        {labelFor(row, emailFallback)}
       </p>
       <p className="inline-flex items-baseline gap-1.5 mt-1" style={{ color: '#fbbf24' }}>
         <Star size={18} fill="#fbbf24" strokeWidth={0} style={{ position: 'relative', top: 3 }} />
@@ -250,6 +260,7 @@ export default function LeaderboardPage() {
   const [rows, setRows] = useState<LeaderRow[] | null>(null)
   const [myRank, setMyRank] = useState<MyRank | null>(null)
   const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [myEmail, setMyEmail] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [infoOpen, setInfoOpen] = useState(false)
   const [usernameEditOpen, setUsernameEditOpen] = useState(false)
@@ -269,6 +280,7 @@ export default function LeaderboardPage() {
       ])
       if (cancelled) return
       setMyUserId(user?.id ?? null)
+      setMyEmail(user?.email ?? null)
       // Backend qanday rank qaytarishidan qat'iy nazar, biz ROW_NUMBER
       // (index+1) bilan qayta hisoblaymiz -- teng balda ham unique
       // o'rin bo'ladi (Tommy 4, sarvinoz 5, backend tie'da 4/4 bergan
@@ -340,9 +352,9 @@ export default function LeaderboardPage() {
           {/* Podium: visually 2nd | 1st | 3rd on desktop, stacked 1-2-3 on mobile */}
           {top3.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-10">
-              {top3.length >= 2 && <div className="sm:order-1 order-2 flex-1 flex"><PodiumCard row={top3[1]} place={2} /></div>}
-              <div className="sm:order-2 order-1 flex-1 flex"><PodiumCard row={top3[0]} place={1} /></div>
-              {top3.length >= 3 && <div className="sm:order-3 order-3 flex-1 flex"><PodiumCard row={top3[2]} place={3} /></div>}
+              {top3.length >= 2 && <div className="sm:order-1 order-2 flex-1 flex"><PodiumCard row={top3[1]} place={2} emailFallback={top3[1].user_id === myUserId ? myEmail : null} /></div>}
+              <div className="sm:order-2 order-1 flex-1 flex"><PodiumCard row={top3[0]} place={1} emailFallback={top3[0].user_id === myUserId ? myEmail : null} /></div>
+              {top3.length >= 3 && <div className="sm:order-3 order-3 flex-1 flex"><PodiumCard row={top3[2]} place={3} emailFallback={top3[2].user_id === myUserId ? myEmail : null} /></div>}
             </div>
           )}
 
@@ -379,9 +391,13 @@ export default function LeaderboardPage() {
                           <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{r.rank}</td>
                           <td className="py-2.5 px-3">
                             <span className="inline-flex items-center gap-2.5">
-                              <Avatar url={r.avatar_url} name={r.username || r.display_name} size={30} />
+                              <Avatar
+                                url={r.avatar_url}
+                                name={r.username || r.display_name || (isMe ? myEmail : null)}
+                                size={30}
+                              />
                               <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                                {labelFor(r)}{isMe ? ` ${t('leaderboard.you')}` : ''}
+                                {labelFor(r, isMe ? myEmail : null)}{isMe ? ` ${t('leaderboard.you')}` : ''}
                               </span>
                               {isMe && (
                                 <button
