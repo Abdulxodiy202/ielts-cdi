@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 
@@ -24,6 +25,7 @@ interface DisplayNameModalProps {
 
 export function DisplayNameModal({ open, onComplete }: DisplayNameModalProps = {}) {
   const { t } = useLanguage()
+  const router = useRouter()
   const [show, setShow] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -51,16 +53,33 @@ export function DisplayNameModal({ open, onComplete }: DisplayNameModalProps = {
     setSaving(true)
     setError(null)
     try {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { error: upErr } = await supabase
-        .from('profiles')
-        .update({ display_name: value, updated_at: new Date().toISOString() })
-        .eq('id', user.id)
-      if (upErr) { setError(upErr.message); return }
+      // Route through the /api/profile PATCH endpoint instead of a raw
+      // client SDK update. Two wins:
+      //   1. The endpoint chains `.select().maybeSingle()` and returns a
+      //      500 when zero rows write (RLS block or missing profile row)
+      //      -- previously a silent no-op showed a bogus "Saved" toast.
+      //   2. We also bump `full_name` so the dashboard greeting fallback
+      //      (`display_name || full_name?.split(' ')[0]`) stays in sync
+      //      even if some future read path drops display_name.
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: value, full_name: value }),
+      })
+      const json = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) {
+        setError(json.error ?? t('profile.saveFailed') ?? 'Save failed')
+        return
+      }
       setShow(false)
       onComplete?.()
+      // Dashboard greeting + sidebar name come from a Server Component
+      // that reads profiles.display_name at request time -- refresh so
+      // the just-persisted value replaces the stale server payload
+      // instead of waiting for a full navigation.
+      router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error')
     } finally {
       setSaving(false)
     }
