@@ -369,13 +369,20 @@ export function Sidebar() {
   const handleSaveName = useCallback(async () => {
     if (!nameInput.trim()) { setEditingName(false); return }
     setNameSaving(true)
+    // Sync BOTH columns. The dashboard greeting reads display_name first
+    // (`display_name || full_name?.split(' ')[0]`), so writing only
+    // full_name here left the greeting on the pre-existing display_name
+    // and looked like the save "didn't stick" -- even though the row was
+    // updated. Sending both keeps the two labels in lockstep from every
+    // edit surface (sidebar inline, DisplayNameModal, future settings).
+    const trimmed = nameInput.trim()
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ full_name: nameInput.trim() }),
+      body: JSON.stringify({ full_name: trimmed, display_name: trimmed }),
     })
     if (res.ok) {
-      setProfile(prev => prev ? { ...prev, full_name: nameInput.trim() } : prev)
+      setProfile(prev => prev ? { ...prev, full_name: trimmed } : prev)
       addToast(t('sidebar.nameSaved'), 'success')
     } else {
       addToast(t('sidebar.nameSaveError'), 'error')
