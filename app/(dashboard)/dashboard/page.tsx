@@ -1,6 +1,6 @@
 export const revalidate = 60
 
-import { unstable_cache } from 'next/cache'
+import { unstable_cache, unstable_noStore as noStore } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
@@ -83,6 +83,13 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
+  // Belt-and-suspenders: the route already reads cookies() (below) which
+  // forces dynamic rendering, but noStore() makes the "never cache the
+  // greeting/profile block" contract explicit. Without it the profiles
+  // fetch on line ~106 could theoretically be memoized within a single
+  // request-scoped React cache, causing a router.refresh() after the
+  // display-name modal saves to display the stale value.
+  noStore()
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')

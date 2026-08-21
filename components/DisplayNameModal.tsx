@@ -66,9 +66,27 @@ export function DisplayNameModal({ open, onComplete }: DisplayNameModalProps = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: value, full_name: value }),
       })
-      const json = await res.json().catch(() => ({})) as { error?: string }
+      type ProfilePatchResponse = {
+        ok?: boolean
+        error?: string
+        message?: string
+        profile?: { display_name?: string | null; full_name?: string | null }
+        recheck?: { display_name?: string | null } | null
+      }
+      const json = await res.json().catch(() => ({})) as ProfilePatchResponse
+      console.log('[DisplayNameModal] PATCH response:', res.status, json)
       if (!res.ok) {
-        setError(json.error ?? t('profile.saveFailed') ?? 'Save failed')
+        setError(json.message ?? json.error ?? t('profile.saveFailed') ?? 'Save failed')
+        return
+      }
+      // Verify the DB actually landed the new value. If the API's
+      // RECHECK snapshot disagrees with what we sent, a trigger is
+      // clobbering the write and no amount of router.refresh() will
+      // help -- surface the mismatch instead of the misleading toast.
+      const saved = json.profile?.display_name ?? null
+      if (saved !== value) {
+        console.error('[DisplayNameModal] DB kept stale value', { sent: value, saved, recheck: json.recheck })
+        setError(`DB kept stale value (saved="${saved ?? 'null'}"). Check Vercel logs.`)
         return
       }
       setShow(false)
