@@ -382,7 +382,11 @@ export function Sidebar() {
       body: JSON.stringify({ full_name: trimmed, display_name: trimmed }),
     })
     if (res.ok) {
-      setProfile(prev => prev ? { ...prev, full_name: trimmed } : prev)
+      // Patch BOTH fields locally too -- the derived `displayName` below
+      // reads display_name first, so leaving it stale here kept showing
+      // the old name until a full reload even though the PATCH (and the
+      // DB row) already had the new value.
+      setProfile(prev => prev ? { ...prev, full_name: trimmed, display_name: trimmed } : prev)
       addToast(t('sidebar.nameSaved'), 'success')
     } else {
       addToast(t('sidebar.nameSaveError'), 'error')
