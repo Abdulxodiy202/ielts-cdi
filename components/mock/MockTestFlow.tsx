@@ -23,6 +23,11 @@ export interface MockScheduleForFlow {
   writing_task1_image_url: string | null
   writing_task1_topic: string | null
   writing_task2_topic: string | null
+  // migration 036 — admins now upload one HTML/ZIP for the whole Writing
+  // section (both tasks in a single CDI-format file). When present, the
+  // section renders the file in an iframe like Reading/Listening; when
+  // null, we fall back to the legacy task1/task2 textarea form.
+  writing_file_url: string | null
 }
 
 type Step = 'pre-start' | 'listening' | 'reading' | 'writing' | 'done'
@@ -819,6 +824,123 @@ function WritingSection({
   const timerWarn   = secsLeft < 10 * 60
   const timerDanger = secsLeft < 5 * 60
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
+
+  /* ── CDI HTML mode (migration 036) ────────────────────────────────
+     When the schedule has writing_file_url set, the admin uploaded one
+     HTML file that contains BOTH tasks. Render it in an iframe exactly
+     like ReadingSection/ListeningSection do -- same useHtmlBlobUrl,
+     same postMessage contract, same anti-cheat behaviour (clicks
+     inside the iframe don't trigger blur-based warnings because the
+     browser treats a focused iframe as still-inside the parent).
+
+     The uploaded file's exact CDI_SUBMIT payload for Writing hasn't
+     been fixed in stone yet, so this handler accepts several shapes
+     defensively (matching MockTakeClient's precedent):
+
+       1. { task1: '...', task2: '...' }           -- ideal explicit
+       2. { answers: [{ question, userAnswer }] }  -- reading-style
+       3. { answers: <any> }                       -- opaque fallback
+
+     Cases 2/3 collapse the whole payload into task1 as JSON so it
+     still lands in mock_test_submissions.writing_task1 and the admin
+     can read it back -- nothing is lost. */
+  const writingFileUrl = schedule.writing_file_url
+  const isCdiWriting = !!writingFileUrl
+  const { blobUrl: writingBlobUrl, loading: writingLoading } = useHtmlBlobUrl(isCdiWriting ? writingFileUrl : null)
+
+  // Refs so the postMessage listener always reads the latest onChange
+  // handlers without re-subscribing on every parent render.
+  const onChangeTask1Ref = useRef(onChangeTask1); onChangeTask1Ref.current = onChangeTask1
+  const onChangeTask2Ref = useRef(onChangeTask2); onChangeTask2Ref.current = onChangeTask2
+  const [cdiSubmittedOnce, setCdiSubmittedOnce] = useState(false)
+
+  useEffect(() => {
+    if (!isCdiWriting) return
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type !== 'CDI_SUBMIT') return
+      const payload = e.data as { task1?: unknown; task2?: unknown; answers?: unknown }
+
+      // Shape 1: explicit task1/task2 strings.
+      const t1 = typeof payload.task1 === 'string' ? payload.task1 : null
+      const t2 = typeof payload.task2 === 'string' ? payload.task2 : null
+      if (t1 !== null || t2 !== null) {
+        if (t1 !== null) onChangeTask1Ref.current(t1)
+        if (t2 !== null) onChangeTask2Ref.current(t2)
+        setCdiSubmittedOnce(true)
+        return
+      }
+
+      // Shape 2: reading-style answers array. Look for entries whose
+      // question key names 'task1'/'task2' (or '1'/'2') and split.
+      if (Array.isArray(payload.answers)) {
+        const map: Record<string, string> = {}
+        for (const item of payload.answers as Array<{ question?: unknown; userAnswer?: unknown }>) {
+          const q = String(item.question ?? '').trim().toLowerCase()
+          const a = String(item.userAnswer ?? '')
+          if (q) map[q] = a
+        }
+        const derivedT1 = map['task1'] ?? map['1'] ?? null
+        const derivedT2 = map['task2'] ?? map['2'] ?? null
+        if (derivedT1 !== null) onChangeTask1Ref.current(derivedT1)
+        if (derivedT2 !== null) onChangeTask2Ref.current(derivedT2)
+        // If neither key matched, stash the whole answers array as JSON
+        // in task1 so nothing is lost -- MockTakeClient does the same.
+        if (derivedT1 === null && derivedT2 === null) {
+          onChangeTask1Ref.current(JSON.stringify(payload.answers))
+        }
+        setCdiSubmittedOnce(true)
+        return
+      }
+
+      // Shape 3: opaque payload -- capture as JSON in task1.
+      onChangeTask1Ref.current(JSON.stringify(payload.answers ?? payload))
+      setCdiSubmittedOnce(true)
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [isCdiWriting])
+
+  if (isCdiWriting) {
+    if (writingLoading) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent)' }} />
+        </div>
+      )
+    }
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 16px', flexShrink: 0 }}>
+          <SectionTimer secsLeft={secsLeft} totalSecs={WRITE_MINS * 60} label={t('mockFlow.writingTimeLeft')} />
+        </div>
+        <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+          <iframe
+            src={writingBlobUrl ?? writingFileUrl ?? ''}
+            title="Writing test"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+          />
+          {/* Bottom-right Submit -- always available so a student can
+              finish before the 60-min timer expires. After the iframe
+              posts CDI_SUBMIT once, we flip the label to make the
+              final-submit intention obvious. */}
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitting}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-white shadow-xl hover:opacity-90 active:scale-95 disabled:opacity-60"
+            style={{
+              position: 'absolute', bottom: 16, right: 16, zIndex: 10,
+              background: cdiSubmittedOnce ? 'linear-gradient(135deg, #16a34a, #059669)' : 'var(--accent)',
+            }}
+          >
+            {submitting
+              ? <><Loader2 size={15} className="animate-spin" /> {t('mockFlow.submittingMock')}</>
+              : <><Send size={15} /> {t('mockFlow.submitMockBtn')}</>}
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ height: '100%', overflowY: 'auto' }}>
