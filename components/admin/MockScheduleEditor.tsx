@@ -42,6 +42,12 @@ interface MockSubmission {
   reading_answers: Record<string, string>
   writing_task1: string
   writing_task2: string
+  // Optional -- populated when a row exists in mock_writing_submissions
+  // (the new CDI-HTML writing pipeline). Older submissions leave these
+  // null and the UI hides the word-count/timestamp chips.
+  writing_task1_words?: number | null
+  writing_task2_words?: number | null
+  writing_submitted_at?: string | null
   status: string
   submitted_at: string | null
 }
@@ -712,7 +718,7 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
 
   const hasListening = Object.keys(sub.listening_answers ?? {}).length > 0
   const hasReading   = Object.keys(sub.reading_answers ?? {}).length > 0
-  const hasWriting   = !!(sub.writing_task1 || sub.writing_task2)
+  const hasWriting   = !!(sub.writing_task1 || sub.writing_task2 || sub.writing_submitted_at)
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
@@ -826,10 +832,28 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
 
           {/* Writing */}
           <div>
-            <p className="text-xs font-bold mb-2" style={{ color: 'var(--warning)' }}>✍️ Writing</p>
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <p className="text-xs font-bold" style={{ color: 'var(--warning)' }}>🖊️ Writing Submissions</p>
+              {sub.writing_submitted_at && (
+                <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  Topshirildi: {new Date(sub.writing_submitted_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Task 1</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Task 1</p>
+                  {typeof sub.writing_task1_words === 'number' && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: sub.writing_task1_words >= 150 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                        color: sub.writing_task1_words >= 150 ? 'var(--success)' : 'var(--warning)',
+                      }}>
+                      {sub.writing_task1_words} so&apos;z
+                    </span>
+                  )}
+                </div>
                 {task1ImageUrl && (
                   <button
                     type="button"
@@ -853,7 +877,18 @@ function SubmissionCard({ sub, index, task1ImageUrl }: {
                 </pre>
               </div>
               <div>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Task 2</p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Task 2</p>
+                  {typeof sub.writing_task2_words === 'number' && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: sub.writing_task2_words >= 250 ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                        color: sub.writing_task2_words >= 250 ? 'var(--success)' : 'var(--warning)',
+                      }}>
+                      {sub.writing_task2_words} so&apos;z
+                    </span>
+                  )}
+                </div>
                 <pre className="text-xs whitespace-pre-wrap leading-relaxed p-3 rounded-xl"
                   style={{ background: 'var(--bg-card)', color: 'var(--text-secondary)', fontFamily: 'inherit', border: '1px solid var(--border)', minHeight: 48 }}>
                   {sub.writing_task2 || '(bo\'sh)'}
