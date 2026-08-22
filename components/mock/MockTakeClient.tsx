@@ -602,10 +602,27 @@ export function MockTakeClient({ schedule }: { schedule: MockSchedule }) {
             <CdiSection
               fileUrl={schedule.writing_file_url}
               onCDISubmit={answers => {
-                // Persist as writing answers via the existing submit
-                // flow (task1/task2 fields become the whole payload
-                // JSON so downstream analytics keep working).
+                // Legacy path: persist via the old submit flow so
+                // downstream analytics keep working.
                 handleWritingSubmit(JSON.stringify(answers), '', 0).catch(() => null)
+                // New path: mirror the payload into
+                // mock_writing_submissions so the admin's Writing
+                // panel picks it up. `answers` here is the parsed
+                // Record<string,string> from CdiSection -- pull task1
+                // / task2 keys if present, otherwise fall back to the
+                // whole blob.
+                const rec = answers as Record<string, string>
+                const t1 = rec.task1 ?? rec['1'] ?? ''
+                const t2 = rec.task2 ?? rec['2'] ?? ''
+                fetch('/api/mock/writing-submissions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    scheduleId: schedule.id,
+                    task1: t1,
+                    task2: t2,
+                  }),
+                }).catch(err => console.error('[writing-submissions] POST failed:', err))
               }}
             />
           ) : (

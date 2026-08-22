@@ -858,14 +858,46 @@ function WritingSection({
     if (!isCdiWriting) return
     const handler = (e: MessageEvent) => {
       if (e.data?.type !== 'CDI_SUBMIT') return
-      const payload = e.data as { task1?: unknown; task2?: unknown; answers?: unknown }
+      const payload = e.data as {
+        testType?: unknown
+        task1?: unknown
+        task2?: unknown
+        task1Words?: unknown
+        task2Words?: unknown
+        scheduleId?: unknown
+        userId?: unknown
+        answers?: unknown
+      }
 
-      // Shape 1: explicit task1/task2 strings.
+      // Shape 1: explicit task1/task2 strings. This is the shape the
+      // Writing CDI HTML sends:
+      //   { testType: 'writing', task1, task2, task1Words, task2Words,
+      //     scheduleId, userId }
+      // In addition to hydrating the parent's textarea state we POST
+      // the whole payload to /api/mock/writing-submissions so it lands
+      // in mock_writing_submissions (the admin's Writing panel reads
+      // from there). Fire-and-forget: a network hiccup shouldn't block
+      // the "you can now submit" UI transition.
       const t1 = typeof payload.task1 === 'string' ? payload.task1 : null
       const t2 = typeof payload.task2 === 'string' ? payload.task2 : null
       if (t1 !== null || t2 !== null) {
         if (t1 !== null) onChangeTask1Ref.current(t1)
         if (t2 !== null) onChangeTask2Ref.current(t2)
+        const isWriting = payload.testType === 'writing' || (t1 !== null && t2 !== null)
+        if (isWriting) {
+          fetch('/api/mock/writing-submissions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scheduleId: typeof payload.scheduleId === 'string' ? payload.scheduleId : schedule.id,
+              userId: typeof payload.userId === 'string' ? payload.userId : undefined,
+              task1: t1 ?? '',
+              task2: t2 ?? '',
+              task1Words: typeof payload.task1Words === 'number' ? payload.task1Words : undefined,
+              task2Words: typeof payload.task2Words === 'number' ? payload.task2Words : undefined,
+            }),
+          }).catch(err => console.error('[writing-submissions] POST failed:', err))
+        }
         setCdiSubmittedOnce(true)
         return
       }
@@ -898,7 +930,7 @@ function WritingSection({
     }
     window.addEventListener('message', handler)
     return () => window.removeEventListener('message', handler)
-  }, [isCdiWriting])
+  }, [isCdiWriting, schedule.id])
 
   if (isCdiWriting) {
     if (writingLoading) {
