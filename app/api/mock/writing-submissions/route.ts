@@ -29,8 +29,6 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     scheduleId?: unknown
     schedule_id?: unknown
-    userId?: unknown
-    user_id?: unknown
     task1?: unknown
     task2?: unknown
     task1Words?: unknown
@@ -43,11 +41,22 @@ export async function POST(req: NextRequest) {
   if (!scheduleId || typeof scheduleId !== 'string') {
     return Response.json({ error: 'scheduleId required' }, { status: 400 })
   }
-  // The iframe supplies userId (may be a candidate string); if missing
-  // -- e.g. the HTML wasn't rebuilt to include it yet -- we default to
-  // the authenticated user's UUID so nothing is lost.
-  const userIdRaw = (body.userId ?? body.user_id) as string | undefined
-  const userId = typeof userIdRaw === 'string' && userIdRaw.length > 0 ? userIdRaw : user.id
+  // ROOT CAUSE FIX: the uploaded CDI Writing HTML is only ever loaded
+  // inside this app's authenticated MockTestFlow iframe -- there is no
+  // real standalone-candidate scenario here, so trusting a client-
+  // supplied userId is both unnecessary and actively harmful: the
+  // HTML's own login gate is disabled and MockTestFlow never sends it
+  // a CDI_INIT with the real user id, so it falls back to a throwaway
+  // 'CDI-<timestamp>' string. That string doesn't match the real
+  // auth UUID that mock_test_submissions.user_id uses, so the admin
+  // panel's writingByUserId lookup (keyed on the real UUID) never
+  // finds this row and shows the Writing task as empty even though it
+  // saved successfully under the wrong user_id.
+  // Always trust the authenticated session instead -- it's already
+  // required (401 above) and it's what every other submission table
+  // keys on, so this is also what actually links the row to the
+  // student in the admin view.
+  const userId = user.id
 
   const task1 = typeof body.task1 === 'string' ? body.task1 : ''
   const task2 = typeof body.task2 === 'string' ? body.task2 : ''
