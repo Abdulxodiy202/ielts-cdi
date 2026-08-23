@@ -810,6 +810,7 @@ function WritingSection({
   onSubmit,
   submitting,
   secsLeft,
+  iframeRef,
 }: {
   schedule: MockScheduleForFlow
   task1: string
@@ -819,6 +820,7 @@ function WritingSection({
   onSubmit: () => void
   submitting: boolean
   secsLeft: number
+  iframeRef: { current: HTMLIFrameElement | null }
 }) {
   const { t } = useLanguage()
   const timerWarn   = secsLeft < 10 * 60
@@ -947,6 +949,7 @@ function WritingSection({
         </div>
         <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
           <iframe
+            ref={iframeRef}
             src={writingBlobUrl ?? writingFileUrl ?? ''}
             title="Writing test"
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
@@ -1138,6 +1141,19 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
   const [readingAnswers,     setReadingAnswers]    = useState<Record<string, string>>({})
   const [task1,              setTask1]             = useState('')
   const [task2,              setTask2]             = useState('')
+  // ROOT CAUSE of "Writing never reaches the admin panel": task1/task2
+  // above are only ever populated by the CDI_SUBMIT postMessage handler
+  // inside WritingSection -- which only fires if the student clicks the
+  // CDI HTML's OWN internal submit button (buried inside the iframe) or
+  // waits for its internal 60-min timer. The app's native, obvious
+  // "Submit Mock Test" button (bottom-right, outside the iframe) and
+  // this component's OWN 60-min writing timer both call
+  // handleFinalSubmit() directly and never touch the iframe at all, so
+  // a student who (naturally) uses the native button submits empty
+  // writing answers. This ref lets handleFinalSubmit reach into the
+  // iframe and pull the live answer itself as a fallback, regardless
+  // of which submit path the student took.
+  const writingIframeRef = useRef<HTMLIFrameElement>(null)
   const [submitting,         setSubmitting]        = useState(false)
   const [skippedNotice,      setSkippedNotice]     = useState<string | null>(null)
   const [nowMs,              setNowMs]             = useState(Date.now())
@@ -1518,7 +1534,50 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
     if (submitting) return
     setSubmitting(true)
     try {
-      const { listeningAnswers: la, readingAnswers: ra, task1: t1, task2: t2 } = stateRef.current
+      const { listeningAnswers: la, readingAnswers: ra } = stateRef.current
+      let { task1: t1, task2: t2 } = stateRef.current
+
+      // Fallback: if this schedule uses the CDI Writing iframe, pull the
+      // live answer directly out of it before finalizing. Covers both
+      // the native Submit button and the 60-min auto-submit timer,
+      // neither of which waits for the iframe's own CDI_SUBMIT message.
+      // Safe no-op if the iframe never sent CDI_SUBMIT some other way,
+      // if the uploaded file doesn't match the expected structure, or
+      // if reading it throws for any reason (blob-origin access failing
+      // in some browser, iframe not mounted, etc.) -- t1/t2 just stay
+      // whatever they already were.
+      if (schedule.writing_file_url) {
+        try {
+          const win = writingIframeRef.current?.contentWindow as (Window & {
+            task1Content?: unknown
+            task2Content?: unknown
+            currentPart?: unknown
+          }) | null | undefined
+          if (win) {
+            const ta = win.document?.getElementById?.('writingTextarea') as HTMLTextAreaElement | null
+            if (ta && typeof win.currentPart === 'number') {
+              if (win.currentPart === 1) win.task1Content = ta.value
+              else win.task2Content = ta.value
+            }
+            const liveT1 = typeof win.task1Content === 'string' ? win.task1Content : ''
+            const liveT2 = typeof win.task2Content === 'string' ? win.task2Content : ''
+            if (liveT1 || liveT2) {
+              t1 = liveT1
+              t2 = liveT2
+              setTask1(t1)
+              setTask2(t2)
+              await fetch('/api/mock/writing-submissions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scheduleId: schedule.id, task1: t1, task2: t2 }),
+              }).catch(err => console.error('[writing-submissions] final-submit POST failed:', err))
+            }
+          }
+        } catch (err) {
+          console.error('[MockTestFlow] could not read writing iframe on submit:', err)
+        }
+      }
+
       const res = await fetch('/api/mock/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1736,6 +1795,7 @@ export function MockTestFlow({ schedule }: { schedule: MockScheduleForFlow }) {
             onSubmit={handleFinalSubmit}
             submitting={submitting}
             secsLeft={secsLeft}
+            iframeRef={writingIframeRef}
           />
         )}
       </div>
