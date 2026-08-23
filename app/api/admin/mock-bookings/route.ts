@@ -21,12 +21,25 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient()
 
-  // Fetch all bookings — include payment_ref so we can look up the phone
-  const { data: bookings, error } = await admin
+  // Fetch all bookings — include payment_ref so we can look up the
+  // phone, and user_name/user_phone (migration 038) which free bookings
+  // (/api/mock/free-book) populate directly since they have no
+  // payment_requests row to read from.
+  let { data: bookings, error } = await admin
     .from('mock_bookings')
-    .select('id, user_id, status, payment_status, payment_ref, created_at')
+    .select('id, user_id, status, payment_status, payment_ref, user_name, user_phone, created_at')
     .eq('schedule_id', scheduleId)
     .order('created_at', { ascending: true })
+
+  // Migration 038 not run yet — retry without the two new columns so
+  // this endpoint still works instead of hard-failing.
+  if (error?.code === '42703') {
+    ;({ data: bookings, error } = await admin
+      .from('mock_bookings')
+      .select('id, user_id, status, payment_status, payment_ref, created_at')
+      .eq('schedule_id', scheduleId)
+      .order('created_at', { ascending: true }))
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -77,12 +90,18 @@ export async function GET(req: NextRequest) {
 
   const enriched: any[] = bookings.map((b: any) => {
     const profile = profileMap[b.user_id] ?? {}
-    // Phone priority: payment_requests → profiles.phone → ''
-    const phone = paymentPhoneMap[b.user_id] || profile.phone || ''
+    // Phone priority: payment_requests (paid bookings) → booking's own
+    // user_phone (free bookings -- migration 038, typed into
+    // FreeBookingModal at booking time) → profiles.phone → ''
+    const phone = paymentPhoneMap[b.user_id] || b.user_phone || profile.phone || ''
+    // Name priority: booking's own user_name (free bookings) →
+    // profiles.full_name (paid bookings, or if the free-booker's own
+    // account name happens to be set) → 'Noma'lum' as last resort.
+    const name = b.user_name || profile.full_name || 'Noma\'lum'
     return {
       id: b.id,
       user_id: b.user_id,
-      user_name: profile.full_name ?? 'Noma\'lum',
+      user_name: name,
       user_email: profile.email ?? '',
       user_phone: phone,
       is_premium: profile.is_premium ?? false,

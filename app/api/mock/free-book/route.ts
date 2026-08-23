@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: 'already_booked' }, { status: 409 })
   }
 
-  const { error: insertErr } = await admin.from('mock_bookings').insert({
+  const baseBookingRow = {
     user_id: user.id,
     schedule_id: scheduleId,
     booking_date: schedule.date,
@@ -92,7 +92,21 @@ export async function POST(request: NextRequest) {
     payment_status: 'paid',
     payment_ref: null,
     status: 'confirmed',
+  }
+
+  // No payment_requests row exists for a free booking (that's the whole
+  // point), so store what the student typed directly on the booking --
+  // it's the only place the admin bookings/submissions lists can read
+  // it from (migration 038). Retry without the two columns if that
+  // migration hasn't been run yet, so booking still succeeds.
+  let { error: insertErr } = await admin.from('mock_bookings').insert({
+    ...baseBookingRow,
+    user_name: fullName,
+    user_phone: phone,
   })
+  if (insertErr?.code === '42703') {
+    ;({ error: insertErr } = await admin.from('mock_bookings').insert(baseBookingRow))
+  }
 
   if (insertErr) {
     console.error('[mock/free-book] insert error:', insertErr)

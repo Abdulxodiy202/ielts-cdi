@@ -90,8 +90,10 @@ export async function GET(req: NextRequest) {
   const bookingIdsFromResigned    = pureResignedBookings.map((b: any) => b.id)
   const allBookingIds = [...new Set([...bookingIdsFromSubmissions, ...bookingIdsFromResigned])]
 
-  // Fetch profiles + bookings (for payment_ref → phone) in parallel
-  const [profilesRes, bookingsForPhoneRes] = await Promise.all([
+  // Fetch profiles + bookings (for payment_ref → phone, and
+  // user_name/user_phone -- migration 038, populated by free bookings
+  // which have no payment_requests row to read from) in parallel
+  const [profilesRes, bookingsForPhoneResRaw] = await Promise.all([
     admin
       .from('profiles')
       .select('id, full_name, email, phone, is_premium')
@@ -99,10 +101,18 @@ export async function GET(req: NextRequest) {
     allBookingIds.length > 0
       ? admin
           .from('mock_bookings')
-          .select('id, user_id, payment_ref')
+          .select('id, user_id, payment_ref, user_name, user_phone')
           .in('id', allBookingIds)
-      : Promise.resolve({ data: [] as any[] }),
+      : Promise.resolve({ data: [] as any[], error: null as any }),
   ])
+  // Migration 038 not run yet — retry without the two new columns.
+  let bookingsForPhoneRes = bookingsForPhoneResRaw
+  if ((bookingsForPhoneRes as any).error?.code === '42703') {
+    bookingsForPhoneRes = await admin
+      .from('mock_bookings')
+      .select('id, user_id, payment_ref')
+      .in('id', allBookingIds)
+  }
 
   const profileMap: Record<string, any> = {}
   for (const p of profilesRes.data ?? []) {
@@ -129,19 +139,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Booking-level name/phone (free bookings), keyed by booking id --
+  // submissions/resigned rows reference a specific booking_id, and a
+  // user could in principle have booked more than one schedule.
+  const bookingContactMap: Record<string, { user_name?: string; user_phone?: string }> = {}
+  for (const b of bookingsForPhoneRes.data ?? []) {
+    bookingContactMap[b.id] = { user_name: (b as any).user_name, user_phone: (b as any).user_phone }
+  }
+
   // Enrich submissions. If a mock_writing_submissions row exists for
   // the same user_id (string match), its task1_answer/task2_answer
   // overrides the old mock_test_submissions.writing_task1/task2 --
   // the new table is the source of truth for the CDI-HTML flow.
   const enrichedSubmissions = submissions.map((s: any) => {
     const profile = profileMap[s.user_id] ?? {}
-    const userPhone = paymentPhoneMap[s.user_id] || profile.phone || ''
+    const bookingContact = bookingContactMap[s.booking_id] ?? {}
+    // Phone priority: payment_requests (paid) → booking's own user_phone
+    // (free bookings) → profiles.phone → ''. Same priority for name.
+    const userPhone = paymentPhoneMap[s.user_id] || bookingContact.user_phone || profile.phone || ''
+    const userName = bookingContact.user_name || profile.full_name || 'Noma\'lum'
     const w = writingByUserId.get(s.user_id) ?? null
     return {
       id: s.id,
       user_id: s.user_id,
       booking_id: s.booking_id,
-      user_name: profile.full_name ?? 'Noma\'lum',
+      user_name: userName,
       user_email: profile.email ?? s.user_id,
       user_phone: userPhone,
       is_premium: profile.is_premium ?? false,
@@ -162,12 +184,14 @@ export async function GET(req: NextRequest) {
   // Enrich resigned bookings (no submission → empty answers, status='resigned')
   const enrichedResigned = pureResignedBookings.map((b: any) => {
     const profile = profileMap[b.user_id] ?? {}
-    const userPhone = paymentPhoneMap[b.user_id] || profile.phone || ''
+    const bookingContact = bookingContactMap[b.id] ?? {}
+    const userPhone = paymentPhoneMap[b.user_id] || bookingContact.user_phone || profile.phone || ''
+    const userName = bookingContact.user_name || profile.full_name || 'Noma\'lum'
     return {
       id: `resigned-${b.id}`,
       user_id: b.user_id,
       booking_id: b.id,
-      user_name: profile.full_name ?? 'Noma\'lum',
+      user_name: userName,
       user_email: profile.email ?? b.user_id,
       user_phone: userPhone,
       is_premium: profile.is_premium ?? false,
