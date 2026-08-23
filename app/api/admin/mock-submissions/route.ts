@@ -106,12 +106,16 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] as any[], error: null as any }),
   ])
   // Migration 038 not run yet — retry without the two new columns.
-  let bookingsForPhoneRes = bookingsForPhoneResRaw
-  if ((bookingsForPhoneRes as any).error?.code === '42703') {
-    bookingsForPhoneRes = await admin
+  // Kept as plain `any` (not reassigning the typed query result) since
+  // the two .select() calls produce different row shapes and TS won't
+  // let a variable be reassigned across them.
+  let bookingsForPhoneData: any[] = bookingsForPhoneResRaw.data ?? []
+  if ((bookingsForPhoneResRaw as any).error?.code === '42703') {
+    const retryRes = await admin
       .from('mock_bookings')
       .select('id, user_id, payment_ref')
       .in('id', allBookingIds)
+    bookingsForPhoneData = retryRes.data ?? []
   }
 
   const profileMap: Record<string, any> = {}
@@ -122,7 +126,7 @@ export async function GET(req: NextRequest) {
   // Build payment_requests phone lookup: user_id → phone
   // mock_bookings.payment_ref format: "PR-<uuid>"
   const paymentReqIds: string[] = []
-  for (const b of bookingsForPhoneRes.data ?? []) {
+  for (const b of bookingsForPhoneData) {
     if (b.payment_ref && typeof b.payment_ref === 'string' && b.payment_ref.startsWith('PR-')) {
       paymentReqIds.push(b.payment_ref.slice(3))
     }
@@ -143,8 +147,8 @@ export async function GET(req: NextRequest) {
   // submissions/resigned rows reference a specific booking_id, and a
   // user could in principle have booked more than one schedule.
   const bookingContactMap: Record<string, { user_name?: string; user_phone?: string }> = {}
-  for (const b of bookingsForPhoneRes.data ?? []) {
-    bookingContactMap[b.id] = { user_name: (b as any).user_name, user_phone: (b as any).user_phone }
+  for (const b of bookingsForPhoneData) {
+    bookingContactMap[b.id] = { user_name: b.user_name, user_phone: b.user_phone }
   }
 
   // Enrich submissions. If a mock_writing_submissions row exists for

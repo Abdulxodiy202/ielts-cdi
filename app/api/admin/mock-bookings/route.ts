@@ -25,20 +25,28 @@ export async function GET(req: NextRequest) {
   // phone, and user_name/user_phone (migration 038) which free bookings
   // (/api/mock/free-book) populate directly since they have no
   // payment_requests row to read from.
-  let { data: bookings, error } = await admin
-    .from('mock_bookings')
-    .select('id, user_id, status, payment_status, payment_ref, user_name, user_phone, created_at')
-    .eq('schedule_id', scheduleId)
-    .order('created_at', { ascending: true })
+  let bookings: any[] | null = null
+  let error: any = null
+  {
+    const res = await admin
+      .from('mock_bookings')
+      .select('id, user_id, status, payment_status, payment_ref, user_name, user_phone, created_at')
+      .eq('schedule_id', scheduleId)
+      .order('created_at', { ascending: true })
+    bookings = res.data
+    error = res.error
+  }
 
   // Migration 038 not run yet — retry without the two new columns so
   // this endpoint still works instead of hard-failing.
   if (error?.code === '42703') {
-    ;({ data: bookings, error } = await admin
+    const res = await admin
       .from('mock_bookings')
       .select('id, user_id, status, payment_status, payment_ref, created_at')
       .eq('schedule_id', scheduleId)
-      .order('created_at', { ascending: true }))
+      .order('created_at', { ascending: true })
+    bookings = res.data
+    error = res.error
   }
 
   if (error) {
