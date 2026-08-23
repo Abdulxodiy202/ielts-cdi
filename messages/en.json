@@ -851,6 +851,7 @@
     "nameRequiredError": "Full name is required",
     "phoneRequiredError": "Phone number is required",
     "receiptRequiredError": "Receipt image is required",
+    "freeNoReceiptNote": "This is free (100% discount applied) — no receipt needed.",
     "networkError": "Network error",
     "genericError": "An error occurred",
     "networkErrorRetry": "Network error. Please try again."

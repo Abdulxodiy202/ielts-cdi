@@ -120,13 +120,15 @@ export function PaymentModal({
   const handleSubmit = async () => {
     if (!fullName.trim()) { setError(t('payment.nameRequiredError')); return }
     if (!phone.trim()) { setError(t('payment.phoneRequiredError')); return }
-    if (!receipt) { setError(t('payment.receiptRequiredError')); return }
+    // A 100%-discount promo brings effectiveAmount to 0 -- nothing was
+    // actually transferred, so there's no receipt to require or upload.
+    if (effectiveAmount > 0 && !receipt) { setError(t('payment.receiptRequiredError')); return }
 
     setLoading(true)
     setError('')
 
     const formData = new FormData()
-    formData.append('receipt', receipt)
+    if (receipt) formData.append('receipt', receipt)
     formData.append('user_name', fullName.trim())
     formData.append('user_phone', phone.trim())
     formData.append('type', type)
@@ -466,7 +468,17 @@ export function PaymentModal({
                   </div>
                 </div>
 
-                {/* Receipt upload */}
+                {/* Receipt upload -- skipped entirely when a 100% promo
+                    brings the price to 0. Nothing was transferred, so
+                    there's nothing to upload a receipt for. */}
+                {effectiveAmount === 0 ? (
+                  <div
+                    className="mb-4 rounded-xl p-4 text-center text-sm font-medium"
+                    style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', color: 'var(--success)' }}
+                  >
+                    ✅ {t('payment.freeNoReceiptNote')}
+                  </div>
+                ) : (
                 <div className="mb-4">
                   <label
                     className="text-xs font-medium mb-1.5 block"
@@ -533,6 +545,7 @@ export function PaymentModal({
                     }}
                   />
                 </div>
+                )}
 
                 {/* Error */}
                 {error && (

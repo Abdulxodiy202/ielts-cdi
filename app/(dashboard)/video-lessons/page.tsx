@@ -110,18 +110,21 @@ export default function VideoLessonsPage() {
             </p>
           )}
         </div>
-        {!loading && visibleVideos.length > 0 && (
+        {/* Stars chip is IELTS-lesson gamification only -- self-improvement
+            videos aren't scored, so the chip (and per-card badges below)
+            stay hidden on that tab. */}
+        {!loading && visibleVideos.length > 0 && tab === 'ielts' && (
           <div className="shrink-0">
             <SectionStarsChip total={sectionTotal} max={maxStars} />
           </div>
         )}
       </div>
 
-      {/* Subcategory tab qatori -- URL query bilan sinxron */}
-      <div
-        className="mb-6 flex gap-1 border-b"
-        style={{ borderColor: 'var(--border)' }}
-      >
+      {/* Subcategory tab qatori -- URL query bilan sinxron. Real pill
+          buttons (filled background + border) instead of an underlined
+          text tab -- the old style read as plain text, not something
+          clickable. */}
+      <div className="mb-6 flex gap-2 flex-wrap">
         {(['ielts', 'self_improvement'] as VideoCategory[]).map(key => {
           const active = tab === key
           return (
@@ -129,12 +132,11 @@ export default function VideoLessonsPage() {
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className="px-6 py-3 text-sm font-medium rounded-t-lg transition-colors"
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
               style={{
-                background: active ? 'rgba(59,130,246,0.15)' : 'transparent',
-                color: active ? '#60a5fa' : 'var(--text-muted)',
-                borderBottom: active ? '2px solid #60a5fa' : '2px solid transparent',
-                marginBottom: -1,
+                background: active ? 'var(--accent)' : 'var(--bg-secondary)',
+                color: active ? 'white' : 'var(--text-secondary)',
+                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
               }}
             >
               {t(TAB_KEY[key])}
@@ -144,12 +146,12 @@ export default function VideoLessonsPage() {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-2xl overflow-hidden animate-pulse flex gap-4 p-4"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="rounded-2xl overflow-hidden animate-pulse"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-              <div style={{ width: 160, height: 90, borderRadius: 10, background: 'var(--bg-secondary)', flexShrink: 0 }} />
-              <div className="flex-1 space-y-2 py-1">
+              <div style={{ width: '100%', paddingTop: '56.25%', background: 'var(--bg-secondary)' }} />
+              <div className="p-4 space-y-2">
                 <div style={{ height: 14, borderRadius: 6, background: 'var(--bg-secondary)' }} />
                 <div style={{ height: 10, borderRadius: 6, background: 'var(--bg-secondary)', width: '70%' }} />
               </div>
@@ -162,7 +164,7 @@ export default function VideoLessonsPage() {
           <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t(EMPTY_KEY[tab])}</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {visibleVideos.map(v => {
             const ytId     = getYouTubeId(v.video_url)
             const thumbSrc = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
@@ -172,86 +174,85 @@ export default function VideoLessonsPage() {
             return (
               // Card no longer a link. Watch + Test are the only nav
               // affordances so a stray click doesn't misfire into either.
+              // Vertical layout (thumb on top, content below) so the card
+              // reads correctly inside a narrow grid column.
               <div key={v.id}
-                className="rounded-2xl overflow-hidden transition-all hover:shadow-lg"
+                className="rounded-2xl overflow-hidden transition-all hover:shadow-lg flex flex-col"
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-                <div className="flex gap-0">
-                  {/* Thumbnail */}
-                  <div style={{ position: 'relative', width: 180, flexShrink: 0 }}>
-                    <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%' }}>
-                      {thumbSrc ? (
-                        <Image
-                          src={thumbSrc}
-                          alt={v.title}
-                          fill
-                          sizes="180px"
-                          style={{ objectFit: 'cover',
-                            filter: locked ? 'blur(3px) brightness(0.5)' : undefined }}
-                        />
-                      ) : (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))' }}>
-                          <Play size={28} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                        </div>
-                      )}
-                      {locked && (
-                        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Lock size={18} style={{ color: '#f59e0b' }} />
-                        </div>
-                      )}
-                      {bestStars > 0 && !locked && (
-                        <StarsBadge stars={bestStars} variant="poster" size={16} />
-                      )}
+                {/* Thumbnail */}
+                <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', flexShrink: 0 }}>
+                  {thumbSrc ? (
+                    <Image
+                      src={thumbSrc}
+                      alt={v.title}
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      style={{ objectFit: 'cover',
+                        filter: locked ? 'blur(3px) brightness(0.5)' : undefined }}
+                    />
+                  ) : (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))' }}>
+                      <Play size={28} style={{ color: 'rgba(255,255,255,0.4)' }} />
                     </div>
-                  </div>
+                  )}
+                  {locked && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Lock size={18} style={{ color: '#f59e0b' }} />
+                    </div>
+                  )}
+                  {/* Stars badge is IELTS-lesson gamification only. */}
+                  {tab === 'ielts' && bestStars > 0 && !locked && (
+                    <StarsBadge stars={bestStars} variant="poster" size={16} />
+                  )}
+                </div>
 
-                  {/* Content */}
-                  <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
-                    <div>
-                      <div className="flex items-start justify-between gap-2 mb-1.5">
-                        <h3 className="font-bold text-sm leading-snug line-clamp-2"
-                          style={{ color: 'var(--text-primary)' }}>{v.title}</h3>
-                        <span className="flex-shrink-0 text-xs font-bold px-2.5 py-0.5 rounded-full"
-                          style={v.is_premium
-                            ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
-                            : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                          {v.is_premium ? `👑 ${t('common.premium')}` : t('common.free')}
-                        </span>
-                      </div>
-                      {v.recommendation && (
-                        <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                          💡 {v.recommendation}
-                        </p>
-                      )}
+                {/* Content */}
+                <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-1.5">
+                      <h3 className="font-bold text-sm leading-snug line-clamp-2"
+                        style={{ color: 'var(--text-primary)' }}>{v.title}</h3>
+                      <span className="flex-shrink-0 text-xs font-bold px-2.5 py-0.5 rounded-full"
+                        style={v.is_premium
+                          ? { background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }
+                          : { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                        {v.is_premium ? `👑 ${t('common.premium')}` : t('common.free')}
+                      </span>
                     </div>
-                    <div className="mt-3 flex gap-2 flex-wrap">
-                      {locked ? (
+                    {v.recommendation && (
+                      <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                        💡 {v.recommendation}
+                      </p>
+                    )}
+                  </div>
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    {locked ? (
+                      <Link
+                        href={`/video-lessons/${v.id}`}
+                        className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                        style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                      >
+                        <Lock size={12} /> {t('videoLessons.unlockBtn')}
+                      </Link>
+                    ) : (
+                      <>
                         <Link
                           href={`/video-lessons/${v.id}`}
                           className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
-                          style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                          style={{ background: 'var(--accent)', color: 'white' }}
                         >
-                          <Lock size={12} /> {t('videoLessons.unlockBtn')}
+                          <Play size={12} /> {t('videoLessons.watchBtn')}
                         </Link>
-                      ) : (
-                        <>
-                          <Link
-                            href={`/video-lessons/${v.id}`}
-                            className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
-                            style={{ background: 'var(--accent)', color: 'white' }}
-                          >
-                            <Play size={12} /> {t('videoLessons.watchBtn')}
-                          </Link>
-                          <Link
-                            href={`/video-lessons/${v.id}/test`}
-                            className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
-                            style={{ background: '#10b981', color: 'white' }}
-                          >
-                            <ClipboardCheck size={12} /> {t('videoLessons.takeTest')}
-                          </Link>
-                        </>
-                      )}
-                    </div>
+                        <Link
+                          href={`/video-lessons/${v.id}/test`}
+                          className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                          style={{ background: '#10b981', color: 'white' }}
+                        >
+                          <ClipboardCheck size={12} /> {t('videoLessons.takeTest')}
+                        </Link>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -286,14 +286,16 @@ export function ListeningPageClient({
       {/* Mode selector */}
       {mode === 'select' && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Full Test card. Navigates to /listening/full (its own route)
-              so post-submit exits land here and the ⭐ chip + celebration
-              toast can live alongside the numbered test list. */}
-          <motion.a
-            href="/listening/full"
+          {/* Full Test card. Card itself is no longer the click target --
+              only the "Choose Test" pill at the bottom navigates, so a
+              stray tap anywhere else on the card does nothing. Navigates
+              to /listening/full (its own route) so post-submit exits land
+              here and the ⭐ chip + celebration toast can live alongside
+              the numbered test list. */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
+            className="card p-6 text-left flex flex-col h-full"
           >
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -318,21 +320,22 @@ export function ListeningPageClient({
                 </span>
               ))}
             </div>
-            <div
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
+            <Link
+              href="/listening/full"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto transition-opacity hover:opacity-80 active:scale-[0.99]"
               style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}
             >
               {t('test.chooseTest')} <ChevronRight size={15} />
-            </div>
-          </motion.a>
+            </Link>
+          </motion.div>
 
-          {/* Training with Sections card */}
-          <motion.button
+          {/* Training with Sections card -- same fix: only the "Choose
+              Part" pill switches to sections mode, not the whole card. */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.07 }}
-            onClick={() => setMode('sections')}
-            className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
+            className="card p-6 text-left flex flex-col h-full"
           >
             <div
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
@@ -357,54 +360,56 @@ export function ListeningPageClient({
                 </span>
               ))}
             </div>
-            <div
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
+            <button
+              type="button"
+              onClick={() => setMode('sections')}
+              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto transition-opacity hover:opacity-80 active:scale-[0.99]"
               style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}
             >
               {t('test.choosePart')} <ChevronRight size={15} />
-            </div>
-          </motion.button>
+            </button>
+          </motion.div>
 
-          {/* Script Practice card */}
-          <Link href="/listening/script" className="block h-full">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.14 }}
-              className="card p-6 text-left transition-all hover:opacity-90 active:scale-[0.99] flex flex-col h-full"
+          {/* Script Practice card -- same fix: only the bottom pill links
+              to /listening/script, not the whole card. */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.14 }}
+            className="card p-6 text-left flex flex-col h-full"
+          >
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 relative"
+              style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))' }}
             >
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 relative"
-                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))' }}
-              >
-                <Headphones size={26} style={{ color: '#10b981' }} />
-                <PenLine size={14} style={{ color: '#06b6d4', position: 'absolute', bottom: 6, right: 6 }} />
-              </div>
-              <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
-                🎧✍️ {t('script.title')}
-              </h2>
-              <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-                {t('script.cardDesc')}
-              </p>
-              <div className="flex flex-wrap gap-2 mb-5">
-                {[t('script.badgeBbc'), t('script.badgeMinutes'), t('script.badgeSmart')].map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs px-2 py-1 rounded-lg"
-                    style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-              <div
-                className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto"
-                style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))', color: '#10b981' }}
-              >
-                {t('test.start')} <ChevronRight size={15} />
-              </div>
-            </motion.div>
-          </Link>
+              <Headphones size={26} style={{ color: '#10b981' }} />
+              <PenLine size={14} style={{ color: '#06b6d4', position: 'absolute', bottom: 6, right: 6 }} />
+            </div>
+            <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
+              🎧✍️ {t('script.title')}
+            </h2>
+            <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+              {t('script.cardDesc')}
+            </p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {[t('script.badgeBbc'), t('script.badgeMinutes'), t('script.badgeSmart')].map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-2 py-1 rounded-lg"
+                  style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <Link
+              href="/listening/script"
+              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 mt-auto transition-opacity hover:opacity-80 active:scale-[0.99]"
+              style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(6,182,212,0.2))', color: '#10b981' }}
+            >
+              {t('test.start')} <ChevronRight size={15} />
+            </Link>
+          </motion.div>
 
         </div>
       )}
@@ -444,14 +449,17 @@ export function ListeningPageClient({
               const freeCount = pts.filter((test) => !test.is_premium).length
               const premiumCount = pts.filter((test) => test.is_premium).length
 
+              // Card itself is no longer the click target -- only the
+              // "Tanlash" button at the end of the row enters the part,
+              // matching the same fix applied to the mode-selector cards
+              // above (a stray tap elsewhere on the card does nothing).
               return (
-                <motion.button
+                <motion.div
                   key={info.part}
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.07 }}
-                  onClick={() => setActivePart(info.part)}
-                  className="card p-5 text-left hover:opacity-90 transition-all active:scale-[0.99]"
+                  className="card p-5 text-left"
                 >
                   <div className="flex items-start gap-4">
                     <div
@@ -485,9 +493,17 @@ export function ListeningPageClient({
                         </span>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="shrink-0 mt-1" style={{ color: 'var(--text-muted)' }} />
+                    <button
+                      type="button"
+                      onClick={() => setActivePart(info.part)}
+                      className="shrink-0 flex items-center justify-center rounded-lg p-2 transition-opacity hover:opacity-70 active:scale-[0.95]"
+                      style={{ background: info.bg }}
+                      aria-label={t('test.choosePart')}
+                    >
+                      <ChevronRight size={18} style={{ color: info.color }} />
+                    </button>
                   </div>
-                </motion.button>
+                </motion.div>
               )
             })}
           </div>

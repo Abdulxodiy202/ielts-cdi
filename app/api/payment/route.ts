@@ -26,7 +26,14 @@ export async function POST(request: NextRequest) {
     ? parseInt(formData.get('original_amount') as string)
     : null
 
-  if (!receipt || !userName || !userPhone || !type || !amount) {
+  // amount === 0 is a legitimate case (100% discount promo) -- only
+  // reject when it's missing/NaN, not when it's falsy-zero. Receipt is
+  // only required when something was actually transferred; a 0-amount
+  // request (fully free) never asked the client for one.
+  if (!userName || !userPhone || !type || amount == null || Number.isNaN(amount)) {
+    return Response.json({ error: 'Maydonlar to\'ldirilishi shart' }, { status: 400 })
+  }
+  if (amount > 0 && !receipt) {
     return Response.json({ error: 'Maydonlar to\'ldirilishi shart' }, { status: 400 })
   }
 
@@ -68,25 +75,28 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Upload receipt image to Supabase Storage
-  const fileExt = (receipt.name.split('.').pop() || 'jpg').toLowerCase()
-  const fileName = `${user.id}-${Date.now()}.${fileExt}`
-  const fileBytes = await receipt.arrayBuffer()
+  // Upload receipt image to Supabase Storage -- skipped for 0-amount
+  // (100% discount) requests, which never had a receipt to begin with.
+  let publicUrl: string | null = null
+  if (receipt) {
+    const fileExt = (receipt.name.split('.').pop() || 'jpg').toLowerCase()
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`
+    const fileBytes = await receipt.arrayBuffer()
 
-  const { error: uploadError } = await supabase.storage
-    .from('receipts')
-    .upload(fileName, fileBytes, { contentType: receipt.type, upsert: false })
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(fileName, fileBytes, { contentType: receipt.type, upsert: false })
 
-  if (uploadError) {
-    return Response.json(
-      { error: `Rasm yuklanmadi: ${uploadError.message}` },
-      { status: 500 }
-    )
+    if (uploadError) {
+      return Response.json(
+        { error: `Rasm yuklanmadi: ${uploadError.message}` },
+        { status: 500 }
+      )
+    }
+
+    const { data } = supabase.storage.from('receipts').getPublicUrl(fileName)
+    publicUrl = data.publicUrl
   }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from('receipts').getPublicUrl(fileName)
 
   // Save payment request
   const { data: paymentRequest, error: insertError } = await supabase
@@ -229,10 +239,15 @@ export async function POST(request: NextRequest) {
           { text: '❌ Rad Et',      callback_data: `reject_${pid}` },
         ]]
 
-  // Send receipt photo with caption; fall back to text-only on failure
-  try {
-    await sendTelegramPhoto(publicUrl, caption, buttons)
-  } catch {
+  // Send receipt photo with caption; fall back to text-only on failure,
+  // or straight to text-only when there was no receipt (0-amount request).
+  if (publicUrl) {
+    try {
+      await sendTelegramPhoto(publicUrl, caption, buttons)
+    } catch {
+      await sendTelegramNotification(caption, buttons)
+    }
+  } else {
     await sendTelegramNotification(caption, buttons)
   }
 

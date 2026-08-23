@@ -851,6 +851,7 @@
     "nameRequiredError": "Ism-sharif kiritilishi shart",
     "phoneRequiredError": "Telefon raqam kiritilishi shart",
     "receiptRequiredError": "Chek rasmi yuklanishi shart",
+    "freeNoReceiptNote": "Bu bepul (100% chegirma qo'llandi) — chek talab qilinmaydi.",
     "networkError": "Tarmoq xatosi",
     "genericError": "Xatolik yuz berdi",
     "networkErrorRetry": "Tarmoq xatosi. Qayta urinib ko'ring."
