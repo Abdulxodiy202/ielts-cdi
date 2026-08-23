@@ -24,6 +24,9 @@ export interface MockSchedule {
   writing_file_url:        string | null
   /** NULL = unlimited seats; integer ≥ 1 = hard cap. */
   capacity:                number | null
+  /** UZS amount shown on the student's Book button. 0 = free session
+      (skips the payment-receipt flow, see /api/mock/free-book). */
+  price:                   number
   created_at: string
 }
 
@@ -76,6 +79,11 @@ interface FormState {
       converts blank → null (unlimited) and numeric strings → integer. */
   capacity:                string
   unlimitedCapacity:       boolean
+  /** UI carries price as a string so the input can be edited freely;
+      save converts it to an integer ≥ 0. isFree just locks it at "0"
+      and disables the input, mirroring the capacity/Unlimited pattern. */
+  price:                   string
+  isFree:                  boolean
 }
 
 /* ─────────────────────────── Helpers ───────────────────────────────── */
@@ -90,6 +98,8 @@ function makeEmpty(): FormState {
     writing_file_url:        null,
     capacity:                '',
     unlimitedCapacity:       true,
+    price:                   '20000',
+    isFree:                  false,
   }
 }
 
@@ -106,6 +116,11 @@ function scheduleToForm(s: MockSchedule): FormState {
     // an integer ⇒ prefill the number and let the admin edit it.
     capacity:                s.capacity !== null && s.capacity !== undefined ? String(s.capacity) : '',
     unlimitedCapacity:       s.capacity === null || s.capacity === undefined,
+    // price=0 ⇒ show the "Bepul" checkbox on; the number input keeps a
+    // sane default (20000) underneath so unchecking it doesn't leave
+    // the admin staring at an empty/0 field.
+    price:                   s.price && s.price > 0 ? String(s.price) : '20000',
+    isFree:                  !s.price || s.price === 0,
   }
 }
 
@@ -1081,11 +1096,30 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
       }
     }
 
+    // price: 0 when "Bepul" is checked; otherwise a non-negative
+    // integer from the input (blank defaults to 20000, same as the
+    // API's own fallback, so an admin who never touches this field
+    // gets the old behavior unchanged).
+    let priceToSend = 20000
+    if (form.isFree) {
+      priceToSend = 0
+    } else {
+      const raw = form.price.trim()
+      if (raw !== '') {
+        const n = Number(raw)
+        if (!Number.isInteger(n) || n < 0) {
+          setMessage({ ok: false, text: 'Narx manfiy bo\'lmagan butun son bo\'lishi kerak' })
+          return
+        }
+        priceToSend = n
+      }
+    }
+
     setSaving(true); setMessage(null)
     try {
-      const { capacity: _c, unlimitedCapacity: _u, ...rest } = form
-      void _c; void _u
-      const payload = { ...rest, capacity: capacityToSend }
+      const { capacity: _c, unlimitedCapacity: _u, price: _p, isFree: _f, ...rest } = form
+      void _c; void _u; void _p; void _f
+      const payload = { ...rest, capacity: capacityToSend, price: priceToSend }
       const res = await fetch('/api/admin/mock-schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1228,6 +1262,49 @@ export function MockScheduleEditor({ initialSchedules }: { initialSchedules: Moc
                 />
                 <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
                   Cheksiz
+                </span>
+              </label>
+            </div>
+          </div>
+
+          {/* ── Price + Free row ─────────────────────────────────────────
+              Admin sets the UZS amount shown on the student's Book
+              button, or ticks "Bepul" to make this session free — the
+              booking form then skips the payment-receipt upload
+              entirely and only asks for name + phone. */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Narx (UZS)
+              </label>
+              <input
+                type="number"
+                min={0}
+                step={1000}
+                disabled={form.isFree}
+                value={form.isFree ? '' : form.price}
+                onChange={e => setForm(p => ({ ...p, price: e.target.value }))}
+                placeholder="20000"
+                className="input-field disabled:opacity-40"
+              />
+            </div>
+            <div className="flex flex-col justify-end">
+              <label
+                className="flex items-center gap-2.5 cursor-pointer px-3 py-2.5 rounded-xl transition-colors"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: `1px solid ${form.isFree ? 'rgba(34,197,94,0.5)' : 'var(--border)'}`,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.isFree}
+                  onChange={e => setForm(p => ({ ...p, isFree: e.target.checked }))}
+                  className="w-4 h-4"
+                  style={{ accentColor: 'var(--success)' }}
+                />
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  Bepul (tekin)
                 </span>
               </label>
             </div>

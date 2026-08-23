@@ -9,6 +9,8 @@ import {
   RefreshCw, PartyPopper, XCircle, Ban, Users,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
+import { FreeBookingModal } from '@/components/FreeBookingModal'
+import { formatPrice } from '@/lib/utils/formatters'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { useAllBookingCounts } from '@/lib/hooks/useAllBookingCounts'
 import { useMyBookings } from '@/lib/hooks/useMyBookings'
@@ -33,6 +35,9 @@ export interface MockScheduleWithBooking {
   writing_file_url: string | null
   /** NULL = unlimited seats; integer ≥ 1 = hard cap (migration 030). */
   capacity: number | null
+  /** UZS amount for the Book button; 0 = free (migration 037) — skips
+      PaymentModal/receipt entirely, see FreeBookingModal. */
+  price: number
   userBooking:      { id: string; status: string; payment_status: string } | null
   isSubmitted:      boolean
   submissionStatus: string | null
@@ -127,6 +132,7 @@ export function MockTestClient({ userId }: Props) {
   const [loading,       setLoading]       = useState(true)
   const [refreshing,    setRefreshing]    = useState(false)
   const [modalSchedule, setModalSchedule] = useState<MockScheduleWithBooking | null>(null)
+  const [freeBookSchedule, setFreeBookSchedule] = useState<MockScheduleWithBooking | null>(null)
 
   // Realtime booking counts for every schedule on the page — one shared
   // channel, refetched on any mock_bookings change. `useMemo` stops the
@@ -528,10 +534,11 @@ export function MockTestClient({ userId }: Props) {
                      below owns the entire message so users can't tap
                      an invisible Book button. */
                   ) : !hasActiveBooking && !isFull ? (
-                    <button type="button" onClick={() => setModalSchedule(s)}
+                    <button type="button" onClick={() => s.price === 0 ? setFreeBookSchedule(s) : setModalSchedule(s)}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
                       style={{ background: 'var(--accent)' }}>
-                      <CreditCard size={14} /> {t('mock.bookSession')}
+                      <CreditCard size={14} />
+                      {s.price === 0 ? t('mock.bookFree') : t('mock.bookSession', { price: formatPrice(s.price) })}
                     </button>
                   ) : null}
                 </div>
@@ -735,12 +742,22 @@ export function MockTestClient({ userId }: Props) {
           onClose={() => setModalSchedule(null)}
           onSuccess={() => { setModalSchedule(null); load(true) }}
           type="mock_booking"
-          amount={20000}
+          amount={modalSchedule.price}
           meta={{
             booking_date: modalSchedule.date,
             time_slot: modalSchedule.time.slice(0, 5),
             schedule_id: modalSchedule.id,
           }}
+        />
+      )}
+
+      {/* Free-booking modal (migration 037 — schedule.price === 0) */}
+      {freeBookSchedule && (
+        <FreeBookingModal
+          isOpen={!!freeBookSchedule}
+          onClose={() => setFreeBookSchedule(null)}
+          onSuccess={() => { setFreeBookSchedule(null); load(true) }}
+          scheduleId={freeBookSchedule.id}
         />
       )}
     </div>

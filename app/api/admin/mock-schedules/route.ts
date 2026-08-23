@@ -47,10 +47,23 @@ export async function POST(request: NextRequest) {
     writing_task2_topic,
     writing_file_url,
     capacity,
+    price,
   } = body
 
   if (!date || !time) {
     return Response.json({ error: 'date va time kerak' }, { status: 400 })
+  }
+
+  // price: 0 = free (skips the payment-receipt flow client-side and in
+  // /api/mock/free-book), positive integer = UZS amount. Default to the
+  // old hardcoded 20,000 so existing/omitted values don't change behavior.
+  let normalizedPrice = 20000
+  if (price !== undefined && price !== null && price !== '') {
+    const p = Number(price)
+    if (!Number.isInteger(p) || p < 0) {
+      return Response.json({ error: 'price must be a non-negative integer' }, { status: 400 })
+    }
+    normalizedPrice = p
   }
 
   // capacity: null = unlimited; positive integer = hard cap. Reject
@@ -79,6 +92,7 @@ export async function POST(request: NextRequest) {
     writing_task2_topic:     writing_task2_topic     ?? null,
     writing_file_url:        writing_file_url        ?? null,
     capacity:                normalizedCapacity,
+    price:                   normalizedPrice,
   }
 
   const { data, error } = await admin

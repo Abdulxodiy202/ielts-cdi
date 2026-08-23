@@ -165,14 +165,15 @@
   },
   "mock": {
     "title": "Mock IELTS Test",
-    "subtitle": "View upcoming sessions and book · 20,000 UZS",
+    "subtitle": "View upcoming sessions and book",
     "upcomingSessions": "{count} upcoming session(s)",
     "refresh": "Refresh",
     "noSessionsTitle": "No sessions available",
     "noSessionsDesc": "New sessions will appear here when added by admin.",
     "startMockTest": "Start Mock Test",
     "timeUntilTest": "Until test:",
-    "bookSession": "Book — 20,000 UZS",
+    "bookSession": "Book — {price}",
+    "bookFree": "Book — Free",
     "confirmed": "Confirmed",
     "pendingBadge": "Awaiting",
     "resignedBadge": "Resigned",
@@ -189,7 +190,7 @@
     "infoItem1": "After booking, admin confirms within 24 hours",
     "infoItem2": "\"Start Mock Test\" button appears when test time comes",
     "infoItem3": "Test: Listening (40 min) + Reading (60 min) + Writing (60 min)",
-    "infoItem4": "Price: 20,000 UZS",
+    "infoItem4": "Price varies by session — shown on each session's Book button",
     "infoItem5": "You have 5 minutes to enter after test starts. If not entered in time, session is auto-cancelled and payment is non-refundable."
   },
   "results": {
@@ -853,6 +854,15 @@
     "networkError": "Network error",
     "genericError": "An error occurred",
     "networkErrorRetry": "Network error. Please try again."
+  },
+  "freeBooking": {
+    "title": "Free Booking",
+    "subtitle": "This session is free — just enter your name and phone to reserve your spot.",
+    "submitBtn": "Book for Free",
+    "submittingBtn": "Booking...",
+    "successTitle": "You're booked! 🎉",
+    "successBody": "Your free spot is confirmed. See you at the session!",
+    "alreadyBookedError": "You already have a booking for this session."
   },
   "sidebar": {
     "yesterday": "Yesterday",

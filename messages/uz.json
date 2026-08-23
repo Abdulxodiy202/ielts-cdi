@@ -165,14 +165,15 @@
   },
   "mock": {
     "title": "Mock IELTS Test",
-    "subtitle": "Kelgusi seanslarni ko'ring va bron qiling · 20,000 UZS",
+    "subtitle": "Kelgusi seanslarni ko'ring va bron qiling",
     "upcomingSessions": "{count} ta kelgusi seans",
     "refresh": "Yangilash",
     "noSessionsTitle": "Hozircha mavjud seanslar yo'q",
     "noSessionsDesc": "Admin yangi seans qo'shganda bu yerda ko'rsatiladi.",
     "startMockTest": "Mock Test boshlash",
     "timeUntilTest": "Testgacha:",
-    "bookSession": "Bron qilish — 20,000 UZS",
+    "bookSession": "Bron qilish — {price}",
+    "bookFree": "Bron qilish — Bepul",
     "confirmed": "Tasdiqlangan",
     "pendingBadge": "Kutilmoqda",
     "resignedBadge": "Resigned",
@@ -189,7 +190,7 @@
     "infoItem1": "Bron qilgach, 24 soat ichida admin tasdiqlaydi",
     "infoItem2": "Test vaqti kelganda \"Mock Test boshlash\" tugmasi paydo bo'ladi",
     "infoItem3": "Test: Listening (40 min) + Reading (60 min) + Writing (60 min)",
-    "infoItem4": "Narx: 20,000 UZS",
+    "infoItem4": "Narx seansga qarab farq qiladi — har bir seansning Bron tugmasida ko'rsatiladi",
     "infoItem5": "Test boshlanganidan so'ng kirish uchun 5 daqiqa vaqt beriladi. Ushbu muddat ichida testga kirilmasa, seans avtomatik bekor qilinadi va to'lov qaytarib berilmaydi."
   },
   "results": {
@@ -853,6 +854,15 @@
     "networkError": "Tarmoq xatosi",
     "genericError": "Xatolik yuz berdi",
     "networkErrorRetry": "Tarmoq xatosi. Qayta urinib ko'ring."
+  },
+  "freeBooking": {
+    "title": "Bepul bron qilish",
+    "subtitle": "Bu seans bepul — joyingizni band qilish uchun ism va telefon raqamingizni kiriting.",
+    "submitBtn": "Bepul bron qilish",
+    "submittingBtn": "Bron qilinmoqda...",
+    "successTitle": "Bron qilindi! 🎉",
+    "successBody": "Joyingiz bepul band qilindi. Seansda ko'rishguncha!",
+    "alreadyBookedError": "Siz bu seansga allaqachon bron qilgansiz."
   },
   "sidebar": {
     "yesterday": "Kecha",
