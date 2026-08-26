@@ -93,19 +93,23 @@ function Avatar({ url, name, size }: { url: string | null; name: string | null; 
   )
 }
 
+// Video darsliklar uchun test/ball feature'i butunlay olib tashlandi --
+// endi video kategoriyasida yulduz ishlab bo'lmaydi, shuning uchun
+// leaderboard'da ham "V" ustuni/chip'i ko'rsatilmaydi. Backend RPC hali
+// ham video_stars maydonini qaytarishi mumkin (eski qatorlar), lekin biz
+// uni endi render qilmaymiz.
 const CATEGORY_COLS = [
   { key: 'reading_stars' as const,   labelKey: 'nav.reading' },
   { key: 'listening_stars' as const, labelKey: 'nav.listening' },
   { key: 'script_stars' as const,    labelKey: 'script.title' },
   { key: 'article_stars' as const,   labelKey: 'nav.articles' },
-  { key: 'video_stars' as const,     labelKey: 'nav.videoCourses' },
   { key: 'game_stars' as const,      labelKey: 'vocabulary.games' },
 ]
 
 function CategoryChips({ row }: { row: LeaderRow }) {
   const chips = [
     ['R', row.reading_stars], ['L', row.listening_stars], ['S', row.script_stars],
-    ['A', row.article_stars], ['V', row.video_stars], ['G', row.game_stars],
+    ['A', row.article_stars], ['G', row.game_stars],
   ] as const
   return (
     <div className="flex flex-wrap justify-center gap-1 mt-2">
@@ -167,7 +171,6 @@ const POINT_RATE_KEYS: { labelKey: string; rateKey: string; color: string }[] = 
   { labelKey: 'leaderboard.rateListening', rateKey: 'leaderboard.rate3', color: '#C084FC' },
   { labelKey: 'leaderboard.rateScript',    rateKey: 'leaderboard.rate2', color: '#FACC15' },
   { labelKey: 'leaderboard.rateArticle',   rateKey: 'leaderboard.rate1', color: '#FB923C' },
-  { labelKey: 'leaderboard.rateVideo',     rateKey: 'leaderboard.rate1', color: '#F87171' },
   { labelKey: 'leaderboard.rateGame',      rateKey: 'leaderboard.rate1', color: '#4ADE80' },
 ]
 

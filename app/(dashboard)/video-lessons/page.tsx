@@ -4,10 +4,8 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, Play, ClipboardCheck } from 'lucide-react'
+import { Lock, Play } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
-import { StarsBadge } from '@/components/ui/StarsBadge'
-import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
 import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 
 type VideoCategory = 'ielts' | 'self_improvement'
@@ -37,12 +35,6 @@ function parseTab(v: string | null): VideoCategory {
   return v === 'self_improvement' ? 'self_improvement' : 'ielts'
 }
 
-interface VideoResult {
-  video_id: string
-  best_stars: number
-  best_score: number
-}
-
 function getYouTubeId(url: string) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
   return m ? m[1] : null
@@ -56,7 +48,6 @@ export default function VideoLessonsPage() {
   const [videos,      setVideos]      = useState<VideoLesson[]>([])
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
-  const [resultsByVideoId, setResultsByVideoId] = useState<Record<string, VideoResult>>({})
 
   const tab = parseTab(searchParams.get('tab'))
 
@@ -69,15 +60,10 @@ export default function VideoLessonsPage() {
 
   useEffect(() => {
     fetch('/api/video-lessons')
-      .then(r => r.ok ? r.json() : { videos: [], userPremium: false, results: [] })
+      .then(r => r.ok ? r.json() : { videos: [], userPremium: false })
       .then(d => {
         setVideos(Array.isArray(d.videos) ? d.videos : [])
         setUserPremium(d.userPremium ?? false)
-        const rmap: Record<string, VideoResult> = {}
-        for (const r of (d.results ?? []) as VideoResult[]) {
-          if (r?.video_id) rmap[r.video_id] = r
-        }
-        setResultsByVideoId(rmap)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -90,12 +76,6 @@ export default function VideoLessonsPage() {
     () => videos.filter(v => (v.category ?? 'ielts') === tab),
     [videos, tab],
   )
-
-  const sectionTotal = visibleVideos.reduce(
-    (sum, v) => sum + (resultsByVideoId[v.id]?.best_stars ?? 0),
-    0,
-  )
-  const maxStars = visibleVideos.length * 5
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -110,14 +90,6 @@ export default function VideoLessonsPage() {
             </p>
           )}
         </div>
-        {/* Stars chip is IELTS-lesson gamification only -- self-improvement
-            videos aren't scored, so the chip (and per-card badges below)
-            stay hidden on that tab. */}
-        {!loading && visibleVideos.length > 0 && tab === 'ielts' && (
-          <div className="shrink-0">
-            <SectionStarsChip total={sectionTotal} max={maxStars} />
-          </div>
-        )}
       </div>
 
       {/* Subcategory tab qatori -- URL query bilan sinxron. Real pill
@@ -169,13 +141,12 @@ export default function VideoLessonsPage() {
             const ytId     = getYouTubeId(v.video_url)
             const thumbSrc = v.thumbnail_url ?? (ytId ? `https://img.youtube.com/vi/${ytId}/mqdefault.jpg` : null)
             const locked   = v.is_premium && !userPremium
-            const bestStars = resultsByVideoId[v.id]?.best_stars ?? 0
 
             return (
-              // Card no longer a link. Watch + Test are the only nav
-              // affordances so a stray click doesn't misfire into either.
-              // Vertical layout (thumb on top, content below) so the card
-              // reads correctly inside a narrow grid column.
+              // Card no longer a link. Watch is the only nav affordance so
+              // a stray click doesn't misfire. Vertical layout (thumb on
+              // top, content below) so the card reads correctly inside a
+              // narrow grid column.
               <div key={v.id}
                 className="rounded-2xl overflow-hidden transition-all hover:shadow-lg flex flex-col"
                 style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
@@ -200,10 +171,6 @@ export default function VideoLessonsPage() {
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Lock size={18} style={{ color: '#f59e0b' }} />
                     </div>
-                  )}
-                  {/* Stars badge is IELTS-lesson gamification only. */}
-                  {tab === 'ielts' && bestStars > 0 && !locked && (
-                    <StarsBadge stars={bestStars} variant="poster" size={16} />
                   )}
                 </div>
 
@@ -236,22 +203,13 @@ export default function VideoLessonsPage() {
                         <Lock size={12} /> {t('videoLessons.unlockBtn')}
                       </Link>
                     ) : (
-                      <>
-                        <Link
-                          href={`/video-lessons/${v.id}`}
-                          className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
-                          style={{ background: 'var(--accent)', color: 'white' }}
-                        >
-                          <Play size={12} /> {t('videoLessons.watchBtn')}
-                        </Link>
-                        <Link
-                          href={`/video-lessons/${v.id}/test`}
-                          className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
-                          style={{ background: '#10b981', color: 'white' }}
-                        >
-                          <ClipboardCheck size={12} /> {t('videoLessons.takeTest')}
-                        </Link>
-                      </>
+                      <Link
+                        href={`/video-lessons/${v.id}`}
+                        className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                        style={{ background: 'var(--accent)', color: 'white' }}
+                      >
+                        <Play size={12} /> {t('videoLessons.watchBtn')}
+                      </Link>
                     )}
                   </div>
                 </div>
