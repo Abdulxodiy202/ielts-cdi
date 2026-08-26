@@ -198,6 +198,7 @@
   },
   "testTaking": {
     "exit": "Chiqish",
+    "confirmExitEarly": "Haqiqatan ham chiqmoqchimisiz? Ushbu testdagi jarayoningiz yo'qoladi.",
     "correct": "To'g'ri",
     "wrong": "Noto'g'ri",
     "time": "Vaqt",

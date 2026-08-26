@@ -198,6 +198,7 @@
   },
   "testTaking": {
     "exit": "Exit",
+    "confirmExitEarly": "Are you sure you want to exit? Your progress on this test will be lost.",
     "correct": "Correct",
     "wrong": "Wrong",
     "time": "Time",

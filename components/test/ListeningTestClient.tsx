@@ -185,7 +185,9 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
           </div>
         )}
 
-        {/* Exit Test button — shown only after CDI_SUBMIT (Check Answers clicked) */}
+        {/* Full "Exit" button — shown once the test has actually been
+            submitted (CDI_SUBMIT / CDI_NATIVE). Before that, the small
+            always-visible ✕ below is the only way out. */}
         {showExit && (
           <button
             onClick={() => router.push(cdiEarnedStars !== null ? `/listening/full?justEarned=${cdiEarnedStars}` : '/listening')}
@@ -206,6 +208,42 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             }}
           >
             ← {t('testTaking.exit')}
+          </button>
+        )}
+
+        {/* Always-available early exit — see ReadingTestClient for the
+            mirror implementation and full rationale (mobile browsers
+            often hide their own back/address-bar chrome, so without this
+            a user is fully trapped in the full-screen iframe until they
+            finish the test). */}
+        {!showExit && (
+          <button
+            onClick={() => {
+              if (window.confirm(t('testTaking.confirmExitEarly'))) router.push('/listening')
+            }}
+            aria-label={t('testTaking.exit')}
+            style={{
+              position: 'fixed',
+              top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+              left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
+              zIndex: 99999,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              background: 'rgba(15,15,26,0.75)',
+              color: 'white',
+              border: '1px solid rgba(255,255,255,0.25)',
+              cursor: 'pointer',
+              fontSize: 18,
+              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+            }}
+          >
+            ✕
           </button>
         )}
       </>
