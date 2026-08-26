@@ -98,7 +98,7 @@ export default function VideoLessonsPage() {
   const maxStars = visibleVideos.length * 5
 
   return (
-    <div className="p-6 md:p-8 max-w-3xl mx-auto">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
       <StudyPlanBackButton />
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
