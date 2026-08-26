@@ -205,8 +205,7 @@ export default function VideoLessonsPage() {
                     ) : (
                       <Link
                         href={`/video-lessons/${v.id}`}
-                        className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg text-sm font-semibold w-full"
-                        style={{ background: 'var(--accent)', color: 'white' }}
+                        className="pill-glow-accent inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg text-sm font-semibold w-full"
                       >
                         <Play size={14} /> {t('videoLessons.watchBtn')}
                       </Link>
