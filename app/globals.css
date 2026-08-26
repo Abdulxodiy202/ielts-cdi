@@ -73,6 +73,43 @@
   ::-webkit-scrollbar-track { background: var(--bg-secondary); }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  /* Global button press/hover animation -- applies site-wide to every
+     native <button> and to link-styled buttons (the codebase's common
+     pattern of an <a>/<Link> carrying its own inline `background`, e.g.
+     "Watch", "Unlock", "Retry" pill buttons) without needing a shared
+     component or touching every page. Native <button>s that opt into the
+     existing .btn-primary/.btn-secondary/.btn-outline classes already
+     define their own (slightly richer) hover/active rules above, which
+     simply override these general ones since they're declared later in
+     the cascade. prefers-reduced-motion turns the motion off but keeps
+     the elements otherwise unaffected. */
+  button:not(:disabled),
+  a[style*="background"] {
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  }
+  button:not(:disabled):hover,
+  a[style*="background"]:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+  }
+  button:not(:disabled):active,
+  a[style*="background"]:active {
+    transform: translateY(0) scale(0.96);
+    filter: brightness(0.97);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button:not(:disabled),
+    a[style*="background"] {
+      transition: filter 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+    }
+    button:not(:disabled):hover,
+    a[style*="background"]:hover,
+    button:not(:disabled):active,
+    a[style*="background"]:active {
+      transform: none;
+    }
+  }
 }
 
 @layer components {

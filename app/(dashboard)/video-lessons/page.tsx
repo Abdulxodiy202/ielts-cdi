@@ -197,18 +197,18 @@ export default function VideoLessonsPage() {
                     {locked ? (
                       <Link
                         href={`/video-lessons/${v.id}`}
-                        className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                        className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg text-sm font-semibold w-full"
                         style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                       >
-                        <Lock size={12} /> {t('videoLessons.unlockBtn')}
+                        <Lock size={14} /> {t('videoLessons.unlockBtn')}
                       </Link>
                     ) : (
                       <Link
                         href={`/video-lessons/${v.id}`}
-                        className="inline-flex items-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold"
+                        className="inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-lg text-sm font-semibold w-full"
                         style={{ background: 'var(--accent)', color: 'white' }}
                       >
-                        <Play size={12} /> {t('videoLessons.watchBtn')}
+                        <Play size={14} /> {t('videoLessons.watchBtn')}
                       </Link>
                     )}
                   </div>
