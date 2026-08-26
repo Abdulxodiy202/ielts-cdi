@@ -185,7 +185,7 @@
     "fiveMinWarning": "5 daqiqa ichida kirmasangiz, seans bekor qilinadi.",
     "minutesWarning": "⚠️ Diqqat!",
     "minutesElapsed": "{n} daqiqa o'tdi. Agar {remaining} daqiqa ichida testga kirmasangiz, seans avtomatik bekor qilinadi.",
-    "autoResigned": "Candidate belgilangan vaqtdan 5 daqiqadan ko'proq kechikkan sababli ushbu seans avtomatik ravishda bekor qilindi.",
+    "autoResigned": "Siz belgilangan vaqtdan 5 daqiqadan ko'proq kechikdingiz, shuning uchun bu seans avtomatik ravishda bekor qilindi.",
     "infoTitle": "Mock Test haqida",
     "infoItem1": "Bron qilgach, 24 soat ichida admin tasdiqlaydi",
     "infoItem2": "Test vaqti kelganda \"Mock Test boshlash\" tugmasi paydo bo'ladi",

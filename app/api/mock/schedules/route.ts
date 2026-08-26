@@ -19,6 +19,14 @@ function tashkentMs(date: string, time: string): number {
  *  - isSubmitted: true if the user has a 'submitted' entry in mock_test_submissions
  *  - submissionStatus: raw status string ('submitted' | 'disqualified' | 'draft' | null)
  *
+ *  Also includes the CURRENT USER's own confirmed/resigned bookings for
+ *  schedules up to 24h in the past, even though those fall outside the
+ *  normal "upcoming" window -- otherwise a booking that should get
+ *  auto-resigned (missed the 5-min grace) simply disappears from the
+ *  page on the next load instead of showing the "siz kechikdingiz"
+ *  message, and the auto-resign side-effect below never gets a chance
+ *  to run for it either (see widening step below).
+ *
  *  Side-effect: auto-resigns confirmed bookings where now > start + 5 min (Tashkent)
  *  and no submission (draft or submitted) exists for that schedule.
  */
@@ -28,13 +36,14 @@ export async function GET() {
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+  const now = Date.now()
 
   // Compute today's date + current time in Asia/Tashkent (UTC+5) so the
   // date/time filter matches what the schedule was authored in. Using the
   // server's UTC would drop today's evening sessions the moment UTC rolls
   // past midnight — Uzbekistan users would lose the last 5 hours of the
   // day for no reason.
-  const nowTashkent = new Date(Date.now() + 5 * 60 * 60 * 1000) // shift to UTC+5
+  const nowTashkent = new Date(now + 5 * 60 * 60 * 1000) // shift to UTC+5
   const today = nowTashkent.toISOString().split('T')[0]           // YYYY-MM-DD (Tashkent)
 
   // Upcoming schedules: (date > today) OR (date = today AND time >= now-5min).
@@ -70,6 +79,41 @@ export async function GET() {
   }
 
   if (fetchError) return Response.json({ error: fetchError.message }, { status: 500 })
+
+  // Widen with the user's OWN confirmed/resigned bookings whose schedule
+  // fell just outside the "upcoming" window above (bounded to the last
+  // 24h so genuinely old history never clutters the list). This is what
+  // lets a student who missed the 5-min grace still see their session on
+  // the page -- and lets the auto-resign loop below actually see it and
+  // flip the booking to 'resigned', instead of it silently vanishing
+  // while still marked 'confirmed' forever.
+  const primaryIds = new Set((schedules ?? []).map(s => s.id))
+  const { data: myActiveBookings } = await supabase
+    .from('mock_bookings')
+    .select('schedule_id')
+    .eq('user_id', user.id)
+    .in('status', ['confirmed', 'resigned'])
+
+  const missingIds = [...new Set(
+    (myActiveBookings ?? [])
+      .map(b => b.schedule_id as string | null)
+      .filter((id): id is string => !!id && !primaryIds.has(id))
+  )]
+
+  if (missingIds.length > 0) {
+    const { data: pastSchedules } = await admin
+      .from('mock_schedules')
+      .select('*')
+      .in('id', missingIds)
+    const DAY_MS = 24 * 60 * 60 * 1000
+    const recentPast = ((pastSchedules ?? []) as ScheduleRow[]).filter(
+      ps => now - tashkentMs(ps.date, ps.time) <= DAY_MS
+    )
+    if (recentPast.length > 0) {
+      schedules = [...(schedules ?? []), ...recentPast]
+    }
+  }
+
   if (!schedules?.length) return Response.json([])
 
   const ids = schedules.map(s => s.id)
@@ -111,7 +155,7 @@ export async function GET() {
   )
 
   // ── Auto-resign: confirmed + now > start+5min (Tashkent) + no submission ──
-  const now = Date.now()
+  // (`now` was captured once at the top of the request, above.)
   const resignScheduleIds: string[] = []
 
   for (const s of schedules) {

@@ -57,6 +57,49 @@ export async function GET(req: NextRequest) {
     return NextResponse.json([])
   }
 
+  // Self-healing auto-resign (same rule /api/mock/schedules applies for
+  // the student): a 'confirmed' booking whose session started more than
+  // 5 minutes ago with no submission flips to 'resigned' right here too.
+  // Without this, the admin only sees "Kelmadi" once the student
+  // themselves happens to reload their own Mock Test page — this makes
+  // opening the admin Bookinglar modal enough on its own.
+  {
+    const [scheduleRes, submissionsRes] = await Promise.all([
+      admin.from('mock_schedules').select('date, time').eq('id', scheduleId).maybeSingle(),
+      admin.from('mock_test_submissions').select('user_id').eq('schedule_id', scheduleId),
+    ])
+    if (scheduleRes.data) {
+      const hhmm = String(scheduleRes.data.time).slice(0, 5)
+      const startMs = new Date(`${scheduleRes.data.date}T${hhmm}:00+05:00`).getTime()
+      if (Date.now() > startMs + 5 * 60 * 1000) {
+        const submittedUserIds = new Set((submissionsRes.data ?? []).map((s: any) => s.user_id))
+        const toResign = (bookings as any[])
+          .filter(b => b.status === 'confirmed' && !submittedUserIds.has(b.user_id))
+          .map(b => b.user_id)
+        if (toResign.length > 0) {
+          const { error: resignErr } = await admin
+            .from('mock_bookings')
+            .update({ status: 'resigned', resign_reason: 'Vaqtida kirmadi' })
+            .eq('schedule_id', scheduleId)
+            .eq('status', 'confirmed')
+            .in('user_id', toResign)
+          if (resignErr) {
+            await admin
+              .from('mock_bookings')
+              .update({ status: 'resigned' })
+              .eq('schedule_id', scheduleId)
+              .eq('status', 'confirmed')
+              .in('user_id', toResign)
+          }
+          // Reflect locally so this same response shows it immediately.
+          for (const b of bookings as any[]) {
+            if (b.status === 'confirmed' && toResign.includes(b.user_id)) b.status = 'resigned'
+          }
+        }
+      }
+    }
+  }
+
   const userIds = [...new Set(bookings.map((b: any) => b.user_id as string))]
 
   // Extract payment_request IDs from payment_ref (format: "PR-<uuid>")

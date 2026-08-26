@@ -185,7 +185,7 @@
     "fiveMinWarning": "You have 5 minutes to enter or session will be auto-cancelled.",
     "minutesWarning": "⚠️ Attention!",
     "minutesElapsed": "{n} minutes elapsed. If you don't enter within {remaining} minute(s), session will be auto-cancelled.",
-    "autoResigned": "Candidate was more than 5 minutes late and this session was automatically cancelled.",
+    "autoResigned": "You were more than 5 minutes late, so this session was automatically cancelled.",
     "infoTitle": "About Mock Test",
     "infoItem1": "After booking, admin confirms within 24 hours",
     "infoItem2": "\"Start Mock Test\" button appears when test time comes",

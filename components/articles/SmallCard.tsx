@@ -6,12 +6,16 @@ import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { CATEGORY_COLOR, CATEGORY_LABEL, articleCategoryFor, articleReadMinutesFor } from '@/lib/utils/articleCategory'
 import { difficultyColor } from '@/lib/utils/articleDifficulty'
+import { StarsBadge } from '@/components/ui/StarsBadge'
 import type { CardArticle } from '@/components/articles/ArticleCard'
 
 interface SmallCardProps {
   article: CardArticle
   locked?: boolean
   delay?: number
+  // Shu article uchun eng yaxshi (maksimal) yulduz natijasi -- ArticleCard
+  // bilan bir xil rationale.
+  bestStars?: number
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -24,7 +28,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Library ArticleCard'idan kichikroq -- kichik badge'lar, kam
 // padding, 140px min balandlik. Chap accent chiziq (kategoriya
 // rangida) mavjud.
-function SmallCardInner({ article, locked = false, delay = 0 }: SmallCardProps) {
+function SmallCardInner({ article, locked = false, delay = 0, bestStars = 0 }: SmallCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -101,9 +105,12 @@ function SmallCardInner({ article, locked = false, delay = 0 }: SmallCardProps) 
           {article.title}
         </h3>
 
-        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <Clock size={11} />
-          <span>{mins} min</span>
+        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <Clock size={11} />
+            <span>{mins} min</span>
+          </div>
+          {bestStars > 0 && <StarsBadge stars={bestStars} size={11} variant="chip" />}
         </div>
       </Link>
     </motion.div>

@@ -7,13 +7,16 @@ import type { CardArticle } from '@/components/articles/ArticleCard'
 interface TodaysPicksProps {
   picks: (CardArticle & { description?: string | null; content?: string | null })[]
   lockedIds?: Set<string>
+  // article_id -> eng yaxshi (maksimal) yulduz. FeaturedCard/SmallCard'ga
+  // shu article uchun bestStars'ni topib beramiz.
+  starsMap?: Record<string, number>
 }
 
 // Today's Picks bento: chap tarafda katta karta, o'ng tarafda 2x2
 // kompakt kartalar. lg dan pastda hammasi bir ustunga tushadi.
 // FeaturedCard endi lg:col-span-2 emas -- tashqi grid ikki ustun,
 // katta karta bittasini, o'ng grid ikkinchisini oladi.
-export function TodaysPicks({ picks, lockedIds }: TodaysPicksProps) {
+export function TodaysPicks({ picks, lockedIds, starsMap }: TodaysPicksProps) {
   if (picks.length === 0) return null
 
   const [featured, ...rest] = picks
@@ -40,6 +43,7 @@ export function TodaysPicks({ picks, lockedIds }: TodaysPicksProps) {
             content={featured.content ?? null}
             locked={lockedIds?.has(featured.id) ?? false}
             delay={0}
+            bestStars={starsMap?.[featured.id] ?? 0}
           />
         </div>
 
@@ -52,6 +56,7 @@ export function TodaysPicks({ picks, lockedIds }: TodaysPicksProps) {
                 article={a}
                 locked={lockedIds?.has(a.id) ?? false}
                 delay={0.06 * (i + 1)}
+                bestStars={starsMap?.[a.id] ?? 0}
               />
             ))}
           </div>

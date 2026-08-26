@@ -6,6 +6,7 @@ import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { CATEGORY_COLOR, CATEGORY_LABEL, articleCategoryFor, articleReadMinutesFor } from '@/lib/utils/articleCategory'
 import { difficultyColor } from '@/lib/utils/articleDifficulty'
+import { StarsBadge } from '@/components/ui/StarsBadge'
 import type { CardArticle } from '@/components/articles/ArticleCard'
 
 interface FeaturedCardProps {
@@ -17,6 +18,9 @@ interface FeaturedCardProps {
   content?: string | null
   locked?: boolean
   delay?: number
+  // Shu article uchun eng yaxshi (maksimal) yulduz natijasi -- ArticleCard
+  // bilan bir xil rationale.
+  bestStars?: number
 }
 
 // Markdown belgilarni ozroq tozalab, birinchi 200 belgigacha excerpt
@@ -45,7 +49,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Today's Picks'dagi katta karta (col-span-2, row-span-2). Chap
 // tarafda kategoriya rangida qalinroq accent chiziq, ichida keng
 // description + ajratuvchi + o'qish vaqti.
-function FeaturedCardInner({ article, description, content, locked = false, delay = 0 }: FeaturedCardProps) {
+function FeaturedCardInner({ article, description, content, locked = false, delay = 0, bestStars = 0 }: FeaturedCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -109,6 +113,7 @@ function FeaturedCardInner({ article, description, content, locked = false, dela
               <Lock size={14} />
             </span>
           )}
+          {bestStars > 0 && <StarsBadge stars={bestStars} size={14} variant="chip" />}
         </div>
 
         <h3

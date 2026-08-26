@@ -205,6 +205,7 @@ export default function ArticlesPage() {
                   article={a}
                   locked={lockedIds.has(a.id)}
                   delay={0.03 * i}
+                  bestStars={stars[a.id] ?? 0}
                 />
               ))}
             </div>
@@ -213,7 +214,7 @@ export default function ArticlesPage() {
       ) : (
         // Default holat: Today's Picks + Library
         <>
-          <TodaysPicks picks={picks} lockedIds={lockedIds} />
+          <TodaysPicks picks={picks} lockedIds={lockedIds} starsMap={stars} />
 
           <section>
             <h2 className="text-2xl font-bold mb-5 flex items-center gap-3" style={{ color: 'var(--text-primary)' }}>
@@ -230,6 +231,7 @@ export default function ArticlesPage() {
                   article={a}
                   locked={lockedIds.has(a.id)}
                   delay={0.03 * i}
+                  bestStars={stars[a.id] ?? 0}
                 />
               ))}
             </div>

@@ -6,6 +6,7 @@ import { Clock, Lock } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { CATEGORY_COLOR, CATEGORY_LABEL, articleCategoryFor, articleReadMinutesFor } from '@/lib/utils/articleCategory'
 import { difficultyColor } from '@/lib/utils/articleDifficulty'
+import { StarsBadge } from '@/components/ui/StarsBadge'
 
 export interface CardArticle {
   id: string
@@ -20,6 +21,12 @@ interface ArticleCardProps {
   article: CardArticle
   locked?: boolean
   delay?: number
+  // Shu article uchun eng yaxshi (maksimal) yulduz natijasi -- backend
+  // Math.max bilan saqlaydi, keyingi past urinishlar uni bosib
+  // yubormaydi; faqat shuni har bir karta ustida ko'rsatish yetmayotgan
+  // edi ("qaysi article uchunligi bilinmayabdi"). undefined/0 bo'lsa --
+  // hali test ishlanmagan, badge ko'rsatilmaydi.
+  bestStars?: number
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -34,7 +41,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // re-renders whenever any card-independent state changes (filter,
 // search); article rows themselves don't change between renders, so
 // memo skips the whole subtree.
-function ArticleCardInner({ article, locked = false, delay = 0 }: ArticleCardProps) {
+function ArticleCardInner({ article, locked = false, delay = 0, bestStars = 0 }: ArticleCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -104,9 +111,12 @@ function ArticleCardInner({ article, locked = false, delay = 0 }: ArticleCardPro
           {article.title}
         </h3>
 
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-          <Clock size={12} />
-          <span>{mins} min</span>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <Clock size={12} />
+            <span>{mins} min</span>
+          </div>
+          {bestStars > 0 && <StarsBadge stars={bestStars} size={13} variant="chip" />}
         </div>
       </Link>
     </motion.div>
