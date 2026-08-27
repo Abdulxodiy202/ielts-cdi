@@ -1,5 +1,55 @@
 /**
- * Builds a <script> string injected into CDI HTML test iframes.
+ * Best-effort responsive safety-net for uploaded CDI test HTML files.
+ *
+ * These files are admin-uploaded content (a passage/questions split-view
+ * template) with their own hard-coded CSS -- we don't control their
+ * source, and it was authored for a desktop-width viewport only. On a
+ * phone, the fixed side-by-side passage|questions columns don't fit, so
+ * question text/options get clipped and pagination controls overlap
+ * whatever sits under them (this is what makes an active test look
+ * "broken" on mobile). This stylesheet is injected into every such file
+ * at render time (see buildInjectScript below) so the fix applies
+ * site-wide without needing to touch each uploaded file individually.
+ *
+ * Since we don't know each file's exact class names, the rules target
+ * generic, common patterns (inline flex/grid, 50%-ish fixed-width
+ * columns) broadly enough to force single-column stacking below a
+ * phone-width breakpoint, while doing nothing on desktop.
+ */
+function buildResponsiveStyle(): string {
+  return `
+<style>
+@media (max-width: 820px) {
+  html, body { max-width: 100vw !important; overflow-x: hidden !important; }
+  img, table, iframe, video, pre, code { max-width: 100% !important; height: auto !important; }
+  body [style*="display: flex"], body [style*="display:flex"],
+  body [style*="display: -webkit-flex"] {
+    flex-wrap: wrap !important;
+  }
+  body [style*="display: grid"], body [style*="display:grid"] {
+    grid-template-columns: 1fr !important;
+  }
+  .split, .split-view, .two-column, .two-col, .columns, .row-split,
+  [class*="grid-cols-2"], [class*="col-2"], [class*="two-column"] {
+    display: block !important;
+    width: 100% !important;
+  }
+  [style*="width: 50%"], [style*="width:50%"],
+  [style*="width: 45%"], [style*="width:45%"],
+  [style*="width: 48%"], [style*="width:48%"] {
+    width: 100% !important;
+  }
+  [style*="position: fixed"], [style*="position:fixed"],
+  [style*="position: sticky"], [style*="position:sticky"] {
+    z-index: 500 !important;
+  }
+}
+</style>`
+}
+
+/**
+ * Builds a <script> (plus the responsive safety-net <style> above) string
+ * injected into CDI HTML test iframes.
  *
  * After the user clicks a Check/Submit button, we wait 1 second for the
  * HTML test to process and render results, then extract the score from the
@@ -109,5 +159,5 @@ export function buildInjectScript(): string {
 })()
 `
 
-  return `<script>${body}${close}`
+  return `${buildResponsiveStyle()}\n<script>${body}${close}`
 }
