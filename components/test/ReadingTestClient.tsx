@@ -270,6 +270,16 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
             touch-target size. */}
         {!showExit && (
           <button
+            type="button"
+            // Explicit onPointerDown handler as a belt-and-suspenders
+            // fix for a mobile-Safari edge case where a click landing
+            // on a full-viewport iframe underneath our button was
+            // getting the tap event first, then the browser cancelled
+            // the parent's click as a "swipe" gesture. onPointerDown
+            // stops the pointer sequence at the button before the
+            // iframe can claim it. onClick still fires normally on
+            // desktop and Android.
+            onPointerDown={e => e.stopPropagation()}
             onClick={() => {
               if (window.confirm(t('testTaking.confirmExitEarly'))) router.push(exitHref)
             }}
@@ -282,9 +292,9 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               width: 44,
               height: 44,
               borderRadius: '50%',
-              background: 'rgba(15,15,26,0.85)',
+              background: 'rgba(15,15,26,0.9)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
+              border: '1px solid rgba(255,255,255,0.35)',
               cursor: 'pointer',
               fontSize: 20,
               lineHeight: 1,
@@ -292,7 +302,17 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
               alignItems: 'center',
               justifyContent: 'center',
               backdropFilter: 'blur(4px)',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+              // pointer-events:auto is the browser default, but stating
+              // it here guarantees it isn't inherited-away by any
+              // ancestor rule (some global resets set pointer-events
+              // on <body> during modal open states).
+              pointerEvents: 'auto',
+              // Suppresses the 300ms tap delay on mobile Safari and
+              // stops the browser from turning a tap into a
+              // double-tap-zoom on the underlying iframe.
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             ✕

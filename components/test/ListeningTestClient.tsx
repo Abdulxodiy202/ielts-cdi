@@ -220,6 +220,13 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             in the top-left corner and collided visually with ours there. */}
         {!showExit && (
           <button
+            type="button"
+            // See ReadingTestClient for the full rationale -- mirror the
+            // hardening here so both entry points behave the same on
+            // mobile Safari (onPointerDown stops iframe from claiming
+            // the tap, touch-action:manipulation kills 300ms tap delay,
+            // explicit pointer-events guards against inherited-away).
+            onPointerDown={e => e.stopPropagation()}
             onClick={() => {
               if (window.confirm(t('testTaking.confirmExitEarly'))) router.push('/listening')
             }}
@@ -232,9 +239,9 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
               width: 44,
               height: 44,
               borderRadius: '50%',
-              background: 'rgba(15,15,26,0.85)',
+              background: 'rgba(15,15,26,0.9)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.3)',
+              border: '1px solid rgba(255,255,255,0.35)',
               cursor: 'pointer',
               fontSize: 20,
               lineHeight: 1,
@@ -242,7 +249,10 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
               alignItems: 'center',
               justifyContent: 'center',
               backdropFilter: 'blur(4px)',
-              boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+              pointerEvents: 'auto',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             ✕

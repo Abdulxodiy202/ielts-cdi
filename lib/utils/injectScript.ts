@@ -1,47 +1,91 @@
 /**
- * Best-effort responsive safety-net for uploaded CDI test HTML files.
+ * Responsive safety-net for uploaded CDI test HTML files.
  *
- * These files are admin-uploaded content (a passage/questions split-view
- * template) with their own hard-coded CSS -- we don't control their
- * source, and it was authored for a desktop-width viewport only. On a
- * phone, the fixed side-by-side passage|questions columns don't fit, so
- * question text/options get clipped and pagination controls overlap
- * whatever sits under them (this is what makes an active test look
- * "broken" on mobile). This stylesheet is injected into every such file
- * at render time (see buildInjectScript below) so the fix applies
- * site-wide without needing to touch each uploaded file individually.
+ * The admin-uploaded template ships with a hard-coded desktop layout:
  *
- * Since we don't know each file's exact class names, the rules target
- * generic, common patterns (inline flex/grid, 50%-ish fixed-width
- * columns) broadly enough to force single-column stacking below a
- * phone-width breakpoint, while doing nothing on desktop.
+ *   .header                (position:fixed, height:60px, z-index:100)
+ *   .main-container        (margin-top:60px, height: calc(100vh - 60px))
+ *     .panels-container    (display:flex, flex:1)
+ *       .passage-panel     (flex:1, min-width:200px)
+ *       .resizer           (width:10px, cursor:col-resize)
+ *       .questions-panel   (flex:1, min-width:200px, border-left)
+ *   .nav-arrows            (fixed bottom:100px right:20px, z-index:101)
+ *   .nav-row               (fixed bottom:0, height:80px, z-index:100)
+ *
+ * On a 400px phone the two flex:1 panels + the 10px resizer squash the
+ * passage/questions text below its own min-width. The nav-arrows (50px
+ * square) and the .nav-row question footer (80px tall) also overlap the
+ * questions-panel scroll area badly enough to hide the last question's
+ * options. The previous generic rules (inline flex/grid selectors,
+ * .split / .two-column names) never fired because this template uses
+ * different class names, so nothing changed on mobile at all.
+ *
+ * Below 820px we now:
+ *   - stack .panels-container vertically (flex-direction: column)
+ *     so each panel takes full width
+ *   - hide .resizer (col-resize is meaningless when stacked)
+ *   - swap .questions-panel border-left for border-top and add extra
+ *     bottom padding so the .nav-row / .nav-arrows can't clip content
+ *   - shrink .nav-arrows to 40px and pull them off the .nav-row so both
+ *     stay reachable (thumb zone)
+ *   - keep the JS layer untouched: prev/next in this template toggle
+ *     .question-set .hidden on a fixed-ID div (id="questions-1" etc.),
+ *     not element widths, so a column stack doesn't break navigation.
  */
 function buildResponsiveStyle(): string {
   return `
 <style>
 @media (max-width: 820px) {
   html, body { max-width: 100vw !important; overflow-x: hidden !important; }
-  img, table, iframe, video, pre, code { max-width: 100% !important; height: auto !important; }
-  body [style*="display: flex"], body [style*="display:flex"],
-  body [style*="display: -webkit-flex"] {
-    flex-wrap: wrap !important;
-  }
-  body [style*="display: grid"], body [style*="display:grid"] {
-    grid-template-columns: 1fr !important;
-  }
-  .split, .split-view, .two-column, .two-col, .columns, .row-split,
-  [class*="grid-cols-2"], [class*="col-2"], [class*="two-column"] {
-    display: block !important;
+  img, table, video, pre, code { max-width: 100% !important; height: auto !important; }
+
+  /* Header: shrink to leave more room for content */
+  .header { height: 50px !important; padding: 8px 12px !important; }
+  .main-container { margin-top: 50px !important; height: calc(100vh - 50px) !important; }
+
+  /* Stack the two panels vertically */
+  .panels-container { flex-direction: column !important; overflow: auto !important; }
+  .passage-panel, .questions-panel {
+    flex: 0 0 auto !important;
     width: 100% !important;
+    min-width: 0 !important;
+    padding: 12px 14px 20px !important;
   }
-  [style*="width: 50%"], [style*="width:50%"],
-  [style*="width: 45%"], [style*="width:45%"],
-  [style*="width: 48%"], [style*="width:48%"] {
-    width: 100% !important;
+  .questions-panel {
+    border-left: none !important;
+    border-top: 1px solid #e0e0e0 !important;
+    /* Reserve room for the fixed .nav-row (70px) + .nav-arrows (50px) */
+    padding-bottom: 140px !important;
   }
-  [style*="position: fixed"], [style*="position:fixed"],
-  [style*="position: sticky"], [style*="position:sticky"] {
-    z-index: 500 !important;
+  .resizer { display: none !important; }
+
+  /* Fixed pagination controls -- keep clickable, out of the way of
+     the .nav-row footer. */
+  .nav-arrows {
+    bottom: 84px !important;
+    right: 8px !important;
+    gap: 4px !important;
+    z-index: 102 !important;
+  }
+  .nav-arrow {
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 18px !important;
+  }
+
+  /* Bottom question-navigation footer: shrink + allow horizontal scroll
+     so 40-question strips still fit a 400px screen. */
+  .nav-row {
+    height: 70px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .footer__questionWrapper___1tZ46 { margin-right: 8px !important; }
+  .footer__questionNo___3WNct {
+    padding: 6px 8px !important;
+    font-size: 13px !important;
+    gap: 3px !important;
   }
 }
 </style>`
