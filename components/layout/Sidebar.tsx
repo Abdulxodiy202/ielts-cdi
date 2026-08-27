@@ -11,7 +11,7 @@ import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
   PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -195,43 +195,46 @@ export function Sidebar() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const navGroups = [
+  // `color` -- faqat Reading/Listening/Writing/Speaking uchun beriladi
+  // (har biri o'z rangida ajralib turishi uchun); qolgan itemlarda
+  // undefined bo'lib, pastdagi render default `var(--accent)`ga tushadi.
+  const navGroups: { label: string; items: { href: string; label: string; icon: LucideIcon; badge: 'ai' | 'book' | 'pro' | null; color?: string }[] }[] = [
     {
       label: '',
       items: [
-        { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, badge: null },
+        { href: '/dashboard', label: t('nav.dashboard'), icon: LayoutDashboard, badge: null, color: undefined },
       ],
     },
     {
       label: t('nav.skillsGroup'),
       items: [
-        { href: '/reading',   label: t('nav.reading'),   icon: BookOpen,   badge: null },
-        { href: '/listening', label: t('nav.listening'), icon: Headphones, badge: null },
-        { href: '/writing',   label: t('nav.writing'),   icon: PenLine,    badge: 'ai' },
-        { href: '/speaking',  label: t('nav.speaking'),  icon: Mic,        badge: 'ai' },
+        { href: '/reading',   label: t('nav.reading'),   icon: BookOpen,   badge: null, color: 'var(--skill-reading)' },
+        { href: '/listening', label: t('nav.listening'), icon: Headphones, badge: null, color: 'var(--skill-listening)' },
+        { href: '/writing',   label: t('nav.writing'),   icon: PenLine,    badge: 'ai', color: 'var(--skill-writing)' },
+        { href: '/speaking',  label: t('nav.speaking'),  icon: Mic,        badge: 'ai', color: 'var(--skill-speaking)' },
       ],
     },
     {
       label: t('nav.examGroup'),
       items: [
-        { href: '/mock-test', label: t('nav.mockTest'), icon: Calendar, badge: 'book' },
+        { href: '/mock-test', label: t('nav.mockTest'), icon: Calendar, badge: 'book', color: undefined },
       ],
     },
     {
       label: t('nav.resourcesGroup'),
       items: [
-        { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null },
-        { href: '/typing',      label: t('nav.typing'),       icon: Keyboard,            badge: null },
-        { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null },
-        { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null },
-        { href: '/video-lessons', label: t('nav.videoCourses'), icon: Video,               badge: null },
+        { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null, color: undefined },
+        { href: '/typing',      label: t('nav.typing'),       icon: Keyboard,            badge: null, color: undefined },
+        { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null, color: undefined },
+        { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null, color: undefined },
+        { href: '/video-lessons', label: t('nav.videoCourses'), icon: Video,               badge: null, color: undefined },
       ],
     },
     {
       label: t('nav.otherGroup'),
       items: [
-        { href: '/community', label: t('nav.community'), icon: Users,             badge: null },
-        { href: '/feedback',  label: t('nav.feedback'),  icon: MessageSquarePlus, badge: null },
+        { href: '/community', label: t('nav.community'), icon: Users,             badge: null, color: undefined },
+        { href: '/feedback',  label: t('nav.feedback'),  icon: MessageSquarePlus, badge: null, color: undefined },
       ],
     },
   ]
@@ -422,10 +425,10 @@ export function Sidebar() {
           {!mini && (
             <div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-                <span style={{ color: 'white', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
-                <span style={{ color: '#60a5fa', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+                <span style={{ color: 'var(--text-primary)', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
+                <span style={{ color: 'var(--accent)', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
               </div>
-              <div style={{ color: '#93c5fd', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
             </div>
           )}
         </div>
@@ -445,14 +448,15 @@ export function Sidebar() {
                 )
             )}
             <div className="space-y-0.5">
-              {group.items.map(({ href, label, icon: Icon, badge }) => {
+              {group.items.map(({ href, label, icon: Icon, badge, color }) => {
                 const active = pathname === href || (href !== '/coming-soon' && pathname.startsWith(href + '/'))
+                const itemColor = color || 'var(--accent)'
                 return (
                   <RailAnchor key={label} enabled={mini} label={label}>
                     <Link href={href} onClick={() => setMobileOpen(false)}
                       className={`flex items-center ${mini ? 'justify-center px-2' : 'gap-3 px-3'} py-2 rounded-lg text-sm font-medium transition-all`}
-                      style={{ background: active ? 'var(--accent)' : 'transparent', color: active ? 'white' : 'var(--text-secondary)' }}>
-                      <Icon size={mini ? 18 : 16} style={{ flexShrink: 0 }} />
+                      style={{ background: active ? itemColor : 'transparent', color: active ? 'white' : 'var(--text-secondary)' }}>
+                      <Icon size={mini ? 18 : 16} style={{ flexShrink: 0, color: active ? 'white' : (color || 'currentColor') }} />
                       {!mini && <span className="flex-1">{label}</span>}
                       {!mini && badge === 'ai' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)', lineHeight: '16px' }}>AI</span>}
                       {!mini && badge === 'book' && <span style={{ fontSize: '10px', fontWeight: 700, padding: '1px 6px', borderRadius: '4px', background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)', lineHeight: '16px' }}>📖</span>}
@@ -610,7 +614,6 @@ export function Sidebar() {
                       {([
                         { id: 'dark'  as const, color: '#6366f1' },
                         { id: 'light' as const, color: '#94a3b8' },
-                        { id: 'cyber' as const, color: '#10b981' },
                       ]).map(thm => (
                         <button key={thm.id} onClick={() => setTheme(thm.id)}
                           className="w-5 h-5 rounded-full border-2 transition-all"
@@ -669,8 +672,10 @@ export function Sidebar() {
                   {/* Divider */}
                   <div style={{ borderTop: '1px solid var(--border)', margin: '8px 0 6px' }} />
 
-                  {/* Logout */}
-                  <button onClick={signOut}
+                  {/* Logout -- akoundan chiqishda tema ham OQ (light)ga
+                      qaytariladi, shunda keyingi kirgan (yoki yangi)
+                      foydalanuvchi doim oq fon bilan boshlaydi. */}
+                  <button onClick={() => { setTheme('light'); signOut() }}
                     className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
                     style={{ color: '#ef4444' }}>
                     <LogOut size={13} style={{ flexShrink: 0 }} />

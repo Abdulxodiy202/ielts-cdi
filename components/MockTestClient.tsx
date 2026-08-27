@@ -430,9 +430,9 @@ export function MockTestClient({ userId }: Props) {
                     {/* Section chips */}
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        { label: 'Reading',   has: hasReading,   bg: 'rgba(99,102,241,0.1)',  c: 'var(--accent)',  bc: 'rgba(99,102,241,0.25)',  Icon: BookOpen   },
-                        { label: 'Listening', has: hasListening, bg: 'rgba(16,185,129,0.1)',  c: 'var(--success)', bc: 'rgba(16,185,129,0.25)',  Icon: Headphones },
-                        { label: 'Writing',   has: hasWriting,   bg: 'rgba(245,158,11,0.1)',  c: 'var(--warning)', bc: 'rgba(245,158,11,0.25)',  Icon: PenTool    },
+                        { label: 'Reading',   has: hasReading,   bg: 'rgba(37,99,235,0.1)',   c: 'var(--skill-reading)',   bc: 'rgba(37,99,235,0.25)',   Icon: BookOpen   },
+                        { label: 'Listening', has: hasListening, bg: 'rgba(124,58,237,0.1)',  c: 'var(--skill-listening)', bc: 'rgba(124,58,237,0.25)',  Icon: Headphones },
+                        { label: 'Writing',   has: hasWriting,   bg: 'rgba(16,185,129,0.1)',  c: 'var(--skill-writing)',   bc: 'rgba(16,185,129,0.25)',  Icon: PenTool    },
                       ].map(({ label, has, bg, c, bc, Icon }) => (
                         <span key={label}
                           className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium"

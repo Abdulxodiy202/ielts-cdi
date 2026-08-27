@@ -798,8 +798,8 @@ export default function TypingPage() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a12' }}>
-        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }} />
       </div>
     )
   }
@@ -807,7 +807,7 @@ export default function TypingPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center px-4 py-10"
-      style={{ background: '#0a0a12', fontFamily: status === 'config' ? undefined : "'JetBrains Mono','Fira Code',monospace" }}
+      style={{ background: 'var(--bg-primary)', fontFamily: status === 'config' ? undefined : "'JetBrains Mono','Fira Code',monospace" }}
       onClick={() => inputRef.current?.focus()}
     >
       <style>{`
@@ -828,7 +828,7 @@ export default function TypingPage() {
           top: 0;
           left: 0;
           width: 2px;
-          background: #6366f1;
+          background: var(--accent);
           border-radius: 1px;
           pointer-events: none;
           transition: transform 0.1s ease-out, height 0.1s ease-out;
@@ -851,12 +851,12 @@ export default function TypingPage() {
         autoCorrect="off"
         spellCheck={false}
         className="fixed bottom-3 left-1/2 -translate-x-1/2 sm:opacity-0 sm:pointer-events-none text-center text-sm rounded-full px-4 py-2 outline-none"
-        style={{ width: 220, zIndex: 40, background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}
+        style={{ width: 220, zIndex: 40, background: 'color-mix(in srgb, var(--text-primary) 6%, transparent)', color: 'color-mix(in srgb, var(--text-primary) 50%, transparent)', border: '1px solid color-mix(in srgb, var(--text-primary) 10%, transparent)' }}
         placeholder={t('typing.tapToType')}
       />
 
       {/* Logo */}
-      <div className="flex items-center gap-2 mb-8 mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
+      <div className="flex items-center gap-2 mb-8 mt-2" style={{ color: 'color-mix(in srgb, var(--text-primary) 50%, transparent)' }}>
         <Keyboard size={20} />
         <span className="font-bold text-sm" style={{ letterSpacing: '-.2px' }}>{t('typing.title')}</span>
       </div>
@@ -874,13 +874,13 @@ export default function TypingPage() {
                   className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                   style={{
                     background: mode === m && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    color: mode === m && !isEssaySet ? '#a5b4fc' : 'rgba(255,255,255,0.4)',
+                    color: mode === m && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                   }}
                 >
                   {m}
                 </button>
               ))}
-              <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
+              <span style={{ color: 'color-mix(in srgb, var(--text-primary) 15%, transparent)' }}>|</span>
               {mode === 'time' ? (
                 TIME_OPTIONS.map(s => (
                   <button
@@ -890,7 +890,7 @@ export default function TypingPage() {
                     className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                     style={{
                       background: duration === s && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                      color: duration === s && !isEssaySet ? '#a5b4fc' : 'rgba(255,255,255,0.4)',
+                      color: duration === s && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                     }}
                   >
                     {s}s
@@ -905,7 +905,7 @@ export default function TypingPage() {
                     className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                     style={{
                       background: wordGoal === w && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                      color: wordGoal === w && !isEssaySet ? '#a5b4fc' : 'rgba(255,255,255,0.4)',
+                      color: wordGoal === w && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                     }}
                   >
                     {w}
@@ -922,9 +922,9 @@ export default function TypingPage() {
                   onClick={() => setWordSet(ws)}
                   className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
                   style={{
-                    background: wordSet === ws ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.04)',
-                    color: wordSet === ws ? '#6ee7b7' : 'rgba(255,255,255,0.5)',
-                    border: '1px solid ' + (wordSet === ws ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.08)'),
+                    background: wordSet === ws ? 'rgba(16,185,129,0.15)' : 'color-mix(in srgb, var(--text-primary) 4%, transparent)',
+                    color: wordSet === ws ? 'var(--success)' : 'color-mix(in srgb, var(--text-primary) 50%, transparent)',
+                    border: '1px solid ' + (wordSet === ws ? 'rgba(16,185,129,0.3)' : 'color-mix(in srgb, var(--text-primary) 8%, transparent)'),
                   }}
                 >
                   {t(`typing.wordSet.${ws}`)}
@@ -937,13 +937,13 @@ export default function TypingPage() {
             onClick={isEssaySet ? loadEssayList : loadTest}
             disabled={loadingWords}
             className="px-8 py-3 rounded-full font-bold text-base transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ background: '#6366f1', color: '#fff' }}
+            style={{ background: 'var(--accent)', color: '#fff' }}
           >
             {loadingWords ? t('common.loading') : t('typing.startBtn')}
           </button>
 
           {loadError && (
-            <p className="text-sm text-center" style={{ color: '#f87171' }}>
+            <p className="text-sm text-center" style={{ color: 'var(--error)' }}>
               {loadError === 'noEssays' ? t('typing.noEssays') : t('typing.loadError')}
             </p>
           )}
@@ -952,12 +952,12 @@ export default function TypingPage() {
 
       {status === 'essaySelector' && (
         <div className="w-full max-w-3xl flex flex-col items-center gap-6">
-          <h2 className="text-lg font-bold" style={{ color: '#fff' }}>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
             {t('typing.essaySelector.chooseEssay')}
           </h2>
 
           {taskEssays.length === 0 ? (
-            <p className="text-sm text-center" style={{ color: '#f87171' }}>{t('typing.noEssays')}</p>
+            <p className="text-sm text-center" style={{ color: 'var(--error)' }}>{t('typing.noEssays')}</p>
           ) : (
             <div className="grid gap-4 w-full sm:grid-cols-2 lg:grid-cols-3">
               {taskEssays.map(essay => (
@@ -965,10 +965,10 @@ export default function TypingPage() {
                   key={essay.id}
                   onClick={() => startEssay(essay)}
                   className="text-left p-4 rounded-xl transition-all hover:opacity-90 hover:-translate-y-0.5 active:scale-[0.99]"
-                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: 'color-mix(in srgb, var(--text-primary) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--text-primary) 8%, transparent)' }}
                 >
-                  <div className="font-medium text-sm mb-1" style={{ color: '#fff' }}>{essay.title}</div>
-                  <div className="text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  <div className="font-medium text-sm mb-1" style={{ color: 'var(--text-primary)' }}>{essay.title}</div>
+                  <div className="text-xs" style={{ color: 'color-mix(in srgb, var(--text-primary) 40%, transparent)' }}>
                     {essay.word_count} {t('typing.essaySelector.words')}
                   </div>
                 </button>
@@ -979,7 +979,7 @@ export default function TypingPage() {
           <button
             onClick={() => setStatus('config')}
             className="flex items-center gap-2 text-sm hover:opacity-70 transition-opacity"
-            style={{ color: 'rgba(255,255,255,0.5)' }}
+            style={{ color: 'color-mix(in srgb, var(--text-primary) 50%, transparent)' }}
           >
             <Settings size={14} /> {t('typing.essaySelector.back')}
           </button>
@@ -992,9 +992,9 @@ export default function TypingPage() {
           style={{ maxWidth: 1600, margin: '0 auto', padding: '0 40px', boxSizing: 'border-box' }}
         >
           {essayTitle && (
-            <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.35)' }}>{essayTitle}</p>
+            <p className="text-xs text-center" style={{ color: 'color-mix(in srgb, var(--text-primary) 35%, transparent)' }}>{essayTitle}</p>
           )}
-          <div className="text-2xl font-bold" style={{ color: '#a5b4fc' }}>{liveCounter}</div>
+          <div className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{liveCounter}</div>
 
           <div
             ref={linesWrapRef}
@@ -1026,11 +1026,11 @@ export default function TypingPage() {
                   const typedKey = essayState.typedKeys[i]
                   const isCurrent = i === essayState.currentIndex
                   const isDone = i < essayState.currentIndex
-                  let color = 'rgba(255,255,255,0.35)'
+                  let color = 'color-mix(in srgb, var(--text-primary) 35%, transparent)'
                   let underline = false
                   if (typedKey !== null) {
                     const correct = typedKey === charStr
-                    color = correct ? '#fff' : '#ca4754'
+                    color = correct ? 'var(--text-primary)' : '#ca4754'
                     underline = !correct
                   }
                   return (
@@ -1108,15 +1108,15 @@ export default function TypingPage() {
 
                   const targetCh = word[j]
                   const typedCh = typed[j]
-                  let color = 'rgba(255,255,255,0.35)'
+                  let color = 'color-mix(in srgb, var(--text-primary) 35%, transparent)'
                   let underline = false
                   if (typedCh !== undefined && targetCh !== undefined) {
-                    color = typedCh === targetCh ? '#fff' : '#ca4754'
+                    color = typedCh === targetCh ? 'var(--text-primary)' : '#ca4754'
                     underline = typedCh !== targetCh
                   } else if (typedCh !== undefined && targetCh === undefined) {
                     color = '#ca4754' // extra char
                   } else if (typedCh === undefined && targetCh !== undefined && isDone) {
-                    color = 'rgba(255,255,255,0.35)' // missed char (word already passed)
+                    color = 'color-mix(in srgb, var(--text-primary) 35%, transparent)' // missed char (word already passed)
                     underline = true
                   }
                   chars.push(
@@ -1147,7 +1147,7 @@ export default function TypingPage() {
                 transition). */}
           </div>
 
-          <div className="flex items-center gap-4 text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
+          <div className="flex items-center gap-4 text-xs" style={{ color: 'color-mix(in srgb, var(--text-primary) 30%, transparent)' }}>
             <span>tab {t('typing.restartHint')}</span>
             <span>esc {t('typing.configHint')}</span>
           </div>
@@ -1158,25 +1158,25 @@ export default function TypingPage() {
         <div className="w-full max-w-xl flex flex-col items-center gap-8">
           <div className="flex items-center justify-center flex-wrap gap-10">
             <div className="text-center">
-              <div className="text-6xl font-black" style={{ color: '#a5b4fc' }}>{wpm}</div>
-              <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>WPM</div>
+              <div className="text-6xl font-black" style={{ color: 'var(--accent)' }}>{wpm}</div>
+              <div className="text-sm mt-1" style={{ color: 'color-mix(in srgb, var(--text-primary) 40%, transparent)' }}>WPM</div>
             </div>
             <div className="text-center">
-              <div className="text-6xl font-black" style={{ color: '#6ee7b7' }}>{accuracy}%</div>
-              <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{t('typing.accuracy')}</div>
+              <div className="text-6xl font-black" style={{ color: 'var(--success)' }}>{accuracy}%</div>
+              <div className="text-sm mt-1" style={{ color: 'color-mix(in srgb, var(--text-primary) 40%, transparent)' }}>{t('typing.accuracy')}</div>
             </div>
             <div className="text-center">
-              <div className="text-6xl font-black" style={{ color: '#fbbf24' }}>{formatTime(elapsedSeconds)}</div>
-              <div className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{t('typing.time')}</div>
+              <div className="text-6xl font-black" style={{ color: 'var(--warning)' }}>{formatTime(elapsedSeconds)}</div>
+              <div className="text-sm mt-1" style={{ color: 'color-mix(in srgb, var(--text-primary) 40%, transparent)' }}>{t('typing.time')}</div>
             </div>
           </div>
 
           <div className="text-center">
-            <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{t('typing.characters')}</div>
-            <div className="text-xl font-mono font-bold" style={{ color: 'rgba(255,255,255,0.85)' }}>
+            <div className="text-xs uppercase tracking-wide mb-1.5" style={{ color: 'color-mix(in srgb, var(--text-primary) 35%, transparent)' }}>{t('typing.characters')}</div>
+            <div className="text-xl font-mono font-bold" style={{ color: 'color-mix(in srgb, var(--text-primary) 85%, transparent)' }}>
               {correctKeystrokes} / {incorrectKeystrokes} / {extraKeystrokes} / {missedChars}
             </div>
-            <div className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            <div className="text-xs mt-1" style={{ color: 'color-mix(in srgb, var(--text-primary) 30%, transparent)' }}>
               {t('typing.correct')} / {t('typing.incorrect')} / {t('typing.extra')} / {t('typing.missed')}
             </div>
           </div>
@@ -1185,14 +1185,14 @@ export default function TypingPage() {
             <button
               onClick={restartCurrent}
               className="flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm"
-              style={{ background: '#6366f1', color: '#fff' }}
+              style={{ background: 'var(--accent)', color: '#fff' }}
             >
               <RotateCcw size={14} /> {t('typing.tryAgain')} <span style={{ opacity: 0.6 }}>(tab)</span>
             </button>
             <button
               onClick={goToConfigOrSelector}
               className="flex items-center gap-2 px-6 py-2.5 rounded-full font-semibold text-sm"
-              style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.7)' }}
+              style={{ background: 'color-mix(in srgb, var(--text-primary) 8%, transparent)', color: 'color-mix(in srgb, var(--text-primary) 70%, transparent)' }}
             >
               <Settings size={14} /> {t('typing.newConfig')} <span style={{ opacity: 0.6 }}>(esc)</span>
             </button>

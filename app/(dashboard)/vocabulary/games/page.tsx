@@ -146,7 +146,7 @@ export default function GamesPage() {
 
   /* Stars — client-only */
   useEffect(() => {
-    setStars(Array.from({ length: 90 }, (_, i) => ({
+    setStars(Array.from({ length: 220 }, (_, i) => ({
       id: i, x: Math.random() * 100, y: Math.random() * 100,
       r: Math.random() < 0.18 ? 1.5 : 0.8,
       dur: (1.8 + Math.random() * 3).toFixed(1) + 's',
@@ -243,41 +243,56 @@ export default function GamesPage() {
 
       <div style={{
         position: 'relative', minHeight: CH + 120,
-        background: 'linear-gradient(170deg, #0c0c1d 0%, #0f0f1a 35%, #10101e 70%, #0a0a14 100%)',
+        // Sof hex o'rniga sayt CSS o'zgaruvchilaridan gradient -- shunda
+        // qorong'i/yorug'/cyber temalarning har birida to'g'ri rangda
+        // ko'rinadi (avval qattiq "kunduzgi osmon" rangi yozilgan edi,
+        // u faqat light temada ishlardi -- dark temada esa matn/badge
+        // ranglari shu qattiq och fon ustida ko'rinmay qolardi).
+        background: 'linear-gradient(170deg, var(--bg-primary) 0%, var(--bg-secondary) 55%, var(--bg-primary) 100%)',
         overflowX: 'hidden',
       }}>
 
-        {/* Star field */}
-        {stars.map(s => (
-          <div key={s.id} style={{
-            position: 'absolute', left: `${s.x}%`, top: `${s.y * (CH / 100)}px`,
-            width: s.r * 2, height: s.r * 2, borderRadius: '50%', background: '#fff',
-            animation: `twinkle ${s.dur} ease-in-out ${s.del} infinite`,
-            pointerEvents: 'none', zIndex: 0,
-          }} />
-        ))}
+        {/* Star field -- endi dumaloq nuqta emas, haqiqiy 4 uchli
+            yulduzcha (clip-path bilan chizilgan) shaklida. `filter:
+            drop-shadow` box-shadow'dan farqli o'laroq shaklning o'ziga
+            (maskalangan konturga) ergashadi, shu bois yorug' fonda ham
+            porlashi bilinib turadi -- oldingi kichkina tekis dumaloq
+            oq fonda deyarli ko'rinmasdi. */}
+        {stars.map(s => {
+          const size = s.r * 7 // 0.8 -> ~5.6px, 1.5 -> ~10.5px
+          return (
+            <div key={s.id} style={{
+              position: 'absolute', left: `${s.x}%`, top: `${s.y * (CH / 100)}px`,
+              width: size, height: size, background: '#f7b731',
+              clipPath: 'polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%)',
+              filter: 'drop-shadow(0 0 3px rgba(247,183,49,0.95)) drop-shadow(0 0 6px rgba(247,183,49,0.5))',
+              animation: `twinkle ${s.dur} ease-in-out ${s.del} infinite`,
+              pointerEvents: 'none', zIndex: 0,
+            }} />
+          )
+        })}
 
         {/* Sticky header */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 200,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '12px 20px',
-          background: 'rgba(8,8,20,0.88)', backdropFilter: 'blur(18px)',
-          borderBottom: '1px solid rgba(99,102,241,0.12)',
+          background: 'color-mix(in srgb, var(--bg-card) 88%, transparent)', backdropFilter: 'blur(18px)',
+          borderBottom: '1px solid color-mix(in srgb, var(--accent) 16%, transparent)',
         }}>
-          <Link href="/vocabulary" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none', fontWeight: 700, fontSize: 13 }}>
+          <Link href="/vocabulary" className="pill-glow-accent" style={{ textDecoration: 'none', fontWeight: 700, fontSize: 12, padding: '6px 12px', borderRadius: 999 }}>
             {t('games.backToVocab')}
           </Link>
-          <span style={{ color: '#fff', fontWeight: 800, fontSize: 15, letterSpacing: '-.3px' }}>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 15, letterSpacing: '-.3px' }}>
             {t('games.title')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {isTestUser && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 4,
-                background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+                background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
                 borderRadius: 8, padding: '4px 8px',
-                fontSize: 11, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
+                fontSize: 11, fontWeight: 700, color: 'var(--skill-listening)',
                 letterSpacing: '.2px',
               }}>
                 🔧 Test
@@ -285,22 +300,22 @@ export default function GamesPage() {
             )}
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
-              background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)',
+              background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
               borderRadius: 10, padding: '5px 10px',
             }}>
               <span style={{ fontSize: 13 }}>⭐</span>
-              <span style={{ color: '#fbbf24', fontWeight: 700, fontSize: 13 }}>
-                {totalStars}<span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>/500</span>
+              <span style={{ color: 'var(--premium)', fontWeight: 700, fontSize: 13 }}>
+                {totalStars}<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/500</span>
               </span>
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 7,
-              background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)',
+              background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)',
               borderRadius: 10, padding: '5px 12px',
             }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-              <span style={{ color: '#fff', fontWeight: 700, fontSize: 13 }}>
-                {doneN}<span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>/100</span>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>
+                {doneN}<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>/100</span>
               </span>
             </div>
           </div>
@@ -312,27 +327,27 @@ export default function GamesPage() {
             {dailyStatus.isAdmin ? (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)',
+                background: 'color-mix(in srgb, var(--accent) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
                 borderRadius: 12, padding: '8px 16px',
-                fontSize: 13, fontWeight: 700, color: 'rgba(167,139,250,0.9)',
+                fontSize: 13, fontWeight: 700, color: 'var(--skill-listening)',
               }}>
                 {t('games.testModeText')}
               </div>
             ) : (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'center',
-                background: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.1)' : 'rgba(99,102,241,0.1)',
-                border: `1px solid ${dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.35)' : 'rgba(99,102,241,0.25)'}`,
+                background: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.1)' : 'color-mix(in srgb, var(--accent) 10%, transparent)',
+                border: `1px solid ${dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'rgba(249,115,22,0.35)' : 'color-mix(in srgb, var(--accent) 25%, transparent)'}`,
                 borderRadius: 12, padding: '8px 16px',
                 fontSize: 13, fontWeight: 700,
-                color: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? '#fb923c' : '#a5b4fc',
+                color: dailyStatus.unlockedToday >= dailyStatus.dailyLimit ? 'var(--warning)' : 'var(--skill-reading)',
               }}>
                 <span>
                   {t('games.dailyStatusText', { current: dailyStatus.unlockedToday, limit: dailyStatus.dailyLimit })}
                   {dailyStatus.unlockedToday >= dailyStatus.dailyLimit && t('games.limitReachedSuffix')}
                 </span>
                 {countdown && (
-                  <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 600, fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: 12 }}>
                     {t('games.countdownLabel', { countdown })}
                   </span>
                 )}
@@ -618,7 +633,8 @@ export default function GamesPage() {
             onClick={e => e.stopPropagation()}
             style={{
               width: '100%', maxWidth: 400, borderRadius: 20, padding: 28,
-              background: '#15152a', border: '1px solid rgba(249,115,22,0.25)',
+              background: 'var(--bg-card)', border: '1px solid rgba(249,115,22,0.3)',
+              boxShadow: '0 20px 50px rgba(15,23,42,0.25)',
               textAlign: 'center',
             }}
           >
@@ -629,14 +645,14 @@ export default function GamesPage() {
             }}>
               🔒
             </div>
-            <h2 style={{ color: '#fff', fontSize: 19, fontWeight: 800, marginBottom: 10 }}>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: 19, fontWeight: 800, marginBottom: 10 }}>
               {t('games.limitModalTitle')}
             </h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.6, marginBottom: 8 }}>
               {t(dailyStatus.dailyLimit > 1 ? 'games.limitModalBodyPlural' : 'games.limitModalBodySingular', { limit: dailyStatus.dailyLimit })}
             </p>
             {countdown && (
-              <p style={{ color: 'rgba(249,115,22,0.8)', fontSize: 13, fontWeight: 700, marginBottom: 20 }}>
+              <p style={{ color: 'var(--warning)', fontSize: 13, fontWeight: 700, marginBottom: 20 }}>
                 {t('games.countdownLabel', { countdown })}
               </p>
             )}
@@ -645,8 +661,8 @@ export default function GamesPage() {
                 onClick={() => setShowLimitModal(false)}
                 style={{
                   flex: 1, padding: '11px 16px', borderRadius: 12, fontSize: 14, fontWeight: 700,
-                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-                  border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+                  background: 'var(--bg-secondary)', color: 'var(--text-secondary)',
+                  border: '1px solid var(--border)', cursor: 'pointer',
                 }}
               >
                 {t('games.closeBtn')}

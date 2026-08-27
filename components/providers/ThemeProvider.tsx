@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 
-type Theme = 'dark' | 'light' | 'cyber'
+type Theme = 'dark' | 'light'
 
 interface ThemeContextType {
   theme: Theme
@@ -10,12 +10,15 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'dark',
+  theme: 'light',
   setTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('dark')
+  // Default endi "light" (Ocean Blue -- oq va ko'k rang kombinatsiyasi).
+  // Foydalanuvchi avval boshqa temani tanlagan bo'lsa, localStorage'dagi
+  // qiymat pastdagi useEffect orqali baribir ustunlik qiladi.
+  const [theme, setThemeState] = useState<Theme>('light')
 
   useEffect(() => {
     const stored = localStorage.getItem('ielts-theme') as Theme | null

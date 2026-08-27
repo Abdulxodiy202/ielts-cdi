@@ -55,13 +55,14 @@ const tileStyle: React.CSSProperties = {
   background: 'var(--bg-card)',
   border: '1px solid var(--border)',
   borderRadius: 16,
+  boxShadow: '0 1px 2px rgba(15,23,42,0.05), 0 1px 3px rgba(15,23,42,0.06)',
 }
 
-function ProgressBar({ done, total }: { done: number; total: number }) {
+function ProgressBar({ done, total, color = 'var(--accent)' }: { done: number; total: number; color?: string }) {
   const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0
   return (
     <div className="h-1.5 rounded-full overflow-hidden mt-3" style={{ background: 'var(--bg-secondary)' }}>
-      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
     </div>
   )
 }
@@ -155,10 +156,10 @@ export function BentoDashboard({
       </div>
 
       {/* ── Reading ── */}
-      <Link href="/reading" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
+      <Link href="/reading" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--skill-reading)]" style={tileStyle}>
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-            <BookOpen size={22} style={{ color: 'var(--accent)' }} />
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(37,99,235,0.15)' }}>
+            <BookOpen size={22} style={{ color: 'var(--skill-reading)' }} />
           </div>
           <div className="min-w-0">
             <div className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.readingTests')}</div>
@@ -171,14 +172,14 @@ export function BentoDashboard({
         <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
           {t('dashboard.completedOf', { done: readingDone, total: counts.readingTotal })}
         </p>
-        <ProgressBar done={readingDone} total={counts.readingTotal} />
+        <ProgressBar done={readingDone} total={counts.readingTotal} color="var(--skill-reading)" />
       </Link>
 
       {/* ── Listening ── */}
-      <Link href="/listening" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--accent)]" style={tileStyle}>
+      <Link href="/listening" className="lg:col-span-6 p-5 md:p-6 group transition-colors hover:border-[var(--skill-listening)]" style={tileStyle}>
         <div className="flex items-center gap-3 mb-2">
-          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(236,72,153,0.15)' }}>
-            <Headphones size={22} style={{ color: '#ec4899' }} />
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.15)' }}>
+            <Headphones size={22} style={{ color: 'var(--skill-listening)' }} />
           </div>
           <div className="min-w-0">
             <div className="font-bold" style={{ color: 'var(--text-primary)' }}>{t('dashboard.listeningTests')}</div>
@@ -191,7 +192,7 @@ export function BentoDashboard({
         <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
           {t('dashboard.completedOf', { done: listeningDone, total: counts.listeningTotal })}
         </p>
-        <ProgressBar done={listeningDone} total={counts.listeningTotal} />
+        <ProgressBar done={listeningDone} total={counts.listeningTotal} color="var(--skill-listening)" />
       </Link>
 
       {/* ── Study plan — hamma userga bir xil "Ishlab chiqilmoqda" ── */}

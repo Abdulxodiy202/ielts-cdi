@@ -1,7 +1,39 @@
 @import 'tailwindcss';
 
-/* ── Theme: Default Dark ── */
+/* ── Theme: Default Light ("Ocean Blue") ──────────────────────────
+   2026-08-27: :root endi ASOSIY (birlamchi) fon sifatida to'g'ridan-
+   to'g'ri OQ/Ocean Blue qiymatlarni ushlaydi -- data-theme atributi
+   hali JS orqali o'rnatilmagan bo'lsa ham (masalan js o'chirilgan
+   holatda yoki birinchi frame'da) sayt OQ ko'rinadi, chunki bu endi
+   haqiqiy CSS default'i. Dark endi faqat [data-theme="dark"] orqali
+   ANIQ tanlanganda ustunlik qiladi -- ya'ni foydalanuvchi o'zi
+   o'zgartirmaguncha yangi user uchun asosiy fon doim OQ bo'ladi.
+
+   Rang tarixi: --bg-primary/--bg-card juda yaqin edi -- kartalar
+   "xira" ko'rinardi (tuzatildi: sahifa ko'k-kulrang, kartalar aniq
+   ajratildi). Kartalar sof oq (#ffffff) "juda oq/charchatuvchi" edi --
+   #ffffff o'rniga yumshoq qaymoq/fil suyagi (ivory) rangga
+   o'zgartirildi, chegara ham shu ohangga moslashtirildi. */
 :root,
+[data-theme="light"] {
+  --bg-primary: #eaf0f8;
+  --bg-secondary: #dfe8f4;
+  --bg-card: #fbf8f1;
+  --bg-card-hover: #f4efe3;
+  --border: #d6d0c0;
+  --text-primary: #0b1a35;
+  --text-secondary: #33465f;
+  --text-muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-glow: rgba(37, 99, 235, 0.25);
+  --success: #16a34a;
+  --warning: #d97706;
+  --error: #dc2626;
+  --premium: #d97706;
+  --sidebar-width: 260px;
+}
+
 [data-theme="dark"] {
   --bg-primary: #0f0f1a;
   --bg-secondary: #1a1a2e;
@@ -21,42 +53,27 @@
   --sidebar-width: 260px;
 }
 
-[data-theme="light"] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f8fafc;
-  --border: #e2e8f0;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-glow: rgba(99, 102, 241, 0.15);
-  --success: #16a34a;
-  --warning: #d97706;
-  --error: #dc2626;
-  --premium: #d97706;
-  --sidebar-width: 260px;
-}
+/* ── Skill accent colors ("Vivid" variant) ──────────────────────────
+   Reading/Listening/Writing/Speaking each get their own distinct,
+   theme-independent color so they stay recognizable across the sidebar,
+   dashboard tiles, and mock-test chips. Reading intentionally matches
+   the Ocean Blue --accent (it's the site's primary/default skill). */
+:root {
+  --skill-reading: #2563eb;
+  --skill-reading-hover: #1d4ed8;
+  --skill-reading-glow: rgba(37, 99, 235, 0.28);
 
-[data-theme="cyber"] {
-  --bg-primary: #030f07;
-  --bg-secondary: #071a0e;
-  --bg-card: #0a2010;
-  --bg-card-hover: #0d2e18;
-  --border: #0d4020;
-  --text-primary: #a7f3d0;
-  --text-secondary: #6ee7b7;
-  --text-muted: #34d399;
-  --accent: #10b981;
-  --accent-hover: #059669;
-  --accent-glow: rgba(16, 185, 129, 0.3);
-  --success: #10b981;
-  --warning: #f59e0b;
-  --error: #ef4444;
-  --premium: #10b981;
-  --sidebar-width: 260px;
+  --skill-listening: #7c3aed;
+  --skill-listening-hover: #6d28d9;
+  --skill-listening-glow: rgba(124, 58, 237, 0.28);
+
+  --skill-speaking: #f59e0b;
+  --skill-speaking-hover: #d97706;
+  --skill-speaking-glow: rgba(245, 158, 11, 0.28);
+
+  --skill-writing: #10b981;
+  --skill-writing-hover: #059669;
+  --skill-writing-glow: rgba(16, 185, 129, 0.28);
 }
 
 @layer base {
@@ -92,11 +109,13 @@
   a[style*="background"]:hover {
     transform: translateY(-1px);
     filter: brightness(1.06);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.16);
   }
   button:not(:disabled):active,
   a[style*="background"]:active {
     transform: translateY(0) scale(0.96);
     filter: brightness(0.97);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
   }
   @media (prefers-reduced-motion: reduce) {
     button:not(:disabled),
@@ -117,9 +136,13 @@
     background-color: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.06);
     transition: all 0.2s ease;
   }
-  .card:hover { background-color: var(--bg-card-hover); }
+  .card:hover {
+    background-color: var(--bg-card-hover);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08), 0 4px 12px rgba(15, 23, 42, 0.08);
+  }
 
   /* .btn-primary carries the same gradient + glow + mouse-sweep "shine"
      look as the landing hero's SpecularButton ("Start Free Today"), but
@@ -260,6 +283,25 @@
     box-shadow: 0 0 0 3px var(--accent-glow);
   }
   .input-field::placeholder { color: var(--text-muted); }
+
+  /* Brauzer autofill (masalan Chrome saqlagan username/parol) o'z
+     ichki oq/sariq fonini majburan qo'yadi -- oddiy background-color
+     bu holatda ishlamaydi. Shu sabab "Foydalanuvchi nomi" va "Parol"
+     kabi maydonlar autofill bo'lganda oq bo'lib qolib, boshqa
+     maydonlardan (ism, email) rangi farq qilib ko'rinardi. Quyidagi
+     inset box-shadow hiylasi orqali autofill fonini ham sahifa
+     temasidagi (--bg-secondary) rangga majburlaymiz, matn rangini
+     esa --text-primary ga. 2026-08-27 tuzatish. */
+  .input-field:-webkit-autofill,
+  .input-field:-webkit-autofill:hover,
+  .input-field:-webkit-autofill:focus,
+  .input-field:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--bg-secondary) inset !important;
+    box-shadow: 0 0 0 1000px var(--bg-secondary) inset !important;
+    -webkit-text-fill-color: var(--text-primary) !important;
+    caret-color: var(--text-primary);
+    transition: background-color 9999s ease-in-out 0s, color 9999s ease-in-out 0s;
+  }
 
   .badge-free {
     background: rgba(34, 197, 94, 0.15);

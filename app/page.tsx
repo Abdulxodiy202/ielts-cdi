@@ -11,7 +11,7 @@ import {
   LandingPricingSection,
   LandingFooter,
 } from '@/components/landing/LandingContent'
-import Silk from '@/components/backgrounds/Silk'
+import { LandingSilk } from '@/components/landing/LandingSilk'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -19,29 +19,36 @@ export default async function LandingPage() {
   const ctaHref = user ? '/dashboard' : '/login'
 
   return (
-    <div className="min-h-screen relative overflow-x-hidden" style={{ color: 'var(--text-primary)', background: '#0a0621' }}>
-      {/* Silk WebGL fon -- fixed inset-0, z-index 0. Wrapper bg juda
-          to'q (#0a0621) Silk bilan yumshoq aralashadi, WebGL yuklashda
-          xato bo'lsa ham qora emas indigo tush. */}
+    <div className="min-h-screen relative overflow-x-hidden" style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+      {/* Silk WebGL fon -- fixed inset-0, z-index 0.
+
+          2026-08-27 tuzatish: kirish sahifasi endi profildan tanlangan
+          temaga (dark/light) qarab rangini o'zgartiradi -- avval doim
+          to'q edi. Silk'ning o'zi <LandingSilk /> ichida useTheme()
+          orqali rang tanlaydi; matn/fon uchun var(--text-*), var(--bg-*)
+          o'zgaruvchilari ham endi qat'iy dark'ga bog'lanmagan --
+          profil oq bo'lsa sahifa oq, ko'k/dark bo'lsa ko'k bo'ladi. */}
       <div
         aria-hidden
         className="fixed inset-0 pointer-events-none"
         style={{ zIndex: 0 }}
       >
-        <Silk speed={5} scale={1} color="#2d1b69" noiseIntensity={2.5} rotation={1.5} />
+        <LandingSilk />
       </div>
 
       {/* Barcha content Silk ustida -- relative + z-10 stacking context */}
       <div className="relative" style={{ zIndex: 10 }}>
 
-      {/* Navbar -- glass effekt, o'rtada nav link'lar */}
+      {/* Navbar -- glass effekt, o'rtada nav link'lar. Fon endi
+          var(--bg-primary) asosida (color-mix) -- dark temada to'q,
+          light temada oq shisha effekti beradi. */}
       <nav
         className="sticky top-0 z-50 flex items-center justify-between px-6 py-5"
         style={{
-          background: 'rgba(2,6,23,0.60)',
+          background: 'color-mix(in srgb, var(--bg-primary) 65%, transparent)',
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
         }}
       >
         <Link href="/" className="flex items-center gap-2.5 hover:opacity-90 transition-opacity">

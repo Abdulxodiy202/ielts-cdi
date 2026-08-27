@@ -39,7 +39,7 @@ export function HeroClient({ ctaHref, hasUser }: HeroClientProps) {
           key={t('landing.hero.titleBefore')}
           tag="h1"
           text={t('landing.hero.titleBefore')}
-          className="text-5xl md:text-7xl font-black leading-tight text-white"
+          className="text-5xl md:text-7xl font-black leading-tight"
           delay={40}
           duration={0.8}
           ease="power3.out"
