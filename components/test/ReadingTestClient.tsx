@@ -260,9 +260,14 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
             no chrome of its own, so without this a user who opens the
             test on a mobile browser (whose address bar/back button is
             often hidden or awkward to reach) has literally no way out
-            until they finish the whole test. `env(safe-area-inset-*)`
-            keeps it clear of notches/home-indicators; a confirm guards
-            against losing progress by an accidental tap. */}
+            until they finish the whole test. Positioned top-RIGHT
+            (not top-left): the uploaded CDI content's own transport
+            controls (timer / pause / restart) live in the top-left
+            corner, and stacking our button there made the two collide
+            visually, making ours hard to find/tap. `env(safe-area-inset-*)`
+            keeps it clear of notches; a confirm guards against losing
+            progress by an accidental tap. 44px is the min. comfortable
+            touch-target size. */}
         {!showExit && (
           <button
             onClick={() => {
@@ -272,22 +277,22 @@ export function ReadingTestClient({ test, passages, questions, session }: Readin
             style={{
               position: 'fixed',
               top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-              left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
-              zIndex: 99999,
-              width: 40,
-              height: 40,
+              right: 'calc(env(safe-area-inset-right, 0px) + 12px)',
+              zIndex: 999999,
+              width: 44,
+              height: 44,
               borderRadius: '50%',
-              background: 'rgba(15,15,26,0.75)',
+              background: 'rgba(15,15,26,0.85)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.25)',
+              border: '1px solid rgba(255,255,255,0.3)',
               cursor: 'pointer',
-              fontSize: 18,
+              fontSize: 20,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               backdropFilter: 'blur(4px)',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
             }}
           >
             ✕

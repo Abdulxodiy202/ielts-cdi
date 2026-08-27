@@ -215,7 +215,9 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             mirror implementation and full rationale (mobile browsers
             often hide their own back/address-bar chrome, so without this
             a user is fully trapped in the full-screen iframe until they
-            finish the test). */}
+            finish the test). Positioned top-RIGHT, not top-left -- the
+            uploaded CDI content's own timer/pause/restart controls live
+            in the top-left corner and collided visually with ours there. */}
         {!showExit && (
           <button
             onClick={() => {
@@ -225,22 +227,22 @@ export function ListeningTestClient({ test, questions, session }: ListeningTestC
             style={{
               position: 'fixed',
               top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-              left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
-              zIndex: 99999,
-              width: 40,
-              height: 40,
+              right: 'calc(env(safe-area-inset-right, 0px) + 12px)',
+              zIndex: 999999,
+              width: 44,
+              height: 44,
               borderRadius: '50%',
-              background: 'rgba(15,15,26,0.75)',
+              background: 'rgba(15,15,26,0.85)',
               color: 'white',
-              border: '1px solid rgba(255,255,255,0.25)',
+              border: '1px solid rgba(255,255,255,0.3)',
               cursor: 'pointer',
-              fontSize: 18,
+              fontSize: 20,
               lineHeight: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               backdropFilter: 'blur(4px)',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.45)',
             }}
           >
             ✕
