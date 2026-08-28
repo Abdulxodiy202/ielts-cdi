@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 import { usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
+  LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
   PenLine, Mic, FileText, Video, Globe, Pencil,
   ChevronLeft, ChevronRight, Sun, Moon, type LucideIcon,
@@ -224,7 +224,6 @@ export function Sidebar() {
       label: t('nav.resourcesGroup'),
       items: [
         { href: '/vocabulary',  label: t('nav.vocabulary'),   icon: Library,             badge: null, color: undefined },
-        { href: '/typing',      label: t('nav.typing'),       icon: Keyboard,            badge: null, color: undefined },
         { href: '/books',       label: t('nav.books'),        icon: BookOpen,            badge: null, color: undefined },
         { href: '/articles',    label: t('nav.articles'),     icon: FileText,            badge: null, color: undefined },
         { href: '/video-lessons', label: t('nav.videoCourses'), icon: Video,               badge: null, color: undefined },

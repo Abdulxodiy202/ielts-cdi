@@ -249,7 +249,19 @@ export default function GamesPage() {
         // u faqat light temada ishlardi -- dark temada esa matn/badge
         // ranglari shu qattiq och fon ustida ko'rinmay qolardi).
         background: 'linear-gradient(170deg, var(--bg-primary) 0%, var(--bg-secondary) 55%, var(--bg-primary) 100%)',
-        overflowX: 'hidden',
+        // `overflowX: 'hidden'` emas, `'clip'` ishlatilyabdi -- ikkalasi
+        // ham gorizontal tashqariga chiqishni (masalan pastdagi manfiy
+        // `left`ga ega dekorativ halqalar) yashiradi, lekin 'hidden'
+        // brauzerda bu elementni "scroll konteyner"ga aylantirib
+        // qo'yadi. Shu sabab ichidagi `position: sticky` header (pastda)
+        // haqiqiy oyna scrolliga emas, shu (asosida hech qachon
+        // scroll bo'lmaydigan) konteynerga bog'lanib qolib, natijada
+        // scroll paytida sekinlashish/qotish va header vaqti-vaqti
+        // bilan yo'qolib qolish (flicker) yuzaga kelardi. 'clip' xuddi
+        // shunday tashqariga chiqishni kesadi, lekin scroll konteyner
+        // yaratmaydi -- sticky header haqiqiy oyna bo'yicha ishlaydi.
+        // 2026-08-28 tuzatish.
+        overflowX: 'clip',
       }}>
 
         {/* Star field -- endi dumaloq nuqta emas, haqiqiy 4 uchli
@@ -262,12 +274,25 @@ export default function GamesPage() {
           const size = s.r * 7 // 0.8 -> ~5.6px, 1.5 -> ~10.5px
           return (
             <div key={s.id} style={{
-              position: 'absolute', left: `${s.x}%`, top: `${s.y * (CH / 100)}px`,
+              // top ham % da -- avval `s.y * (CH/100)}px` edi, bu esa
+              // yulduzlarni faqat Canvas balandligi (CH) doirasida
+              // joylashtirardi. Lekin yulduzlar aslida TASHQI wrapper
+              // ichida (sticky header + banner + Canvas'ning o'zi),
+              // uning haqiqiy balandligi CH'dan katta -- shu farq
+              // tufayli sahifaning pastki qismida yulduz umuman
+              // qolmasdi. % qiymat esa wrapper'ning haqiqiy balandligiga
+              // avtomatik moslashadi. 2026-08-28 tuzatish.
+              position: 'absolute', left: `${s.x}%`, top: `${s.y}%`,
               width: size, height: size, background: '#f7b731',
               clipPath: 'polygon(50% 0%, 63% 37%, 100% 50%, 63% 63%, 50% 100%, 37% 63%, 0% 50%, 37% 37%)',
-              filter: 'drop-shadow(0 0 3px rgba(247,183,49,0.95)) drop-shadow(0 0 6px rgba(247,183,49,0.5))',
+              // Avval 2ta drop-shadow filter bor edi -- 220ta yulduzning
+              // har biri uchun 2 marta filter hisoblash scroll paytida
+              // brauzerni og'irlashtirib, "qotish" (jank)ga sabab
+              // bo'lardi. 1ta filterga tushirildi -- ko'rinishi deyarli
+              // bir xil, lekin hisoblash yuki yarmiga tushadi.
+              filter: 'drop-shadow(0 0 4px rgba(247,183,49,0.9))',
               animation: `twinkle ${s.dur} ease-in-out ${s.del} infinite`,
-              pointerEvents: 'none', zIndex: 0,
+              pointerEvents: 'none', zIndex: 0, willChange: 'opacity, transform',
             }} />
           )
         })}

@@ -124,6 +124,15 @@
     "freeBadge": "{count} ta bepul",
     "premiumBadge": "{count} ta premium"
   },
+  "writing": {
+    "title": "Writing",
+    "subtitle": "Insho yozish ko'nikmangizni oshiring — AI baholash va typing amaliyoti",
+    "comingSoon": "Tez orada",
+    "aiTitle": "AI Writing",
+    "aiDesc": "Insholaringizning IELTS band balini aniqlang va sun'iy intellektdan real, foydali feedback oling.",
+    "typingTitle": "Typing amaliyoti",
+    "typingDesc": "Tez va aniq yozishni mashq qiling — IELTS lug'ati va Writing Task matnlari bilan."
+  },
   "script": {
     "title": "Script Practice",
     "cardDesc": "Audioni tinglang, matnni yozing",

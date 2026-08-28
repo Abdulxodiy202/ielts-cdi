@@ -124,6 +124,15 @@
     "freeBadge": "{count} free",
     "premiumBadge": "{count} premium"
   },
+  "writing": {
+    "title": "Writing",
+    "subtitle": "Sharpen your essay writing — AI evaluation and typing practice",
+    "comingSoon": "Coming soon",
+    "aiTitle": "AI Writing",
+    "aiDesc": "Find out your essay's IELTS band score and get real, useful feedback from AI.",
+    "typingTitle": "Typing Practice",
+    "typingDesc": "Practice fast, accurate typing — with IELTS vocabulary and Writing Task texts."
+  },
   "script": {
     "title": "Script Practice",
     "cardDesc": "Listen to the audio, type what you hear",

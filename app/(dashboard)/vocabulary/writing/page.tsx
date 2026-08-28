@@ -149,8 +149,8 @@ export default function WritingCollocationPage() {
           <span style={{ color: 'var(--text-primary)' }}>{t('vocabulary.writingCollocations')}</span>
         </div>
         <button onClick={() => router.push('/vocabulary')}
-          className="flex items-center gap-1.5 text-sm mb-5 hover:opacity-70 transition-opacity"
-          style={{ color: 'var(--text-muted)' }}>
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-5 px-3 py-1.5 rounded-full"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
           <ChevronLeft size={16} /> {t('vocabCard.backToVocabBtn')}
         </button>
 

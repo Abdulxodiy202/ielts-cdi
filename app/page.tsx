@@ -19,7 +19,14 @@ export default async function LandingPage() {
   const ctaHref = user ? '/dashboard' : '/login'
 
   return (
-    <div className="min-h-screen relative overflow-x-hidden" style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+    // `overflow-x-hidden` emas, `overflow-x-clip` ishlatilyabdi -- 'hidden'
+    // bu elementni brauzerda "scroll konteyner"ga aylantirib qo'yardi,
+    // shu sabab pastroqdagi `sticky top-0` navbar haqiqiy oyna scrolliga
+    // emas, shu konteynerga bog'lanib qolib, scroll qilinganda butunlay
+    // yo'qolib qolardi (Games sahifasidagi xuddi shu xil bug). 'clip'
+    // xuddi shunday gorizontal tashqariga chiqishni kesadi, lekin scroll
+    // konteyner yaratmaydi -- navbar endi doim ko'rinadi. 2026-08-28.
+    <div className="min-h-screen relative overflow-x-clip" style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
       {/* Silk WebGL fon -- fixed inset-0, z-index 0.
 
           2026-08-27 tuzatish: kirish sahifasi endi profildan tanlangan

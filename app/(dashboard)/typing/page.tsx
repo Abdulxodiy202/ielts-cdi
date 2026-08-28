@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useReducer, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { recordTypingMinutes } from '@/lib/utils/studyPlan'
-import { Keyboard, RotateCcw, Settings } from 'lucide-react'
+import { Keyboard, RotateCcw, Settings, ChevronLeft } from 'lucide-react'
 
 /* ── Config types ─────────────────────────────────────────────────── */
 type Mode = 'time' | 'words'
@@ -854,6 +855,19 @@ export default function TypingPage() {
         style={{ width: 220, zIndex: 40, background: 'color-mix(in srgb, var(--text-primary) 6%, transparent)', color: 'color-mix(in srgb, var(--text-primary) 50%, transparent)', border: '1px solid color-mix(in srgb, var(--text-primary) 10%, transparent)' }}
         placeholder={t('typing.tapToType')}
       />
+
+      {/* Writing'ga qaytish -- 2026-08-28 qo'shildi: Typing endi Writing
+          bo'limi ichida joylashgan, shuning uchun ortga qaytish tugmasi
+          kerak (Vocabulary bo'limlaridagi bilan bir xil pill-button
+          uslubi). Barcha holatlarda (config/typing/result) ko'rinadi. */}
+      <Link
+        href="/writing"
+        onClick={e => e.stopPropagation()}
+        className="self-start inline-flex items-center gap-1.5 text-sm font-semibold mb-2 px-3 py-1.5 rounded-full"
+        style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
+      >
+        <ChevronLeft size={14} /> {t('nav.writing')}
+      </Link>
 
       {/* Logo */}
       <div className="flex items-center gap-2 mb-8 mt-2" style={{ color: 'color-mix(in srgb, var(--text-primary) 50%, transparent)' }}>

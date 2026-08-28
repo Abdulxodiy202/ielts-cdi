@@ -75,7 +75,7 @@ export function BentoDashboard({
 
   const secondaryTiles = [
     { href: '/vocabulary',       icon: Gamepad2, color: '#22c55e', title: t('nav.vocabulary'),   sub: `${gameCompleted}/100` },
-    { href: '/typing',           icon: Keyboard, color: '#a855f7', title: t('nav.typing'),       sub: t('dashboard.typingModes') },
+    { href: '/writing/typing',   icon: Keyboard, color: '#a855f7', title: t('nav.typing'),       sub: t('dashboard.typingModes') },
     { href: '/listening/script', icon: Mic,      color: '#06b6d4', title: t('script.title'),     sub: t('script.badgeBbc') },
     { href: '/video-lessons',    icon: Video,    color: '#ec4899', title: t('nav.videoCourses'), sub: t('dashboard.videosCount', { count: videoCount }) },
   ]

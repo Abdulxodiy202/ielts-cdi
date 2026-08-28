@@ -298,15 +298,14 @@ export default function CategoryBooksView({ category }: { category: BookCategory
   return (
     <div className="min-h-screen p-6 md:p-8" style={{ background: 'var(--bg-primary)' }}>
       <div className="max-w-7xl mx-auto">
-        {/* Breadcrumb / back */}
+        {/* Ortga qaytish -- boshqa bo'limlar (Vocabulary va h.k.) bilan bir
+            xil pill-button uslubi, avval oddiy matnli breadcrumb edi. */}
         <Link
           href="/books"
-          className="inline-flex items-center gap-1 text-sm mb-4 hover:opacity-80 transition-opacity"
-          style={{ color: 'var(--text-muted)' }}
+          className="inline-flex items-center gap-1.5 text-sm font-semibold mb-4 px-3 py-1.5 rounded-full"
+          style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}
         >
           <ChevronLeft size={14} /> {t('books.title')}
-          <span className="mx-1" style={{ color: 'var(--text-muted)' }}>/</span>
-          <span style={{ color: 'var(--text-primary)' }}>{categoryLabel}</span>
         </Link>
 
         <div className="text-center mb-8">
