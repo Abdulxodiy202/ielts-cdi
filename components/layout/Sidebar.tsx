@@ -11,7 +11,7 @@ import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
   PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
-  ChevronLeft, ChevronRight, type LucideIcon,
+  ChevronLeft, ChevronRight, Sun, Moon, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
 import { useTheme } from '@/components/providers/ThemeProvider'
@@ -416,20 +416,40 @@ export function Sidebar() {
 
       {/* Logo */}
       <div className={`${mini ? 'px-3' : 'px-6'} py-4 border-b`} style={{ borderColor: 'var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: mini ? 'center' : 'flex-start', gap: '10px', padding: '4px 0' }}>
-          <svg width="36" height="40" viewBox="0 0 36 40" fill="none" style={{ flexShrink: 0 }}>
-            <path d="M18 0L0 7V20C0 30 8 38 18 40C28 38 36 30 36 20V7L18 0Z" fill="#1e40af"/>
-            <path d="M18 4L4 10V20C4 28 10 35 18 37C26 35 32 28 32 20V10L18 4Z" fill="#2563eb"/>
-            <path d="M13 20L16.5 23.5L23 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          {!mini && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
-                <span style={{ color: 'var(--accent)', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: mini ? 'center' : 'space-between', gap: '10px', padding: '4px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <svg width="36" height="40" viewBox="0 0 36 40" fill="none" style={{ flexShrink: 0 }}>
+              <path d="M18 0L0 7V20C0 30 8 38 18 40C28 38 36 30 36 20V7L18 0Z" fill="#1e40af"/>
+              <path d="M18 4L4 10V20C4 28 10 35 18 37C26 35 32 28 32 20V10L18 4Z" fill="#2563eb"/>
+              <path d="M13 20L16.5 23.5L23 16" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {!mini && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px' }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '800', fontSize: '20px', letterSpacing: '1px' }}>IELTS</span>
+                  <span style={{ color: 'var(--accent)', fontWeight: '700', fontSize: '14px' }}>.PRO</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
               </div>
-              <div style={{ color: 'var(--text-muted)', fontSize: '8px', letterSpacing: '2px', fontWeight: '600' }}>BAND 9 STARTS HERE.</div>
-            </div>
+            )}
+          </div>
+          {/* Tema tugmasi (quyosh/oy) -- admin paneldagi bilan bir xil
+              uslub, sidebar'da doim ko'rinib turadi. Mini (yig'ilgan)
+              holatda joy yetishmagani uchun yashiringan -- o'sha holatda
+              tema hali ham profil dropdown'idagi eski tanlov orqali
+              o'zgartiriladi. 2026-08-28 qo'shildi. */}
+          {!mini && (
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label={t('common.theme')}
+              className="flex items-center justify-center rounded-full transition-all hover:opacity-80"
+              style={{
+                width: 32, height: 32, flexShrink: 0,
+                background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)',
+              }}
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
           )}
         </div>
       </div>
