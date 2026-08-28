@@ -210,8 +210,8 @@ export function Sidebar() {
       items: [
         { href: '/reading',   label: t('nav.reading'),   icon: BookOpen,   badge: null, color: 'var(--skill-reading)' },
         { href: '/listening', label: t('nav.listening'), icon: Headphones, badge: null, color: 'var(--skill-listening)' },
-        { href: '/writing',   label: t('nav.writing'),   icon: PenLine,    badge: 'ai', color: 'var(--skill-writing)' },
-        { href: '/speaking',  label: t('nav.speaking'),  icon: Mic,        badge: 'ai', color: 'var(--skill-speaking)' },
+        { href: '/writing',   label: t('nav.writing'),   icon: PenLine,    badge: null, color: 'var(--skill-writing)' },
+        { href: '/speaking',  label: t('nav.speaking'),  icon: Mic,        badge: null, color: 'var(--skill-speaking)' },
       ],
     },
     {

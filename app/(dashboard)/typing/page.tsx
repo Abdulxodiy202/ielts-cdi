@@ -887,8 +887,8 @@ export default function TypingPage() {
                   disabled={isEssaySet}
                   className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                   style={{
-                    background: mode === m && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                    color: mode === m && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
+                    background: mode === m && !isEssaySet ? 'color-mix(in srgb, var(--skill-writing) 18%, transparent)' : 'transparent',
+                    color: mode === m && !isEssaySet ? 'var(--skill-writing)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                   }}
                 >
                   {m}
@@ -903,8 +903,8 @@ export default function TypingPage() {
                     disabled={isEssaySet}
                     className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                     style={{
-                      background: duration === s && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                      color: duration === s && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
+                      background: duration === s && !isEssaySet ? 'color-mix(in srgb, var(--skill-writing) 18%, transparent)' : 'transparent',
+                      color: duration === s && !isEssaySet ? 'var(--skill-writing)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                     }}
                   >
                     {s}s
@@ -918,8 +918,8 @@ export default function TypingPage() {
                     disabled={isEssaySet}
                     className="px-4 py-1.5 rounded-full text-sm font-medium transition-all disabled:opacity-30"
                     style={{
-                      background: wordGoal === w && !isEssaySet ? 'rgba(99,102,241,0.18)' : 'transparent',
-                      color: wordGoal === w && !isEssaySet ? 'var(--accent)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
+                      background: wordGoal === w && !isEssaySet ? 'color-mix(in srgb, var(--skill-writing) 18%, transparent)' : 'transparent',
+                      color: wordGoal === w && !isEssaySet ? 'var(--skill-writing)' : 'color-mix(in srgb, var(--text-primary) 40%, transparent)',
                     }}
                   >
                     {w}
@@ -951,7 +951,7 @@ export default function TypingPage() {
             onClick={isEssaySet ? loadEssayList : loadTest}
             disabled={loadingWords}
             className="px-8 py-3 rounded-full font-bold text-base transition-all hover:opacity-90 disabled:opacity-50"
-            style={{ background: 'var(--accent)', color: '#fff' }}
+            style={{ background: 'var(--skill-writing)', color: '#fff' }}
           >
             {loadingWords ? t('common.loading') : t('typing.startBtn')}
           </button>
