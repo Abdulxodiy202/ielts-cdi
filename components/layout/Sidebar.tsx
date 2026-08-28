@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, BookOpen, Headphones, Calendar, Library, Users, Keyboard,
   LogOut, Menu, X, Crown, Zap, CheckCircle, Camera, Bell, MessageSquarePlus,
-  PenLine, Mic, FileText, Video, Globe, Palette, Pencil,
+  PenLine, Mic, FileText, Video, Globe, Pencil,
   ChevronLeft, ChevronRight, Sun, Moon, type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '@/lib/hooks/useAuth'
@@ -626,25 +626,10 @@ export function Sidebar() {
                     {t('sidebar.settings')}
                   </div>
 
-                  {/* Theme row */}
-                  <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
-                    <Palette size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    <span className="flex-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{t('common.theme')}</span>
-                    <div className="flex gap-1.5">
-                      {([
-                        { id: 'dark'  as const, color: '#6366f1' },
-                        { id: 'light' as const, color: '#94a3b8' },
-                      ]).map(thm => (
-                        <button key={thm.id} onClick={() => setTheme(thm.id)}
-                          className="w-5 h-5 rounded-full border-2 transition-all"
-                          style={{
-                            background: thm.color,
-                            borderColor: theme === thm.id ? 'white' : 'transparent',
-                            transform: theme === thm.id ? 'scale(1.2)' : 'scale(1)',
-                          }} />
-                      ))}
-                    </div>
-                  </div>
+                  {/* Theme row -- 2026-08-28: olib tashlandi, chunki
+                      endi tema tugmasi (quyosh/oy) sidebar logosi
+                      yonida doim ko'rinib turadi -- shu profil
+                      dropdown'idagi eski tanlov endi ortiqcha edi. */}
 
                   {/* Language row */}
                   <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-0.5 hover:opacity-80">
