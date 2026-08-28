@@ -133,6 +133,17 @@
     "typingTitle": "Typing Practice",
     "typingDesc": "Practice fast, accurate typing — with IELTS vocabulary and Writing Task texts."
   },
+  "speaking": {
+    "title": "Speaking",
+    "subtitle": "Sharpen your speaking — AI evaluation, Shadowing, and live conversation practice",
+    "comingSoon": "Coming soon",
+    "aiTitle": "AI Speaking",
+    "aiDesc": "Record your answer and get your IELTS band score plus real feedback on pronunciation, fluency, and grammar from AI.",
+    "shadowingTitle": "Shadowing",
+    "shadowingDesc": "Repeat after native-speaker audio to practice pronunciation, stress, and fluency.",
+    "speakliveTitle": "SpeakLive",
+    "speakliveDesc": "Have a free 5-minute live call in English with an IELTS learner matched to your level — every call, like, and minute is saved to your history."
+  },
   "script": {
     "title": "Script Practice",
     "cardDesc": "Listen to the audio, type what you hear",

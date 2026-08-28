@@ -133,6 +133,17 @@
     "typingTitle": "Typing amaliyoti",
     "typingDesc": "Tez va aniq yozishni mashq qiling — IELTS lug'ati va Writing Task matnlari bilan."
   },
+  "speaking": {
+    "title": "Speaking",
+    "subtitle": "Gapirish ko'nikmangizni oshiring — AI baholash, Shadowing va jonli suhbat amaliyoti",
+    "comingSoon": "Tez orada",
+    "aiTitle": "AI Speaking",
+    "aiDesc": "Javobingizni yozib oling va sun'iy intellektdan IELTS band bali hamda talaffuz, ravonlik va grammatika bo'yicha aniq feedback oling.",
+    "shadowingTitle": "Shadowing",
+    "shadowingDesc": "Ona tilida so'zlashuvchi audio ortidan takrorlab gapirib, talaffuz, urg'u va ravonlikni mashq qiling.",
+    "speakliveTitle": "SpeakLive",
+    "speakliveDesc": "Darajangizga mos IELTS o'quvchisi bilan 5 daqiqalik jonli qo'ng'iroqda ingliz tilida erkin suhbatlashing — har bir call, like va daqiqangiz tarixingizda saqlanadi."
+  },
   "script": {
     "title": "Script Practice",
     "cardDesc": "Audioni tinglang, matnni yozing",
