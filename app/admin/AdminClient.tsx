@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Play, Keyboard,
+  Loader2, Upload, FileText, X, Music, Play, Keyboard, Sun, Moon,
 } from 'lucide-react'
 import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
 import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
@@ -16,6 +16,7 @@ import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { TestFileUploader } from '@/components/admin/TestFileUploader'
 import { MockScheduleEditor, type MockSchedule } from '@/components/admin/MockScheduleEditor'
 import { usePresenceHeartbeat } from '@/lib/hooks/usePresenceHeartbeat'
+import { useTheme } from '@/components/providers/ThemeProvider'
 
 interface TestResult {
   id: string
@@ -5256,6 +5257,11 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
   // Layout (dashboard) admin route'ni qamramaydi.
   usePresenceHeartbeat()
 
+  // Admin panel Sidebar ichida emas (yuqoridagi izohga qarang), shuning
+  // uchun tema tugmasi (quyosh/oy) shu yerda alohida qo'yilgan --
+  // bosilganda light/dark almashadi. 2026-08-28 qo'shildi.
+  const { theme, setTheme } = useTheme()
+
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
   const readingTests = tests.filter(t => t.type === 'reading')
   const listeningTests = tests.filter(t => t.type === 'listening')
@@ -5263,11 +5269,24 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
   return (
     <div className="min-h-screen p-6 md:p-8" style={{ background: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Admin Panel</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          To&apos;lovlar va test content boshqaruvi
-        </p>
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Admin Panel</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            To&apos;lovlar va test content boshqaruvi
+          </p>
+        </div>
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          aria-label="Temani almashtirish"
+          className="flex items-center justify-center rounded-full transition-all hover:opacity-80"
+          style={{
+            width: 40, height: 40, flexShrink: 0,
+            background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)',
+          }}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
       </div>
 
       {/* Tab bar */}
