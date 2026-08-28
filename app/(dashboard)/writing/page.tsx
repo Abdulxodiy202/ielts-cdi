@@ -51,18 +51,22 @@ export default function WritingPage() {
           </p>
         </div>
 
-        {/* Typing amaliyoti -- ishlaydigan, bosiladigan karta */}
+        {/* Typing amaliyoti -- ishlaydigan, bosiladigan karta. Avval
+            var(--accent) (ko'k) ishlatilgan edi, shu bois yonidagi
+            yashil AI Writing kartasidan rangi mos kelmasdi -- endi
+            ikkalasi ham Writing bo'limining o'z rangi (--skill-writing,
+            yashil)dan foydalanadi. 2026-08-28 tuzatish. */}
         <Link
           href="/writing/typing"
           className="group block rounded-2xl p-5 transition-all duration-200 hover:scale-[1.02] hover:shadow-lg"
-          style={{ background: 'color-mix(in srgb, var(--accent) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)' }}
+          style={{ background: 'color-mix(in srgb, var(--skill-writing) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--skill-writing) 25%, transparent)' }}
         >
           <div className="flex items-start justify-between mb-3">
             <div
               className="flex items-center justify-center rounded-xl"
-              style={{ width: 44, height: 44, background: 'color-mix(in srgb, var(--accent) 15%, transparent)' }}
+              style={{ width: 44, height: 44, background: 'color-mix(in srgb, var(--skill-writing) 15%, transparent)' }}
             >
-              <Keyboard size={22} style={{ color: 'var(--accent)' }} />
+              <Keyboard size={22} style={{ color: 'var(--skill-writing)' }} />
             </div>
           </div>
           <h2 className="text-lg font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
@@ -71,7 +75,7 @@ export default function WritingPage() {
           <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
             {t('writing.typingDesc')}
           </p>
-          <div className="mt-4 flex items-center gap-1 text-sm font-medium" style={{ color: 'var(--accent)' }}>
+          <div className="mt-4 flex items-center gap-1 text-sm font-medium" style={{ color: 'var(--skill-writing)' }}>
             {t('vocabulary.open')} <span className="transition-transform group-hover:translate-x-1">→</span>
           </div>
         </Link>
