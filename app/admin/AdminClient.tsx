@@ -4015,6 +4015,10 @@ function VideoLessonsTab() {
   const [plDeleting,     setPlDeleting]     = useState<string | null>(null)
   const [plFormError,    setPlFormError]    = useState('')
   const [plModal,        setPlModal]        = useState<{ mode: 'add' | 'edit'; data: typeof PL_BLANK & { id?: string } } | null>(null)
+  // video_playlists jadvali migratsiyasi (039) hali Supabase'da
+  // ishga tushirilmagan bo'lishi mumkin -- shu holatni "hali playlist
+  // yo'q" bo'sh holatidan farqlab ko'rsatish uchun.
+  const [plDbMissing,    setPlDbMissing]    = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -4026,6 +4030,7 @@ function VideoLessonsTab() {
   const loadPlaylists = async () => {
     setPlLoading(true)
     const res = await fetch('/api/admin/video-playlists')
+    if (res.status === 503) { setPlDbMissing(true); setPlLoading(false); return }
     if (res.ok) { const d = await res.json(); setPlaylists(Array.isArray(d) ? d : []) }
     setPlLoading(false)
   }
@@ -4243,6 +4248,7 @@ function VideoLessonsTab() {
         <PlaylistsView
           playlists={playlists}
           loading={plLoading}
+          dbMissing={plDbMissing}
           deleting={plDeleting}
           onEdit={plOpenEdit}
           onDelete={plHandleDelete}
@@ -4717,15 +4723,27 @@ function VideoLessonsTab() {
 
 /* ── Playlists view (list) for VideoLessonsTab ───────────────────────── */
 function PlaylistsView({
-  playlists, loading, deleting, onEdit, onDelete,
+  playlists, loading, dbMissing, deleting, onEdit, onDelete,
 }: {
   playlists: AdminPlaylist[]
   loading: boolean
+  dbMissing: boolean
   deleting: string | null
   onEdit: (p: AdminPlaylist) => void
   onDelete: (p: AdminPlaylist) => void
 }) {
   if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ video_playlists jadvali topilmadi</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Supabase Dashboard → SQL Editor'da <code>039_video_playlists.sql</code> migratsiyasini ishga tushiring, keyin sahifani yangilang.
+        </p>
+      </div>
+    )
+  }
 
   if (playlists.length === 0) {
     return (
