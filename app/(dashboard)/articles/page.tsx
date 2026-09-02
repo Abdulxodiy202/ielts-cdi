@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { BookOpen } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { isActivePremium } from '@/lib/utils/premium'
@@ -12,6 +13,9 @@ import { articleCategoryFor, pickForToday, type ArticleCategory } from '@/lib/ut
 import { FilterBar, type CategoryFilter, type DifficultyFilter } from '@/components/articles/FilterBar'
 import { TodaysPicks } from '@/components/articles/TodaysPicks'
 import { ArticleCard, type CardArticle } from '@/components/articles/ArticleCard'
+import { PremiumLockModal } from '@/components/PremiumLockModal'
+
+const PaymentModal = dynamic(() => import('@/components/PaymentModal').then(m => ({ default: m.PaymentModal })), { ssr: false })
 
 // Articles hub -- crackd.it uslubi.
 //
@@ -57,6 +61,23 @@ export default function ArticlesPage() {
   // Filter holati -- URL query params bilan sync.
   const category = parseCategory(searchParams.get('category'))
   const difficulty = parseDifficulty(searchParams.get('difficulty'))
+
+  // Study Plan'dagi vazifadan "aynan shu article'ni ishlang" deb
+  // yo'naltirilganda ?highlight=<articleId> bilan keladi -- shu kartani
+  // ~5 soniya glow qilib ko'rsatamiz va ko'rinadigan joyga skroll qilamiz.
+  const highlightId = searchParams.get('highlight')
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(highlightId)
+
+  // Premium-locked kartaga bosilganda -- endi /premium sahifasiga
+  // o'tkazmaydi, shu yerda kichik modal + to'lov oynasini ochadi
+  // (Reading/Listening test ro'yxatidagi oddiy pattern bilan bir xil).
+  const [showLockModal, setShowLockModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const handleLockedClick = useCallback(() => setShowLockModal(true), [])
+  const handleUpgradeFromLock = useCallback(() => {
+    setShowLockModal(false)
+    setShowPaymentModal(true)
+  }, [])
 
   const updateFilter = useCallback(
     (nextCategory: CategoryFilter, nextDifficulty: DifficultyFilter) => {
@@ -113,6 +134,14 @@ export default function ArticlesPage() {
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (!highlightId || loading) return
+    const el = document.querySelector(`[data-highlight-id="${highlightId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setActiveHighlight(null), 5000)
+    return () => clearTimeout(timer)
+  }, [highlightId, loading])
 
   const lockedIds = useMemo(() => {
     const s = new Set<string>()
@@ -206,6 +235,8 @@ export default function ArticlesPage() {
                   locked={lockedIds.has(a.id)}
                   delay={0.03 * i}
                   bestStars={stars[a.id] ?? 0}
+                  highlighted={activeHighlight === a.id}
+                  onLockedClick={handleLockedClick}
                 />
               ))}
             </div>
@@ -214,7 +245,7 @@ export default function ArticlesPage() {
       ) : (
         // Default holat: Today's Picks + Library
         <>
-          <TodaysPicks picks={picks} lockedIds={lockedIds} starsMap={stars} />
+          <TodaysPicks picks={picks} lockedIds={lockedIds} starsMap={stars} onLockedClick={handleLockedClick} />
 
           <section>
             <h2 className="text-2xl font-bold mb-5 flex items-center gap-3" style={{ color: 'var(--text-primary)' }}>
@@ -232,12 +263,33 @@ export default function ArticlesPage() {
                   locked={lockedIds.has(a.id)}
                   delay={0.03 * i}
                   bestStars={stars[a.id] ?? 0}
+                  highlighted={activeHighlight === a.id}
+                  onLockedClick={handleLockedClick}
                 />
               ))}
             </div>
           </section>
         </>
       )}
+
+      {/* Premium lock modal -- ilova bo'yicha yagona umumiy komponent */}
+      <PremiumLockModal
+        open={showLockModal}
+        onClose={() => setShowLockModal(false)}
+        onUpgrade={handleUpgradeFromLock}
+        title={t('articles.lockedTitle')}
+        description={t('articles.lockedDesc')}
+        cancelLabel={t('common.cancel')}
+        upgradeLabel={t('common.upgradeToPremium')}
+      />
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </div>
   )
 }

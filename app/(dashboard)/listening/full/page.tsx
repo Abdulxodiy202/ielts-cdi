@@ -9,6 +9,7 @@ import { TestListClient } from '@/components/test/TestListClient'
 import { CelebrationToast } from '@/components/test/CelebrationToast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
+import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 import { isActivePremium } from '@/lib/utils/premium'
 
 // Full-Listening test list at its own URL. Split off from /listening
@@ -71,6 +72,9 @@ export default async function ListeningFullListPage() {
     <div className="p-6 md:p-8 max-w-5xl mx-auto">
       <Suspense fallback={null}>
         <CelebrationToast />
+      </Suspense>
+      <Suspense fallback={null}>
+        <StudyPlanBackButton />
       </Suspense>
 
       <PageHeader

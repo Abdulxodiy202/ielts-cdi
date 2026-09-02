@@ -4,11 +4,12 @@ import { useCallback, useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, Play } from 'lucide-react'
+import { Lock, Play, ListVideo } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 
 type VideoCategory = 'ielts' | 'self_improvement'
+type ViewMode = 'videos' | 'playlists'
 
 interface VideoLesson {
   id: string
@@ -19,6 +20,15 @@ interface VideoLesson {
   recommendation: string | null
   is_premium: boolean
   category: VideoCategory | null
+}
+
+interface VideoPlaylist {
+  id: string
+  title: string
+  description: string | null
+  thumbnail_url: string | null
+  category: VideoCategory | null
+  video_count: number
 }
 
 const TAB_KEY: Record<VideoCategory, string> = {
@@ -35,6 +45,10 @@ function parseTab(v: string | null): VideoCategory {
   return v === 'self_improvement' ? 'self_improvement' : 'ielts'
 }
 
+function parseView(v: string | null): ViewMode {
+  return v === 'playlists' ? 'playlists' : 'videos'
+}
+
 function getYouTubeId(url: string) {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)
   return m ? m[1] : null
@@ -46,36 +60,55 @@ export default function VideoLessonsPage() {
   const searchParams = useSearchParams()
 
   const [videos,      setVideos]      = useState<VideoLesson[]>([])
+  const [playlists,   setPlaylists]   = useState<VideoPlaylist[]>([])
   const [userPremium, setUserPremium] = useState(false)
   const [loading,     setLoading]     = useState(true)
 
-  const tab = parseTab(searchParams.get('tab'))
+  const tab  = parseTab(searchParams.get('tab'))
+  const view = parseView(searchParams.get('view'))
 
   const setTab = useCallback((next: VideoCategory) => {
     const p = new URLSearchParams()
     if (next !== 'ielts') p.set('tab', next)
+    if (view !== 'videos') p.set('view', view)
     const qs = p.toString()
     router.replace(qs ? `/video-lessons?${qs}` : '/video-lessons', { scroll: false })
-  }, [router])
+  }, [router, view])
+
+  const setView = useCallback((next: ViewMode) => {
+    const p = new URLSearchParams()
+    if (tab !== 'ielts') p.set('tab', tab)
+    if (next !== 'videos') p.set('view', next)
+    const qs = p.toString()
+    router.replace(qs ? `/video-lessons?${qs}` : '/video-lessons', { scroll: false })
+  }, [router, tab])
 
   useEffect(() => {
     fetch('/api/video-lessons')
-      .then(r => r.ok ? r.json() : { videos: [], userPremium: false })
+      .then(r => r.ok ? r.json() : { videos: [], playlists: [], userPremium: false })
       .then(d => {
         setVideos(Array.isArray(d.videos) ? d.videos : [])
+        setPlaylists(Array.isArray(d.playlists) ? d.playlists : [])
         setUserPremium(d.userPremium ?? false)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
 
-  // Aktiv tabga tegishli videolar. Backend hech qanday filter yubormaydi --
-  // client'da bir marta ajratamiz. Kategoriya null bo'lsa 'ielts' deb
-  // olamiz (eski qatorlar migration'ga qadar).
+  // Aktiv tabga tegishli videolar/playlistlar. Backend hech qanday filter
+  // yubormaydi -- client'da bir marta ajratamiz. Kategoriya null bo'lsa
+  // 'ielts' deb olamiz (eski qatorlar migration'ga qadar).
   const visibleVideos = useMemo(
     () => videos.filter(v => (v.category ?? 'ielts') === tab),
     [videos, tab],
   )
+  const visiblePlaylists = useMemo(
+    () => playlists.filter(p => (p.category ?? 'ielts') === tab),
+    [playlists, tab],
+  )
+
+  const isPlaylistsView = view === 'playlists'
+  const visibleCount = isPlaylistsView ? visiblePlaylists.length : visibleVideos.length
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -84,9 +117,9 @@ export default function VideoLessonsPage() {
         <div className="min-w-0">
           <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>{t('videoLessons.title')}</h1>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.subtitle')}</p>
-          {!loading && visibleVideos.length > 0 && (
+          {!loading && visibleCount > 0 && (
             <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
-              {t('videoLessons.totalLabel', { count: visibleVideos.length })}
+              {t('videoLessons.totalLabel', { count: visibleCount })}
             </p>
           )}
         </div>
@@ -96,7 +129,7 @@ export default function VideoLessonsPage() {
           buttons (filled background + border) instead of an underlined
           text tab -- the old style read as plain text, not something
           clickable. */}
-      <div className="mb-6 flex gap-2 flex-wrap">
+      <div className="mb-3 flex gap-2 flex-wrap">
         {(['ielts', 'self_improvement'] as VideoCategory[]).map(key => {
           const active = tab === key
           return (
@@ -117,6 +150,35 @@ export default function VideoLessonsPage() {
         })}
       </div>
 
+      {/* Videolar / Playlistlar filtri -- YouTube kanalidagi kabi ikki
+          xil ko'rinish: alohida videolar ro'yxati yoki playlistlar
+          to'plami. Playlistga qo'shilgan video shu "Videolar"
+          ro'yxatida endi ko'rinmaydi -- u faqat o'z playlisti ichida
+          chiqadi. */}
+      <div className="mb-6 flex gap-1.5 flex-wrap">
+        {([
+          { key: 'videos' as ViewMode,    label: t('videoLessons.viewVideos'),    icon: <Play size={13} /> },
+          { key: 'playlists' as ViewMode, label: t('videoLessons.viewPlaylists'), icon: <ListVideo size={13} /> },
+        ]).map(({ key, label, icon }) => {
+          const active = view === key
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setView(key)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all"
+              style={{
+                background: active ? 'rgba(99,102,241,0.14)' : 'transparent',
+                color: active ? 'var(--accent)' : 'var(--text-muted)',
+                border: active ? '1px solid rgba(99,102,241,0.35)' : '1px solid transparent',
+              }}
+            >
+              {icon} {label}
+            </button>
+          )
+        })}
+      </div>
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -130,6 +192,62 @@ export default function VideoLessonsPage() {
             </div>
           ))}
         </div>
+      ) : isPlaylistsView ? (
+        visiblePlaylists.length === 0 ? (
+          <div className="py-20 text-center rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="text-4xl mb-3">📑</div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>{t('videoLessons.emptyPlaylists')}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {visiblePlaylists.map(p => (
+              <Link
+                key={p.id}
+                href={`/video-lessons/playlist/${p.id}?tab=${tab}`}
+                className="rounded-2xl overflow-hidden transition-all hover:shadow-lg flex flex-col"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+              >
+                {/* Thumbnail -- YouTube playlist card: stacked-edge
+                    effect (two faint layers behind the main image) plus
+                    a video-count badge in the corner. */}
+                <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', flexShrink: 0 }}>
+                  <div style={{ position: 'absolute', inset: '6px 4px 0 4px', top: 6, borderRadius: 8, background: 'rgba(0,0,0,0.35)', zIndex: 0 }} />
+                  <div style={{ position: 'absolute', inset: '3px 2px 0 2px', top: 3, borderRadius: 9, background: 'rgba(0,0,0,0.45)', zIndex: 1 }} />
+                  <div style={{ position: 'absolute', inset: 0, zIndex: 2, borderRadius: '0 0 0 0', overflow: 'hidden' }}>
+                    {p.thumbnail_url ? (
+                      <Image
+                        src={p.thumbnail_url}
+                        alt={p.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                        style={{ objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))' }}>
+                        <ListVideo size={28} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                      </div>
+                    )}
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,0.55), transparent 45%)' }} />
+                    <div style={{ position: 'absolute', bottom: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 999, background: 'rgba(0,0,0,0.75)', color: '#fff', fontSize: 12, fontWeight: 700 }}>
+                      <ListVideo size={13} /> {p.video_count}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 p-4">
+                  <h3 className="font-bold text-sm leading-snug line-clamp-2 mb-1" style={{ color: 'var(--text-primary)' }}>{p.title}</h3>
+                  {p.description && (
+                    <p className="text-xs line-clamp-2 leading-relaxed" style={{ color: 'var(--text-muted)' }}>{p.description}</p>
+                  )}
+                  <p className="text-xs font-medium mt-2" style={{ color: 'var(--accent)' }}>
+                    {t('videoLessons.videoCount', { count: p.video_count })}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
       ) : visibleVideos.length === 0 ? (
         <div className="py-20 text-center rounded-2xl" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
           <div className="text-4xl mb-3">🎬</div>

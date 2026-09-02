@@ -16,6 +16,9 @@ interface SmallCardProps {
   // Shu article uchun eng yaxshi (maksimal) yulduz natijasi -- ArticleCard
   // bilan bir xil rationale.
   bestStars?: number
+  // Premium bilan qulflangan kartaga bosilganda -- ArticleCard bilan bir
+  // xil rationale (parent modalni shu yerda ochadi, /premium'ga sakramaydi).
+  onLockedClick?: () => void
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -28,7 +31,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Library ArticleCard'idan kichikroq -- kichik badge'lar, kam
 // padding, 140px min balandlik. Chap accent chiziq (kategoriya
 // rangida) mavjud.
-function SmallCardInner({ article, locked = false, delay = 0, bestStars = 0 }: SmallCardProps) {
+function SmallCardInner({ article, locked = false, delay = 0, bestStars = 0, onLockedClick }: SmallCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -36,6 +39,12 @@ function SmallCardInner({ article, locked = false, delay = 0, bestStars = 0 }: S
   const diffKey = article.difficulty ?? 'easy'
 
   const href = locked ? '/premium' : `/articles/${article.id}`
+  const handleClick = (e: React.MouseEvent) => {
+    if (locked && onLockedClick) {
+      e.preventDefault()
+      onLockedClick()
+    }
+  }
 
   return (
     <motion.div
@@ -45,6 +54,7 @@ function SmallCardInner({ article, locked = false, delay = 0, bestStars = 0 }: S
     >
       <Link
         href={href}
+        onClick={handleClick}
         className="block rounded-xl p-4 h-full transition-all hover:scale-[1.01]"
         style={{
           background: 'var(--bg-card)',

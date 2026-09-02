@@ -9,6 +9,7 @@ import { TestListClient } from '@/components/test/TestListClient'
 import { CelebrationToast } from '@/components/test/CelebrationToast'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { SectionStarsChip } from '@/components/ui/SectionStarsChip'
+import { StudyPlanBackButton } from '@/components/StudyPlanBackButton'
 import { isActivePremium } from '@/lib/utils/premium'
 
 /* ── Cached: reading test list (same for all users, revalidate every 5 min) ── */
@@ -78,6 +79,9 @@ export default async function ReadingListPage() {
           which Next.js treats as a dynamic API. */}
       <Suspense fallback={null}>
         <CelebrationToast />
+      </Suspense>
+      <Suspense fallback={null}>
+        <StudyPlanBackButton />
       </Suspense>
       <PageHeader
         titleKey="reading.title"

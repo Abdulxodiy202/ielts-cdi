@@ -42,6 +42,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState<object[]>([])
   const [promoCodes, setPromoCodes] = useState<object[]>([])
   const [promoDbMissing, setPromoDbMissing] = useState(false)
+  const [feedback, setFeedback] = useState<object[]>([])
 
   useEffect(() => {
     async function init() {
@@ -52,13 +53,14 @@ export default function AdminPage() {
       if (!isAdmin(user.email)) { router.replace('/dashboard'); return }
 
       // Fetch all admin data in parallel from API routes
-      const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes, promoRes] = await Promise.all([
+      const [paymentsRes, testsRes, schedulesRes, resultsRes, usersRes, promoRes, feedbackRes] = await Promise.all([
         fetch('/api/admin/payments'),
         fetch('/api/admin/tests'),
         fetch('/api/admin/mock-schedules'),
         fetch('/api/admin/results'),
         fetch('/api/admin/users'),
         fetch('/api/admin/promo-codes'),
+        fetch('/api/admin/feedback'),
       ])
 
       setPayments(paymentsRes.ok ? await paymentsRes.json() : [])
@@ -72,6 +74,7 @@ export default function AdminPage() {
       } else {
         setPromoCodes(promoRes.ok ? await promoRes.json() : [])
       }
+      setFeedback(feedbackRes.ok ? await feedbackRes.json() : [])
       setStatus('ready')
     }
 
@@ -104,6 +107,7 @@ export default function AdminPage() {
       initialUsers={users as any}
       initialPromoCodes={promoCodes as any}
       promoDbMissing={promoDbMissing}
+      initialFeedback={feedback as any}
     />
   )
 }

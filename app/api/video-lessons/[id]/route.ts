@@ -16,9 +16,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [videoRes, profileRes] = await Promise.all([
     admin
       .from('video_lessons')
-      // Client renders these seven fields — everything else on the row
+      // Client renders these fields — everything else on the row
       // (created_at, is_published, admin metadata) never reaches the UI.
-      .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, category')
+      .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, category, playlist_id')
       .eq('id', id)
       .eq('is_published', true)
       .single(),
@@ -40,5 +40,33 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ? { ...video, video_url: '' }
     : video
 
-  return Response.json({ video: safeVideo, userPremium })
+  // Video biror playlist ichida bo'lsa -- YouTube'dagi "Up next" panelini
+  // qurish uchun o'sha playlistning nomini va ichidagi qolgan videolar
+  // ro'yxatini (tartib bilan) qo'shib yuboramiz. Standalone video uchun
+  // ikkalasi ham null/bo'sh qaytadi va frontend panelni ko'rsatmaydi.
+  let playlist: { id: string; title: string } | null = null
+  let playlistVideos: Array<{
+    id: string
+    title: string
+    thumbnail_url: string | null
+    video_url: string
+    video_source: string | null
+    is_premium: boolean
+  }> = []
+
+  if (video.playlist_id) {
+    const [playlistRow, siblingsRes] = await Promise.all([
+      admin.from('video_playlists').select('id, title').eq('id', video.playlist_id).single(),
+      admin
+        .from('video_lessons')
+        .select('id, title, thumbnail_url, video_url, video_source, is_premium, order_in_playlist')
+        .eq('playlist_id', video.playlist_id)
+        .eq('is_published', true)
+        .order('order_in_playlist', { ascending: true }),
+    ])
+    if (playlistRow.data) playlist = playlistRow.data
+    playlistVideos = siblingsRes.data ?? []
+  }
+
+  return Response.json({ video: safeVideo, userPremium, playlist, playlistVideos })
 }

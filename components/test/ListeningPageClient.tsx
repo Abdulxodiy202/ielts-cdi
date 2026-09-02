@@ -1,12 +1,13 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
   Clock, CheckCircle, Lock, Play, RotateCcw, Crown, X,
   ChevronLeft, ChevronRight, Headphones, Zap,
-  MessageSquare, Mic, GraduationCap, BookOpen, PenLine, ListChecks,
+  MessageSquare, Mic, GraduationCap, BookOpen, PenLine, ListChecks, ArrowLeft,
 } from 'lucide-react'
 import { PaymentModal } from '@/components/PaymentModal'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -100,6 +101,39 @@ export function ListeningPageClient({
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [attemptsModal, setAttemptsModal] = useState<{ id: string; title: string; total: number } | null>(null)
 
+  // Study Plan'dan "listening_part" vazifasi ustiga bosilganda
+  // ?highlight=<testId>&part=<1-4> bilan keladi -- bu ekran 3 bosqichli
+  // (mode select -> part tanlash -> testlar ro'yxati) bo'lgani uchun
+  // shunchaki linkka href berish yetarli emas: kerakli part'ni ham
+  // avtomatik ochib berish kerak, aks holda foydalanuvchi hali ham
+  // qo'lda qidirishga majbur bo'lardi.
+  const searchParams = useSearchParams()
+  const highlightId = searchParams.get('highlight')
+  const highlightPart = searchParams.get('part')
+  // Study Plan'dan o'tilganmi -- shunda "back to modes"/"back to parts"
+  // o'rniga "Study Plan'ga qaytish" ko'rsatiladi (script/page.tsx'dagi
+  // xuddi shu naqsh).
+  const fromPlan = searchParams.get('fromPlan') === 'true'
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(highlightId)
+
+  useEffect(() => {
+    if (!highlightId) return
+    const partNum = Number(highlightPart)
+    if (Number.isFinite(partNum) && partNum >= 1 && partNum <= 4) {
+      setMode('sections')
+      setActivePart(partNum)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!highlightId) return
+    const el = document.querySelector(`[data-highlight-id="${highlightId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setActiveHighlight(null), 5000)
+    return () => clearTimeout(timer)
+  }, [highlightId, activePart])
+
   const canAccess = (test: Test) => !test.is_premium || isPremium
 
   const handleLockedClick = () => setShowLockModal(true)
@@ -136,14 +170,21 @@ export function ListeningPageClient({
       (meta?.section ?? test.order_number)
     )
 
+    const isHighlighted = activeHighlight === test.id
+
     return (
       <motion.div
         key={test.id}
+        data-highlight-id={test.id}
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: index * 0.05 }}
         className="card p-5 flex items-center justify-between gap-4"
-        style={{ opacity: accessible ? 1 : 0.75 }}
+        style={{
+          opacity: accessible ? 1 : 0.75,
+          animation: isHighlighted ? 'planHighlightPulse 1.4s ease-in-out infinite' : undefined,
+          transition: 'box-shadow 1s ease',
+        }}
       >
         {/* Left */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -283,6 +324,12 @@ export function ListeningPageClient({
 
   return (
     <>
+      <style>{`
+        @keyframes planHighlightPulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.55), 0 0 22px 4px rgba(99,102,241,0.35); }
+          50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.9), 0 0 32px 10px rgba(99,102,241,0.55); }
+        }
+      `}</style>
       {/* Mode selector */}
       {mode === 'select' && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -417,13 +464,23 @@ export function ListeningPageClient({
       {/* Full test list */}
       {mode === 'full' && (
         <div>
-          <button
-            onClick={() => setMode('select')}
-            className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <ChevronLeft size={16} /> {t('test.backToModes')}
-          </button>
+          {fromPlan ? (
+            <Link
+              href="/dashboard/study-plan"
+              className="inline-flex items-center gap-1.5 text-sm mb-6 hover:opacity-80 transition-opacity"
+              style={{ color: '#a855f7' }}
+            >
+              <ArrowLeft size={14} /> Study Plan&apos;ga qaytish
+            </Link>
+          ) : (
+            <button
+              onClick={() => setMode('select')}
+              className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={16} /> {t('test.backToModes')}
+            </button>
+          )}
           <div className="grid gap-4">
             {fullTests.map((test, i) => renderTestRow(test, i, false))}
           </div>
@@ -433,13 +490,23 @@ export function ListeningPageClient({
       {/* Sections: part picker */}
       {mode === 'sections' && activePart === null && (
         <div>
-          <button
-            onClick={() => setMode('select')}
-            className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <ChevronLeft size={16} /> {t('test.backToModes')}
-          </button>
+          {fromPlan ? (
+            <Link
+              href="/dashboard/study-plan"
+              className="inline-flex items-center gap-1.5 text-sm mb-6 hover:opacity-80 transition-opacity"
+              style={{ color: '#a855f7' }}
+            >
+              <ArrowLeft size={14} /> Study Plan&apos;ga qaytish
+            </Link>
+          ) : (
+            <button
+              onClick={() => setMode('select')}
+              className="flex items-center gap-1.5 text-sm mb-6 hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={16} /> {t('test.backToModes')}
+            </button>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             {PART_INFO.map((info, i) => {
               const { Icon } = info
@@ -513,13 +580,23 @@ export function ListeningPageClient({
       {/* в"Ђв"Ђ Sections: test list for a part в"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђв"Ђ */}
       {mode === 'sections' && activePart !== null && (
         <div>
-          <button
-            onClick={() => setActivePart(null)}
-            className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <ChevronLeft size={16} /> {t('test.backToParts')}
-          </button>
+          {fromPlan ? (
+            <Link
+              href="/dashboard/study-plan"
+              className="inline-flex items-center gap-1.5 text-sm mb-4 hover:opacity-80 transition-opacity"
+              style={{ color: '#a855f7' }}
+            >
+              <ArrowLeft size={14} /> Study Plan&apos;ga qaytish
+            </Link>
+          ) : (
+            <button
+              onClick={() => setActivePart(null)}
+              className="flex items-center gap-1.5 text-sm mb-4 hover:opacity-70 transition-opacity"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={16} /> {t('test.backToParts')}
+            </button>
+          )}
 
           {/* Part header banner */}
           {(() => {

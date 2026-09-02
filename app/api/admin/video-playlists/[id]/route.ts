@@ -20,39 +20,34 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const admin = createAdminClient()
 
   const allowed: Record<string, unknown> = {}
-  if ('title' in body)          allowed.title          = String(body.title).trim()
-  if ('video_url' in body)      allowed.video_url      = String(body.video_url).trim()
-  if ('video_source' in body)   allowed.video_source   = String(body.video_source)
-  if ('thumbnail_url' in body)  allowed.thumbnail_url  = body.thumbnail_url ? String(body.thumbnail_url) : null
-  if ('recommendation' in body) allowed.recommendation = body.recommendation ? String(body.recommendation).trim() : null
-  if ('is_premium' in body)     allowed.is_premium     = Boolean(body.is_premium)
-  if ('is_published' in body)   allowed.is_published   = Boolean(body.is_published)
-  // Category faqat ma'lum 2 qiymatdan biri bo'lsa qabul qilamiz.
+  if ('title' in body)         allowed.title         = String(body.title).trim()
+  if ('description' in body)   allowed.description   = body.description ? String(body.description).trim() : null
+  if ('thumbnail_url' in body) allowed.thumbnail_url = body.thumbnail_url ? String(body.thumbnail_url) : null
+  if ('order_index' in body)   allowed.order_index   = Number.isFinite(body.order_index) ? body.order_index : 0
+  if ('is_published' in body)  allowed.is_published  = Boolean(body.is_published)
   if ('category' in body && (body.category === 'ielts' || body.category === 'self_improvement')) {
     allowed.category = body.category
   }
-  // Playlist bog'lanishi -- bo'sh/null kelsa videoni playlistdan chiqaradi.
-  if ('playlist_id' in body) allowed.playlist_id = body.playlist_id || null
-  if ('order_in_playlist' in body) {
-    allowed.order_in_playlist = Number.isFinite(body.order_in_playlist) ? body.order_in_playlist : 0
-  }
 
   const { data, error } = await admin
-    .from('video_lessons')
+    .from('video_playlists')
     .update(allowed)
     .eq('id', id)
-    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, category, playlist_id, order_in_playlist, created_at')
+    .select('id, title, description, thumbnail_url, category, order_index, is_published, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })
   return Response.json(data)
 }
 
+// Playlistni o'chirish videolarni o'chirmaydi -- video_lessons.playlist_id
+// FK'si ON DELETE SET NULL bo'lgani uchun ichidagi videolar shunchaki
+// standalone (playlistsiz) videoga aylanadi.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const { id } = await params
   const admin = createAdminClient()
-  const { error } = await admin.from('video_lessons').delete().eq('id', id)
+  const { error } = await admin.from('video_playlists').delete().eq('id', id)
   if (error) return Response.json({ error: error.message }, { status: 500 })
   return new Response(null, { status: 204 })
 }

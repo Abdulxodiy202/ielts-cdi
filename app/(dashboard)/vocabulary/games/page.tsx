@@ -545,7 +545,14 @@ export default function GamesPage() {
                     el.style.opacity = String(opacity)
                   }}
                 >
-                  {/* Floating stars above stone — skip for perfect milestones (giant icon says it all) */}
+                  {/* Floating stars above stone — skip for perfect milestones (giant icon says it all).
+                      Qatorlar orasidagi bo'sh joy (RSP - nodeW = 110-96 = 14px) bu badge'ning
+                      balandligidan (font 15px) kichikroq edi, shuning uchun `top:-20` bilan
+                      yuqoriga chiqarilgan yulduzcha USTIDAGI qatordagi tosh ortida qolib,
+                      qisman "kesilgan" ko'rinardi (tosh keyinroq DOM'da chizilgani uchun ustidan
+                      bosib chiqardi). Endi zIndex barcha toshlarnikidan (maks 20) baland
+                      qilib qo'yildi -- shu bois qaysi tosh ustiga tushsa ham yulduzcha
+                      har doim TO'LIQ ko'rinadi. */}
                   {isDone && lvlStars > 0 && !isPerfectMilestone && (
                     <span style={{
                       position: 'absolute', top: -20, left: '50%',
@@ -554,6 +561,7 @@ export default function GamesPage() {
                       color: '#fbbf24',
                       textShadow: '0 0 6px rgba(255,200,0,0.7)',
                       whiteSpace: 'nowrap', pointerEvents: 'none',
+                      zIndex: 30,
                     }}>
                       {'★'.repeat(lvlStars)}
                     </span>

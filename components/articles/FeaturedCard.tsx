@@ -21,6 +21,9 @@ interface FeaturedCardProps {
   // Shu article uchun eng yaxshi (maksimal) yulduz natijasi -- ArticleCard
   // bilan bir xil rationale.
   bestStars?: number
+  // Premium bilan qulflangan kartaga bosilganda -- ArticleCard bilan bir
+  // xil rationale (parent modalni shu yerda ochadi, /premium'ga sakramaydi).
+  onLockedClick?: () => void
 }
 
 // Markdown belgilarni ozroq tozalab, birinchi 200 belgigacha excerpt
@@ -49,7 +52,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // Today's Picks'dagi katta karta (col-span-2, row-span-2). Chap
 // tarafda kategoriya rangida qalinroq accent chiziq, ichida keng
 // description + ajratuvchi + o'qish vaqti.
-function FeaturedCardInner({ article, description, content, locked = false, delay = 0, bestStars = 0 }: FeaturedCardProps) {
+function FeaturedCardInner({ article, description, content, locked = false, delay = 0, bestStars = 0, onLockedClick }: FeaturedCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -57,6 +60,12 @@ function FeaturedCardInner({ article, description, content, locked = false, dela
   const diffKey = article.difficulty ?? 'easy'
 
   const href = locked ? '/premium' : `/articles/${article.id}`
+  const handleClick = (e: React.MouseEvent) => {
+    if (locked && onLockedClick) {
+      e.preventDefault()
+      onLockedClick()
+    }
+  }
 
   // Description ustunlik qiladi. Bo'sh bo'lsa content'dan excerpt.
   // Ikkalasi ham yo'q bo'lsa null qaytadi va matn qismi ko'rinmaydi.
@@ -76,6 +85,7 @@ function FeaturedCardInner({ article, description, content, locked = false, dela
     >
       <Link
         href={href}
+        onClick={handleClick}
         className="flex flex-col rounded-2xl p-6 md:p-7 h-full transition-all hover:scale-[1.005]"
         style={{
           background: 'var(--bg-card)',

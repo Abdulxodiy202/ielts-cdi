@@ -27,6 +27,16 @@ interface ArticleCardProps {
   // edi ("qaysi article uchunligi bilinmayabdi"). undefined/0 bo'lsa --
   // hali test ishlanmagan, badge ko'rsatilmaydi.
   bestStars?: number
+  // Study Plan'dagi vazifadan "aynan shu article'ni ishlang" deb
+  // yo'naltirilganda true bo'ladi -- ~5 soniya glow ko'rsatish uchun
+  // (timer parentda, Library grid butun ro'yxatni bir joyda ushlab
+  // turgani uchun shu yerda emas).
+  highlighted?: boolean
+  // Premium bilan qulflangan kartaga bosilganda -- berilsa, /premium
+  // sahifasiga o'tish o'rniga shu funksiya chaqiriladi (parent kichik
+  // modal + to'lov oynasini shu yerda ochadi, "juda ko'p oynaga
+  // kirib ketish" muammosi bo'lmasligi uchun).
+  onLockedClick?: () => void
 }
 
 const DIFFICULTY_LABEL: Record<string, string> = {
@@ -41,7 +51,7 @@ const DIFFICULTY_LABEL: Record<string, string> = {
 // re-renders whenever any card-independent state changes (filter,
 // search); article rows themselves don't change between renders, so
 // memo skips the whole subtree.
-function ArticleCardInner({ article, locked = false, delay = 0, bestStars = 0 }: ArticleCardProps) {
+function ArticleCardInner({ article, locked = false, delay = 0, bestStars = 0, highlighted = false, onLockedClick }: ArticleCardProps) {
   const category = articleCategoryFor(article)
   const catColor = CATEGORY_COLOR[category]
   const diffColor = difficultyColor(article.difficulty)
@@ -49,6 +59,12 @@ function ArticleCardInner({ article, locked = false, delay = 0, bestStars = 0 }:
   const diffKey = article.difficulty ?? 'easy'
 
   const href = locked ? '/premium' : `/articles/${article.id}`
+  const handleClick = (e: React.MouseEvent) => {
+    if (locked && onLockedClick) {
+      e.preventDefault()
+      onLockedClick()
+    }
+  }
 
   return (
     <motion.div
@@ -56,13 +72,23 @@ function ArticleCardInner({ article, locked = false, delay = 0, bestStars = 0 }:
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.3 }}
     >
+      <style>{`
+        @keyframes planHighlightPulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.55), 0 0 22px 4px rgba(99,102,241,0.35); }
+          50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.9), 0 0 32px 10px rgba(99,102,241,0.55); }
+        }
+      `}</style>
       <Link
         href={href}
+        onClick={handleClick}
+        data-highlight-id={article.id}
         className="block rounded-2xl p-5 h-full transition-all hover:scale-[1.01]"
         style={{
           background: 'var(--bg-card)',
           border: '1px solid var(--border)',
           borderLeft: `4px solid ${catColor.accent}`,
+          animation: highlighted ? 'planHighlightPulse 1.4s ease-in-out infinite' : undefined,
+          transition: 'box-shadow 1s ease',
         }}
       >
         <div className="flex items-center gap-2 flex-wrap mb-3">

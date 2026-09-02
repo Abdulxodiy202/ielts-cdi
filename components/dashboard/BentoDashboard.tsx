@@ -8,9 +8,9 @@ import {
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { getBandColor } from '@/lib/utils/bandScore'
 import { LeaderboardWidget } from '@/components/dashboard/LeaderboardWidget'
-import { StudyPlanWidget } from '@/components/dashboard/StudyPlanWidget'
 import { ReferralCard } from '@/components/dashboard/ReferralCard'
 import { RecentTestsCompact } from '@/components/dashboard/RecentTestsCompact'
+import { AiStudyPlanWidget } from '@/components/dashboard/AiStudyPlanWidget'
 
 // Bento-grid dashboard body. Pure presentation -- every number arrives
 // as a prop from the server page so this stays one render pass. The
@@ -195,40 +195,9 @@ export function BentoDashboard({
         <ProgressBar done={listeningDone} total={counts.listeningTotal} color="var(--skill-listening)" />
       </Link>
 
-      {/* ── Study plan — hamma userga bir xil "Ishlab chiqilmoqda" ── */}
-      {/* Premium/free farq vaqtincha olib tashlandi; tayyor bo'lganda
-          isPremium branchi bilan asl ko'rinishga qaytariladi. */}
-      <div
-        className="lg:col-span-6 p-5 md:p-6 transition-colors"
-        style={tileStyle}
-      >
-        <div className="relative h-full">
-          <div
-            aria-hidden
-            style={{ filter: 'blur(6px)', pointerEvents: 'none', opacity: 0.65 }}
-          >
-            <StudyPlanWidget />
-          </div>
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-4"
-            style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(2px)' }}
-          >
-            <span
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide"
-              style={{
-                background: 'linear-gradient(135deg, rgba(245,158,11,0.20), rgba(217,119,6,0.30))',
-                border: '1px solid rgba(245,158,11,0.45)',
-                color: '#fbbf24',
-              }}
-            >
-              {t('common.workInProgress')}
-            </span>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              {t('dailyPlanner.comingSoon')}
-            </p>
-          </div>
-        </div>
-      </div>
+      {/* ── AI Study Plan — o'zi holatni (reja bor/yo'q) tekshirib,
+          mos ko'rinishni (CTA yoki mini-grafik) tanlaydi ── */}
+      <AiStudyPlanWidget />
       <div className="lg:col-span-6 p-5 md:p-6 transition-colors" style={tileStyle}>
         <LeaderboardWidget />
       </div>

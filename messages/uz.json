@@ -929,7 +929,13 @@
     "ieltsLessons": "IELTS darslari",
     "selfImprovement": "O'z-o'zini rivojlantirish",
     "emptyIelts": "Hozircha IELTS darslari qo'shilmagan",
-    "emptySelfImprovement": "Hozircha o'z-o'zini rivojlantirish videolari qo'shilmagan"
+    "emptySelfImprovement": "Hozircha o'z-o'zini rivojlantirish videolari qo'shilmagan",
+    "viewVideos": "Videolar",
+    "viewPlaylists": "Playlistlar",
+    "emptyPlaylists": "Hozircha playlistlar qo'shilmagan",
+    "videoCount": "{count} ta video",
+    "playlistNotFound": "Playlist topilmadi",
+    "upNext": "Keyingi videolar"
   },
   "videoTest": {
     "unavailableTitle": "Test hali qo'shilmagan",

@@ -929,7 +929,13 @@
     "ieltsLessons": "IELTS lessons",
     "selfImprovement": "Self-improvement",
     "emptyIelts": "No IELTS lessons added yet",
-    "emptySelfImprovement": "No self-improvement videos added yet"
+    "emptySelfImprovement": "No self-improvement videos added yet",
+    "viewVideos": "Videos",
+    "viewPlaylists": "Playlists",
+    "emptyPlaylists": "No playlists added yet",
+    "videoCount": "{count} videos",
+    "playlistNotFound": "Playlist not found",
+    "upNext": "Up next"
   },
   "videoTest": {
     "unavailableTitle": "Test not added yet",

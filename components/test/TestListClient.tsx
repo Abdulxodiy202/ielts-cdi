@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import {
@@ -44,6 +45,22 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [attemptsModal, setAttemptsModal] = useState<{ id: string; title: string } | null>(null)
 
+  // Study Plan'dagi vazifadan "aynan shu testni ishlang" deb yo'naltirilgan
+  // bo'lsa, ?highlight=<id> orqali keladi -- shu kartani ~5 soniya
+  // ko'zga tashlanadigan qilib (glow) ko'rsatamiz va ko'rinadigan joyga
+  // skroll qilamiz, foydalanuvchi bir qatorlarga qarab qidirmasin.
+  const searchParams = useSearchParams()
+  const highlightId = searchParams.get('highlight')
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(highlightId)
+
+  useEffect(() => {
+    if (!highlightId) return
+    const el = document.querySelector(`[data-highlight-id="${highlightId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setActiveHighlight(null), 5000)
+    return () => clearTimeout(timer)
+  }, [highlightId])
+
   const canAccess = (test: Test) => !test.is_premium || isPremium
   const handleLockedClick = () => setShowLockModal(true)
   const handleUpgradeFromLock = () => {
@@ -74,6 +91,12 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
 
   return (
     <>
+      <style>{`
+        @keyframes planHighlightPulse {
+          0%, 100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.55), 0 0 22px 4px rgba(99,102,241,0.35); }
+          50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.9), 0 0 32px 10px rgba(99,102,241,0.55); }
+        }
+      `}</style>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {tests.map((test, i) => {
           const accessible = canAccess(test)
@@ -84,10 +107,12 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
           const summary = summaryMap[test.id]
           const hasStars = (summary?.best_stars ?? 0) > 0
           const attemptCount = summary?.attempts ?? 0
+          const isHighlighted = activeHighlight === test.id
 
           return (
             <motion.div
               key={test.id}
+              data-highlight-id={test.id}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.03, duration: 0.25 }}
@@ -96,6 +121,8 @@ export function TestListClient({ tests, isPremium, sessionMap, summaryMap = {}, 
                 background: 'var(--bg-card)',
                 border: '1px solid var(--border)',
                 minHeight: 210,
+                animation: isHighlighted ? 'planHighlightPulse 1.4s ease-in-out infinite' : undefined,
+                transition: 'box-shadow 1s ease, background 0.2s ease',
               }}
               onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-secondary)' }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--bg-card)' }}

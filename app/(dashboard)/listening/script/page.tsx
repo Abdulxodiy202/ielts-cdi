@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
@@ -10,6 +11,9 @@ import { isActivePremium } from '@/lib/utils/premium'
 import { formatTime } from '@/lib/utils/formatters'
 import { Headphones, Lock, Star, ChevronLeft, ListChecks, ArrowLeft } from 'lucide-react'
 import { ScriptAttemptsModal } from '@/components/test/ScriptAttemptsModal'
+import { PremiumLockModal } from '@/components/PremiumLockModal'
+
+const PaymentModal = dynamic(() => import('@/components/PaymentModal').then(m => ({ default: m.PaymentModal })), { ssr: false })
 
 interface ScriptProgress {
   script_id: number
@@ -37,6 +41,11 @@ export default function ScriptListPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fromPlan = searchParams.get('fromPlan') === 'true'
+  // Study Plan'dan "aynan shu scriptni ishlang" deb yo'naltirilganda
+  // ?highlight=<scriptId> bilan keladi -- shu kartani ~5 soniya
+  // ko'zga tashlanadigan (glow) qilib ko'rsatamiz.
+  const highlightId = searchParams.get('highlight')
+  const [activeHighlight, setActiveHighlight] = useState<string | null>(highlightId)
   const { t } = useLanguage()
   const [authChecked, setAuthChecked] = useState(false)
   const [userIsAdmin, setUserIsAdmin] = useState(false)
@@ -45,6 +54,16 @@ export default function ScriptListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attemptsModal, setAttemptsModal] = useState<{ id: number; title: string } | null>(null)
+  // Premium-locked karta bosilganda -- endi /premium sahifasiga
+  // o'tkazmaydi, shu yerda kichik modal + to'lov oynasini ochadi
+  // (Reading/Listening test ro'yxatidagi oddiy pattern bilan bir xil).
+  const [showLockModal, setShowLockModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const handleLockedClick = () => setShowLockModal(true)
+  const handleUpgradeFromLock = () => {
+    setShowLockModal(false)
+    setShowPaymentModal(true)
+  }
 
   useEffect(() => {
     const sb = createClient()
@@ -70,6 +89,14 @@ export default function ScriptListPage() {
       setLoading(false)
     }).catch(() => { setError('genericError'); setLoading(false) })
   }, [authChecked])
+
+  useEffect(() => {
+    if (!highlightId || loading) return
+    const el = document.querySelector(`[data-highlight-id="${highlightId}"]`)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const timer = setTimeout(() => setActiveHighlight(null), 5000)
+    return () => clearTimeout(timer)
+  }, [highlightId, loading])
 
   const totalStars = scripts.reduce((sum, s) => sum + (s.progress?.best_stars ?? 0), 0)
   const maxStars = scripts.length * 5
@@ -131,10 +158,20 @@ export default function ScriptListPage() {
 
       {!error && scripts.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <style>{`
+            @keyframes planHighlightPulse {
+              0%, 100% { box-shadow: 0 0 0 3px rgba(99,102,241,0.55), 0 0 22px 4px rgba(99,102,241,0.35); }
+              50% { box-shadow: 0 0 0 3px rgba(99,102,241,0.9), 0 0 32px 10px rgba(99,102,241,0.55); }
+            }
+          `}</style>
           {scripts.map((script, i) => {
             const unlocked = isUnlocked(i)
             const premiumLocked = script.is_premium && !userIsPremium && !userIsAdmin
             const progress = script.progress
+            const isHighlighted = activeHighlight === String(script.id)
+            const highlightStyle: React.CSSProperties = isHighlighted
+              ? { animation: 'planHighlightPulse 1.4s ease-in-out infinite', transition: 'box-shadow 1s ease' }
+              : { transition: 'box-shadow 1s ease' }
             const content = (
               <>
                 <div className="relative w-full aspect-video rounded-t-2xl overflow-hidden shrink-0">
@@ -233,28 +270,31 @@ export default function ScriptListPage() {
 
             if (premiumLocked) {
               return (
-                <Link
+                <button
                   key={script.id}
-                  href="/premium"
-                  className="card overflow-hidden flex flex-col hover:opacity-90 transition-opacity"
-                  style={{ padding: 0 }}
+                  type="button"
+                  data-highlight-id={script.id}
+                  onClick={handleLockedClick}
+                  className="card overflow-hidden flex flex-col text-left hover:opacity-90 transition-opacity"
+                  style={{ padding: 0, ...highlightStyle }}
                   title="Premium kontent -- bosib upgrade qiling"
                 >
                   {content}
-                </Link>
+                </button>
               )
             }
             return unlocked ? (
               <Link
                 key={script.id}
+                data-highlight-id={script.id}
                 href={`/listening/script/${script.id}`}
                 className="card overflow-hidden flex flex-col hover:opacity-90 transition-opacity"
-                style={{ padding: 0 }}
+                style={{ padding: 0, ...highlightStyle }}
               >
                 {content}
               </Link>
             ) : (
-              <div key={script.id} className="card overflow-hidden flex flex-col opacity-75 cursor-not-allowed" style={{ padding: 0 }}>
+              <div key={script.id} data-highlight-id={script.id} className="card overflow-hidden flex flex-col opacity-75 cursor-not-allowed" style={{ padding: 0, ...highlightStyle }}>
                 {content}
               </div>
             )
@@ -270,6 +310,25 @@ export default function ScriptListPage() {
           scriptTitle={attemptsModal.title}
         />
       )}
+
+      {/* Premium lock modal -- ilova bo'yicha yagona umumiy komponent */}
+      <PremiumLockModal
+        open={showLockModal}
+        onClose={() => setShowLockModal(false)}
+        onUpgrade={handleUpgradeFromLock}
+        title={t('test.premiumTestTitle')}
+        description={t('test.premiumTestDesc')}
+        cancelLabel={t('test.cancel')}
+        upgradeLabel={t('common.upgradeToPremium')}
+      />
+
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onSuccess={() => setShowPaymentModal(false)}
+        type="premium"
+        amount={50000}
+      />
     </div>
   )
 }

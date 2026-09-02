@@ -18,7 +18,7 @@ export async function GET() {
   const admin = createAdminClient()
   const { data, error } = await admin
     .from('video_lessons')
-    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, category, created_at')
+    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, category, playlist_id, order_in_playlist, created_at')
     .order('created_at', { ascending: false })
   if (error) {
     if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
@@ -33,7 +33,7 @@ type VideoCategory = (typeof VALID_CATEGORIES)[number]
 export async function POST(request: NextRequest) {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const body = await request.json()
-  const { title, video_url, recommendation, is_premium, video_source, thumbnail_url, category } = body
+  const { title, video_url, recommendation, is_premium, video_source, thumbnail_url, category, playlist_id, order_in_playlist } = body
 
   if (!title?.trim()) return Response.json({ error: 'Sarlavha kiritilishi shart' }, { status: 400 })
   if (!video_url?.trim()) return Response.json({ error: 'Video URL kiritilishi shart' }, { status: 400 })
@@ -47,16 +47,20 @@ export async function POST(request: NextRequest) {
   const { data, error } = await admin
     .from('video_lessons')
     .insert({
-      title:         title.trim(),
-      video_url:     video_url.trim(),
-      video_source:  video_source ?? 'youtube',
-      thumbnail_url: thumbnail_url ?? null,
-      recommendation:recommendation?.trim() ?? null,
-      is_premium:    is_premium ?? false,
-      is_published:  true,
-      category:      cat,
+      title:              title.trim(),
+      video_url:          video_url.trim(),
+      video_source:       video_source ?? 'youtube',
+      thumbnail_url:      thumbnail_url ?? null,
+      recommendation:     recommendation?.trim() ?? null,
+      is_premium:         is_premium ?? false,
+      is_published:       true,
+      category:           cat,
+      // Playlistga qo'shish ixtiyoriy -- bo'sh string/undefined bo'lsa
+      // standalone video sifatida qoladi.
+      playlist_id:        playlist_id || null,
+      order_in_playlist:  Number.isFinite(order_in_playlist) ? order_in_playlist : 0,
     })
-    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, category, created_at')
+    .select('id, title, video_url, video_source, thumbnail_url, recommendation, is_premium, is_published, category, playlist_id, order_in_playlist, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 400 })

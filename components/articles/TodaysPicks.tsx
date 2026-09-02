@@ -10,13 +10,16 @@ interface TodaysPicksProps {
   // article_id -> eng yaxshi (maksimal) yulduz. FeaturedCard/SmallCard'ga
   // shu article uchun bestStars'ni topib beramiz.
   starsMap?: Record<string, number>
+  // Qulflangan kartaga bosilganda -- FeaturedCard/SmallCard'ga forward
+  // qilinadi (parent, ArticlesPage, kichik modalni shu yerda ochadi).
+  onLockedClick?: () => void
 }
 
 // Today's Picks bento: chap tarafda katta karta, o'ng tarafda 2x2
 // kompakt kartalar. lg dan pastda hammasi bir ustunga tushadi.
 // FeaturedCard endi lg:col-span-2 emas -- tashqi grid ikki ustun,
 // katta karta bittasini, o'ng grid ikkinchisini oladi.
-export function TodaysPicks({ picks, lockedIds, starsMap }: TodaysPicksProps) {
+export function TodaysPicks({ picks, lockedIds, starsMap, onLockedClick }: TodaysPicksProps) {
   if (picks.length === 0) return null
 
   const [featured, ...rest] = picks
@@ -44,6 +47,7 @@ export function TodaysPicks({ picks, lockedIds, starsMap }: TodaysPicksProps) {
             locked={lockedIds?.has(featured.id) ?? false}
             delay={0}
             bestStars={starsMap?.[featured.id] ?? 0}
+            onLockedClick={onLockedClick}
           />
         </div>
 
@@ -57,6 +61,7 @@ export function TodaysPicks({ picks, lockedIds, starsMap }: TodaysPicksProps) {
                 locked={lockedIds?.has(a.id) ?? false}
                 delay={0.06 * (i + 1)}
                 bestStars={starsMap?.[a.id] ?? 0}
+                onLockedClick={onLockedClick}
               />
             ))}
           </div>

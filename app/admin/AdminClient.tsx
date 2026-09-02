@@ -8,7 +8,7 @@ import {
   ExternalLink, RefreshCw, User, Mail, Phone, Crown,
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
-  Loader2, Upload, FileText, X, Music, Play, Keyboard, Sun, Moon,
+  Loader2, Upload, FileText, X, Music, Play, Keyboard, Sun, Moon, Sparkles, ListVideo,
 } from 'lucide-react'
 import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
 import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
@@ -106,6 +106,41 @@ interface Props {
   initialUsers: AdminUser[]
   initialPromoCodes: PromoCode[]
   promoDbMissing?: boolean
+  initialFeedback: FeedbackItem[]
+}
+
+// Tab'lardagi "yangilik" belgisi (raqamli badge) uchun umumiy hook --
+// To'lovlar/Feedback'dagidek haqiqiy DB holati (status) bo'lmagan
+// bo'limlar uchun (Foydalanuvchilar, O'chirilgan hisoblar). Har bir
+// admin/brauzer o'zining "oxirgi ko'rilgan vaqti"ni localStorage'da
+// saqlaydi -- shu vaqtdan KEYIN yaratilgan yozuvlar "yangi" hisoblanadi.
+// Birinchi marta ochilganda (localStorage bo'sh) darhol "hozir"ga
+// o'rnatiladi -- aks holda butun eski tarix bittada "yangi" bo'lib
+// ko'rinib ketardi.
+function useAdminSeenBadge<T extends { created_at: string }>(storageKey: string, items: T[]) {
+  const [seenAt, setSeenAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    const key = `admin_seen_${storageKey}`
+    let stored: string | null = null
+    try { stored = localStorage.getItem(key) } catch { /* ignore */ }
+    if (!stored) {
+      stored = new Date().toISOString()
+      try { localStorage.setItem(key, stored) } catch { /* ignore */ }
+    }
+    setSeenAt(stored)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey])
+
+  const count = seenAt ? items.filter(i => i.created_at > seenAt).length : 0
+
+  const markSeen = () => {
+    const now = new Date().toISOString()
+    try { localStorage.setItem(`admin_seen_${storageKey}`, now) } catch { /* ignore */ }
+    setSeenAt(now)
+  }
+
+  return { count, markSeen }
 }
 
 /* ── Badges ──────────────────────────────────────────────────────────── */
@@ -3900,7 +3935,30 @@ interface AdminVideo {
   is_premium: boolean
   is_published: boolean
   category: VideoCategory | null
+  playlist_id: string | null
+  order_in_playlist: number | null
   created_at: string
+}
+
+interface AdminPlaylist {
+  id: string
+  title: string
+  description: string | null
+  thumbnail_url: string | null
+  category: VideoCategory | null
+  order_index: number
+  is_published: boolean
+  video_count: number
+  created_at: string
+}
+
+const PL_BLANK = {
+  title:         '',
+  description:   '',
+  thumbnail_url: null as string | null,
+  category:      'ielts' as VideoCategory,
+  order_index:   0,
+  is_published:  true,
 }
 
 type VideoSource = 'youtube' | 'upload'
@@ -3915,6 +3973,9 @@ const VL_BLANK = {
   thumbnail_url: null as string | null,
   // Yangi video default 'ielts' -- IELTS darslari asosiy content turi.
   category:      'ielts' as VideoCategory,
+  // Ixtiyoriy -- playlist ichiga qo'shish uchun. null = standalone video.
+  playlist_id:       null as string | null,
+  order_in_playlist: 0,
 }
 
 const VIDEO_CATEGORY_LABEL: Record<VideoCategory, string> = {
@@ -3943,6 +4004,18 @@ function VideoLessonsTab() {
   const videoInputRef = useRef<HTMLInputElement>(null)
   const posterInputRef= useRef<HTMLInputElement>(null)
 
+  // Videolar / Playlistlar sub-ko'rinishi -- YouTube kanalidagi kabi.
+  // Playlistlar ro'yxati har ikkala ko'rinish uchun ham kerak: video
+  // qo'shish/tahrirlash modalidagi "Playlist" dropdown'i uchun ham,
+  // "Playlistlar" ko'rinishining o'zi uchun ham.
+  const [view,           setView]           = useState<'videos' | 'playlists'>('videos')
+  const [playlists,      setPlaylists]      = useState<AdminPlaylist[]>([])
+  const [plLoading,      setPlLoading]      = useState(true)
+  const [plSaving,       setPlSaving]       = useState(false)
+  const [plDeleting,     setPlDeleting]     = useState<string | null>(null)
+  const [plFormError,    setPlFormError]    = useState('')
+  const [plModal,        setPlModal]        = useState<{ mode: 'add' | 'edit'; data: typeof PL_BLANK & { id?: string } } | null>(null)
+
   const load = async () => {
     setLoading(true)
     const res = await fetch('/api/admin/video-lessons')
@@ -3950,7 +4023,62 @@ function VideoLessonsTab() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  const loadPlaylists = async () => {
+    setPlLoading(true)
+    const res = await fetch('/api/admin/video-playlists')
+    if (res.ok) { const d = await res.json(); setPlaylists(Array.isArray(d) ? d : []) }
+    setPlLoading(false)
+  }
+
+  useEffect(() => { load(); loadPlaylists() }, [])
+
+  function plOpenAdd() {
+    setPlFormError('')
+    setPlModal({ mode: 'add', data: { ...PL_BLANK } })
+  }
+  function plOpenEdit(p: AdminPlaylist) {
+    setPlFormError('')
+    setPlModal({ mode: 'edit', data: {
+      id: p.id, title: p.title, description: p.description ?? '',
+      thumbnail_url: p.thumbnail_url, category: p.category ?? 'ielts',
+      order_index: p.order_index, is_published: p.is_published,
+    }})
+  }
+  function plCloseModal() { setPlModal(null); setPlFormError('') }
+
+  async function plHandleSave() {
+    if (!plModal) return
+    if (!plModal.data.title.trim()) { setPlFormError('Sarlavha kiritilishi shart'); return }
+    setPlSaving(true); setPlFormError('')
+    const body = {
+      title:         plModal.data.title.trim(),
+      description:   plModal.data.description?.trim() || null,
+      thumbnail_url: plModal.data.thumbnail_url || null,
+      category:      plModal.data.category,
+      order_index:   plModal.data.order_index,
+      is_published:  plModal.data.is_published,
+    }
+    const res = plModal.mode === 'add'
+      ? await fetch('/api/admin/video-playlists',                  { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      : await fetch(`/api/admin/video-playlists/${plModal.data.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    const json = await res.json()
+    if (!res.ok) { setPlFormError(json.error || 'Xatolik'); setPlSaving(false); return }
+    if (plModal.mode === 'add') setPlaylists(prev => [...prev, json])
+    else setPlaylists(prev => prev.map(p => p.id === plModal.data.id ? { ...p, ...json } : p))
+    plCloseModal()
+    setPlSaving(false)
+  }
+
+  const plHandleDelete = async (p: AdminPlaylist) => {
+    if (!confirm(`"${p.title}" playlistini o'chirishni tasdiqlaysizmi? Ichidagi videolar o'chmaydi, faqat playlistdan ajraladi.`)) return
+    setPlDeleting(p.id)
+    const res = await fetch(`/api/admin/video-playlists/${p.id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) {
+      setPlaylists(prev => prev.filter(x => x.id !== p.id))
+      load() // videolar ro'yxatidagi playlist_id'lar ham eskirgan bo'lishi mumkin
+    }
+    setPlDeleting(null)
+  }
 
   function resetFiles() {
     setVideoFile(null); setPosterFile(null); setVideoProgress(0); setPosterProgress(0)
@@ -3970,6 +4098,8 @@ function VideoLessonsTab() {
       video_source:  (v.video_source as VideoSource) ?? 'youtube',
       thumbnail_url: v.thumbnail_url ?? null,
       category:      v.category ?? 'ielts',
+      playlist_id:       v.playlist_id ?? null,
+      order_in_playlist: v.order_in_playlist ?? 0,
     }})
   }
   function closeModal() {
@@ -4030,6 +4160,8 @@ function VideoLessonsTab() {
         is_premium:     modal.data.is_premium,
         is_published:   modal.data.is_published,
         category:       modal.data.category,
+        playlist_id:       modal.data.playlist_id || null,
+        order_in_playlist: modal.data.order_in_playlist ?? 0,
       }
       const res = modal.mode === 'add'
         ? await fetch('/api/admin/video-lessons',                    { method: 'POST',  headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -4074,12 +4206,49 @@ function VideoLessonsTab() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>{videos.length} ta video</span>
-        <button onClick={openAdd} className="btn-primary text-sm flex items-center gap-2">
-          <Plus size={14} /> Yangi video qo&apos;shish
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          {view === 'videos' ? `${videos.length} ta video` : `${playlists.length} ta playlist`}
+        </span>
+        <button onClick={view === 'videos' ? openAdd : plOpenAdd} className="btn-primary text-sm flex items-center gap-2">
+          <Plus size={14} /> {view === 'videos' ? "Yangi video qo'shish" : "Yangi playlist qo'shish"}
         </button>
       </div>
 
+      {/* Videolar / Playlistlar sub-ko'rinishi -- YouTube kanalidagi
+          kabi: bitta bo'limda ham alohida videolar, ham ularni
+          guruhlaydigan playlistlar boshqariladi. */}
+      <div
+        className="flex gap-1 p-1 rounded-xl"
+        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', width: 'fit-content' }}
+      >
+        {([
+          { key: 'videos' as const,    label: '🎬 Videolar' },
+          { key: 'playlists' as const, label: '📑 Playlistlar' },
+        ]).map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setView(key)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap"
+            style={{
+              background: view === key ? 'var(--accent)' : 'transparent',
+              color: view === key ? 'white' : 'var(--text-secondary)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'playlists' ? (
+        <PlaylistsView
+          playlists={playlists}
+          loading={plLoading}
+          deleting={plDeleting}
+          onEdit={plOpenEdit}
+          onDelete={plHandleDelete}
+        />
+      ) : (
+      <>
       {/* Category filter tabs */}
       {videos.length > 0 && (
         <div
@@ -4138,6 +4307,11 @@ function VideoLessonsTab() {
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                    {v.playlist_id && (
+                      <p className="text-xs truncate mt-0.5" style={{ color: 'var(--accent)' }}>
+                        📑 {playlists.find(p => p.id === v.playlist_id)?.title ?? 'Playlist'}
+                      </p>
+                    )}
                     {v.recommendation && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{v.recommendation}</p>}
                   </div>
                   {/* Category badge -- IELTS ko'k, Self-improvement yashil */}
@@ -4214,6 +4388,37 @@ function VideoLessonsTab() {
                 <option value="ielts">{VIDEO_CATEGORY_LABEL.ielts}</option>
                 <option value="self_improvement">{VIDEO_CATEGORY_LABEL.self_improvement}</option>
               </select>
+            </div>
+
+            {/* 2b. Playlist -- ixtiyoriy. Tanlansa, video shu playlist
+                ichida chiqadi va bosh "Videolar" ro'yxatidan yashiriladi. */}
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Playlist (ixtiyoriy)
+              </label>
+              <select
+                className="input-field text-sm w-full"
+                value={modal.data.playlist_id ?? ''}
+                onChange={e => setModal(m => m ? { ...m, data: { ...m.data, playlist_id: e.target.value || null } } : m)}
+              >
+                <option value="">— Alohida video (playlistsiz) —</option>
+                {playlists.map(p => (
+                  <option key={p.id} value={p.id}>{p.title} ({VIDEO_CATEGORY_LABEL[p.category ?? 'ielts']})</option>
+                ))}
+              </select>
+              {modal.data.playlist_id && (
+                <div className="mt-2">
+                  <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                    Playlist ichidagi tartib raqami
+                  </label>
+                  <input type="number" className="input-field text-sm w-full" placeholder="0"
+                    value={modal.data.order_in_playlist}
+                    onChange={e => setModal(m => m ? { ...m, data: { ...m.data, order_in_playlist: Number(e.target.value) || 0 } } : m)} />
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Kichik raqam avval chiqadi (0, 1, 2, ...).
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* 3. Source toggle */}
@@ -4424,6 +4629,167 @@ function VideoLessonsTab() {
           </div>
         </div>
       )}
+      </>
+      )}
+
+      {/* ── Playlist Add / Edit modal ──────────────────────────────────── */}
+      {plModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 space-y-4 overflow-y-auto"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '90vh' }}>
+
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-base" style={{ color: 'var(--text-primary)' }}>
+                {plModal.mode === 'add' ? "📑 Yangi playlist qo'shish" : '✏️ Playlistni tahrirlash'}
+              </h3>
+              <button onClick={plCloseModal} disabled={plSaving} className="p-1 rounded-lg hover:opacity-70"
+                style={{ color: 'var(--text-muted)' }}><X size={18} /></button>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Sarlavha *</label>
+              <input className="input-field text-sm w-full" placeholder="Writing Task 2 — to'liq kurs"
+                value={plModal.data.title}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, title: e.target.value } } : m)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tavsif (ixtiyoriy)</label>
+              <textarea className="input-field text-sm w-full resize-none" rows={2}
+                placeholder="Bu playlist Writing Task 2 uchun barcha darslarni o'z ichiga oladi..."
+                value={plModal.data.description ?? ''}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, description: e.target.value } } : m)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Toifa *</label>
+              <select
+                className="input-field text-sm w-full"
+                value={plModal.data.category}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, category: e.target.value as VideoCategory } } : m)}
+              >
+                <option value="ielts">{VIDEO_CATEGORY_LABEL.ielts}</option>
+                <option value="self_improvement">{VIDEO_CATEGORY_LABEL.self_improvement}</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>
+                Kartochka rasmi URL (ixtiyoriy)
+              </label>
+              <input className="input-field text-sm w-full" placeholder="Bo'sh qoldirilsa, birinchi videoning rasmi ishlatiladi"
+                value={plModal.data.thumbnail_url ?? ''}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, thumbnail_url: e.target.value || null } } : m)} />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--text-secondary)' }}>Tartib raqami</label>
+              <input type="number" className="input-field text-sm w-full" placeholder="0"
+                value={plModal.data.order_index}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, order_index: Number(e.target.value) || 0 } } : m)} />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Playlistlar ro'yxatida kichik raqam avval chiqadi.</p>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm cursor-pointer pt-1" style={{ color: 'var(--text-secondary)' }}>
+              <input type="checkbox" className="rounded" checked={plModal.data.is_published}
+                onChange={e => setPlModal(m => m ? { ...m, data: { ...m.data, is_published: e.target.checked } } : m)} />
+              Nashr etilgan
+            </label>
+
+            {plFormError && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {plFormError}</p>}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={plHandleSave} disabled={plSaving}
+                className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+                {plSaving
+                  ? <><Loader2 size={14} className="animate-spin" /> Saqlanmoqda...</>
+                  : <><Plus size={14} /> {plModal.mode === 'add' ? "Qo'shish" : 'Saqlash'}</>}
+              </button>
+              <button onClick={plCloseModal} disabled={plSaving} className="btn-outline text-sm disabled:opacity-50">Yopish</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Playlists view (list) for VideoLessonsTab ───────────────────────── */
+function PlaylistsView({
+  playlists, loading, deleting, onEdit, onDelete,
+}: {
+  playlists: AdminPlaylist[]
+  loading: boolean
+  deleting: string | null
+  onEdit: (p: AdminPlaylist) => void
+  onDelete: (p: AdminPlaylist) => void
+}) {
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (playlists.length === 0) {
+    return (
+      <div className="card p-16 text-center">
+        <div className="text-4xl mb-3">📑</div>
+        <p style={{ color: 'var(--text-muted)' }}>Hali playlist qo&apos;shilmagan</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+        style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+        <span>Preview</span><span>Sarlavha</span><span>Toifa</span><span>Videolar</span><span>Holat</span><span className="text-right">Amal</span>
+      </div>
+      <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+        {playlists.map(p => {
+          const isIelts = (p.category ?? 'ielts') === 'ielts'
+          return (
+            <div key={p.id} className="grid items-center px-4 py-3"
+              style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8 }}>
+              <div className="rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
+                style={{ width: 88, height: 50, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+                {p.thumbnail_url
+                  ? <img src={p.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  : <ListVideo size={14} style={{ color: 'var(--text-muted)' }} />}
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate" style={{ color: 'var(--text-primary)' }}>{p.title}</p>
+                {p.description && <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{p.description}</p>}
+              </div>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                style={isIelts
+                  ? { background: 'rgba(59,130,246,0.12)', color: '#60a5fa', border: '1px solid rgba(59,130,246,0.30)' }
+                  : { background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.30)' }}>
+                {isIelts ? 'IELTS' : "O'z-o'zini riv."}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium text-center whitespace-nowrap"
+                style={{ background: 'rgba(99,102,241,0.1)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                {p.video_count} ta
+              </span>
+              <span className="text-xs px-2 py-1 rounded-lg font-medium text-center"
+                style={p.is_published
+                  ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                  : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {p.is_published ? 'Chop' : 'Draft'}
+              </span>
+              <div className="flex items-center gap-1.5 justify-end">
+                <button onClick={() => onEdit(p)} title="Tahrirlash"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                  style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
+                  <Edit3 size={12} />
+                </button>
+                <button onClick={() => onDelete(p)} disabled={deleting === p.id} title="O'chirish"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}>
+                  {deleting === p.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -5230,6 +5596,94 @@ function ScriptsTab() {
   )
 }
 
+function AiStudyPlanTab() {
+  const [prompt, setPrompt] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/ai-settings')
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data?.error === 'TABLE_NOT_FOUND' ? 'ai_settings jadvali topilmadi (Supabase\'da yarating).' : (data?.error || 'Xatolik'))
+      } else {
+        setPrompt(data.study_plan_prompt ?? '')
+      }
+    } catch {
+      setError('Yuklashda xatolik')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const res = await fetch('/api/admin/ai-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ study_plan_prompt: prompt }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data?.error || 'Saqlashda xatolik')
+      } else {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 2500)
+      }
+    } catch {
+      setError('Saqlashda xatolik')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+        <Loader2 size={16} className="animate-spin" /> Yuklanmoqda...
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      <div>
+        <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>AI Study Plan sozlamalari</h2>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Bu yerga yozgan ko&apos;rsatmangiz AI har bir foydalanuvchi uchun haftalik o&apos;quv reja tuzayotganda hisobga olinadi.
+          Masalan: &quot;Ko&apos;proq listening va vocabulary ustiga urg&apos;u ber&quot;, &quot;Har kuni kamida 1 ta writing vazifa qo&apos;sh&quot; va h.k.
+        </p>
+      </div>
+
+      <textarea
+        value={prompt}
+        onChange={e => setPrompt(e.target.value)}
+        rows={8}
+        placeholder="Masalan: Foydalanuvchilarga ko'proq listening va reading testlar tavsiya qil, har kuni kamida 15 daqiqa typing mashqi qo'sh..."
+        className="w-full rounded-xl p-3 text-sm resize-y"
+        style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+      />
+
+      {error && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {error}</p>}
+      {saved && <p className="text-xs" style={{ color: '#22c55e' }}>✅ Saqlandi</p>}
+
+      <button onClick={handleSave} disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
+        {saving ? <><Loader2 size={14} className="animate-spin" /> Saqlanmoqda...</> : <><Sparkles size={14} /> Saqlash</>}
+      </button>
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -5246,11 +5700,15 @@ const TABS = [
   { id: 'videos',        label: 'Video darslar',    Icon: Play },
   { id: 'typing',        label: 'Typing',           Icon: Keyboard },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
+  { id: 'ai-study-plan', label: 'AI Study Plan',    Icon: Sparkles },
 ] as const
 type TabId = typeof TABS[number]['id']
 
 /* ── Main AdminClient ────────────────────────────────────────────────── */
-export function AdminClient({ initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing }: Props) {
+export function AdminClient({
+  initialPayments, tests, initialSchedules, initialResults, initialUsers, initialPromoCodes, promoDbMissing,
+  initialFeedback,
+}: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('payments')
 
   // Admin ham heartbeat yuborsin -- aks holda o'zi "offline" ko'rinadi.
@@ -5263,6 +5721,23 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
   const { theme, setTheme } = useTheme()
 
   const pendingCount = initialPayments.filter(p => p.status === 'pending').length
+  // Feedback -- haqiqiy DB holati bor ('new'/'replied'), To'lovlardagi
+  // pendingCount bilan bir xil mantiq: javob berilmagan feedback soni.
+  const feedbackNewCount = initialFeedback.filter(f => f.status === 'new').length
+  // Foydalanuvchilar'da bunday DB holati yo'q -- "oxirgi ko'rilgandan
+  // beri yangi qo'shilganlar" localStorage'ga asoslanadi (yuqoridagi
+  // useAdminSeenBadge).
+  const usersBadge = useAdminSeenBadge('users', initialUsers)
+  // Tab id -> shu tabga mos badge son (0 bo'lsa ko'rsatilmaydi).
+  const badgeCounts: Partial<Record<TabId, number>> = {
+    payments: pendingCount,
+    feedback: feedbackNewCount,
+    users: usersBadge.count,
+  }
+  function handleTabClick(id: TabId) {
+    setActiveTab(id)
+    if (id === 'users') usersBadge.markSeen()
+  }
   const readingTests = tests.filter(t => t.type === 'reading')
   const listeningTests = tests.filter(t => t.type === 'listening')
 
@@ -5296,10 +5771,11 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       >
         {TABS.map(({ id, label, Icon }) => {
           const active = activeTab === id
+          const badgeCount = badgeCounts[id] ?? 0
           return (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => handleTabClick(id)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
               style={{
                 background: active ? 'var(--accent)' : 'transparent',
@@ -5308,7 +5784,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
             >
               <Icon size={15} />
               {label}
-              {id === 'payments' && pendingCount > 0 && (
+              {badgeCount > 0 && (
                 <span
                   className="text-xs font-bold px-1.5 py-0.5 rounded-full ml-0.5"
                   style={{
@@ -5316,7 +5792,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
                     color: active ? 'white' : 'var(--warning)',
                   }}
                 >
-                  {pendingCount}
+                  {badgeCount}
                 </span>
               )}
             </button>
@@ -5352,6 +5828,7 @@ export function AdminClient({ initialPayments, tests, initialSchedules, initialR
       {activeTab === 'videos'               && <VideoLessonsTab />}
       {activeTab === 'typing'               && <TypingEssaysTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
+      {activeTab === 'ai-study-plan'         && <AiStudyPlanTab />}
     </div>
   )
 }
