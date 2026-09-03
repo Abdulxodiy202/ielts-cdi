@@ -4019,6 +4019,10 @@ function VideoLessonsTab() {
   // ishga tushirilmagan bo'lishi mumkin -- shu holatni "hali playlist
   // yo'q" bo'sh holatidan farqlab ko'rsatish uchun.
   const [plDbMissing,    setPlDbMissing]    = useState(false)
+  // Playlist qatoridan to'g'ridan-to'g'ri "shu playlistga qaysi
+  // videolar kirsin" deb boshqarish uchun modal holati.
+  const [plVideosModal,  setPlVideosModal]  = useState<AdminPlaylist | null>(null)
+  const [plVideoBusyId,  setPlVideoBusyId]  = useState<string | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -4198,6 +4202,32 @@ function VideoLessonsTab() {
     setDeleting(null)
   }
 
+  // Playlist-videos modalidagi checkbox bosilganda: video shu
+  // playlistda bo'lsa -- undan chiqaradi (null), bo'lmasa -- shu
+  // playlistga qo'shadi (boshqa playlistda bo'lsa, u yerdan "ko'chadi",
+  // chunki video_lessons.playlist_id bitta ustun -- bir vaqtda faqat
+  // bitta playlistga tegishli bo'lishi mumkin).
+  const toggleVideoInPlaylist = async (v: AdminVideo, playlist: AdminPlaylist) => {
+    const wasInThis = v.playlist_id === playlist.id
+    const prevPlaylistId = v.playlist_id
+    const nextPlaylistId = wasInThis ? null : playlist.id
+    setPlVideoBusyId(v.id)
+    const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playlist_id: nextPlaylistId }),
+    })
+    if (res.ok) {
+      setVideos(prev => prev.map(x => x.id === v.id ? { ...x, playlist_id: nextPlaylistId } : x))
+      setPlaylists(prev => prev.map(p => {
+        let delta = 0
+        if (p.id === playlist.id) delta += wasInThis ? -1 : 1
+        if (prevPlaylistId && p.id === prevPlaylistId && !wasInThis) delta -= 1
+        return delta !== 0 ? { ...p, video_count: Math.max(0, p.video_count + delta) } : p
+      }))
+    }
+    setPlVideoBusyId(null)
+  }
+
   if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
 
   // Category filter -- client-side. Backend hamma videolarni qaytaradi;
@@ -4252,6 +4282,7 @@ function VideoLessonsTab() {
           deleting={plDeleting}
           onEdit={plOpenEdit}
           onDelete={plHandleDelete}
+          onManageVideos={setPlVideosModal}
         />
       ) : (
       <>
@@ -4717,13 +4748,24 @@ function VideoLessonsTab() {
           </div>
         </div>
       )}
+
+      {plVideosModal && (
+        <PlaylistVideosModal
+          playlist={plVideosModal}
+          videos={videos}
+          playlists={playlists}
+          busyId={plVideoBusyId}
+          onToggle={v => toggleVideoInPlaylist(v, plVideosModal)}
+          onClose={() => setPlVideosModal(null)}
+        />
+      )}
     </div>
   )
 }
 
 /* ── Playlists view (list) for VideoLessonsTab ───────────────────────── */
 function PlaylistsView({
-  playlists, loading, dbMissing, deleting, onEdit, onDelete,
+  playlists, loading, dbMissing, deleting, onEdit, onDelete, onManageVideos,
 }: {
   playlists: AdminPlaylist[]
   loading: boolean
@@ -4731,6 +4773,7 @@ function PlaylistsView({
   deleting: string | null
   onEdit: (p: AdminPlaylist) => void
   onDelete: (p: AdminPlaylist) => void
+  onManageVideos: (p: AdminPlaylist) => void
 }) {
   if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
 
@@ -4757,7 +4800,7 @@ function PlaylistsView({
   return (
     <div className="card overflow-hidden">
       <div className="grid px-4 py-3 text-xs font-semibold uppercase tracking-wide"
-        style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
+        style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 108px', gap: 8, color: 'var(--text-muted)', background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border)' }}>
         <span>Preview</span><span>Sarlavha</span><span>Toifa</span><span>Videolar</span><span>Holat</span><span className="text-right">Amal</span>
       </div>
       <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
@@ -4765,7 +4808,7 @@ function PlaylistsView({
           const isIelts = (p.category ?? 'ielts') === 'ielts'
           return (
             <div key={p.id} className="grid items-center px-4 py-3"
-              style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 72px', gap: 8 }}>
+              style={{ gridTemplateColumns: '88px 1fr 130px 90px 80px 108px', gap: 8 }}>
               <div className="rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
                 style={{ width: 88, height: 50, background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
                 {p.thumbnail_url
@@ -4793,6 +4836,11 @@ function PlaylistsView({
                 {p.is_published ? 'Chop' : 'Draft'}
               </span>
               <div className="flex items-center gap-1.5 justify-end">
+                <button onClick={() => onManageVideos(p)} title="Videolarni boshqarish"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
+                  style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', color: 'var(--success)' }}>
+                  <ListVideo size={12} />
+                </button>
                 <button onClick={() => onEdit(p)} title="Tahrirlash"
                   className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80"
                   style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)' }}>
@@ -4807,6 +4855,97 @@ function PlaylistsView({
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+/* ── Playlist videos manager modal ───────────────────────────────────────
+   "Videolar" ko'rinishidagi har bir videoni tahrirlashda "Playlist"
+   dropdown allaqachon bor edi -- lekin playlist qatoridan to'g'ridan-to'g'ri
+   "shu playlistga qaysi videolarni qo'shaman" deb boshqarish imkoni yo'q
+   edi. Bu modal shuni beradi: checkbox bilan belgilash, PATCH orqali
+   video_lessons.playlist_id yangilanadi. Video bir vaqtda faqat bitta
+   playlistga tegishli bo'lishi mumkin (schema), shuning uchun boshqa
+   playlistdagi videoni belgilasa, u shu playlistga "ko'chadi". */
+function PlaylistVideosModal({
+  playlist, videos, playlists, busyId, onToggle, onClose,
+}: {
+  playlist: AdminPlaylist
+  videos: AdminVideo[]
+  playlists: AdminPlaylist[]
+  busyId: string | null
+  onToggle: (v: AdminVideo) => void
+  onClose: () => void
+}) {
+  const inThis = videos.filter(v => v.playlist_id === playlist.id)
+  const others = videos.filter(v => v.playlist_id !== playlist.id)
+  const ordered = [...inThis, ...others]
+  const otherPlaylistTitle = (id: string | null) => id ? (playlists.find(p => p.id === id)?.title ?? null) : null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl p-6 flex flex-col"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', maxHeight: '85vh' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="font-bold text-lg flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <ListVideo size={18} style={{ color: 'var(--accent)' }} /> Videolarni boshqarish
+          </h3>
+          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80" style={{ color: 'var(--text-muted)' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
+          <strong style={{ color: 'var(--text-primary)' }}>{playlist.title}</strong> playlistiga kiritmoqchi bo&apos;lgan videolarni belgilang.
+        </p>
+
+        {videos.length === 0 ? (
+          <div className="card p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+            Hali umuman video qo&apos;shilmagan. Avval &quot;Videolar&quot; ko&apos;rinishidan video qo&apos;shing.
+          </div>
+        ) : (
+          <div className="overflow-y-auto space-y-1.5 pr-1" style={{ flex: 1 }}>
+            {ordered.map(v => {
+              const checked = v.playlist_id === playlist.id
+              const otherTitle = !checked ? otherPlaylistTitle(v.playlist_id) : null
+              return (
+                <label key={v.id}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+                  style={{
+                    background: checked ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)',
+                    border: `1px solid ${checked ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={busyId === v.id}
+                    onChange={() => onToggle(v)}
+                    className="w-4 h-4 shrink-0"
+                  />
+                  <div className="w-12 h-8 rounded-md overflow-hidden shrink-0 flex items-center justify-center"
+                    style={{ background: 'var(--bg-primary)' }}>
+                    {v.thumbnail_url
+                      ? <img src={v.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <Play size={12} style={{ color: 'var(--text-muted)' }} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                    {otherTitle && (
+                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>Hozir boshqa playlistda: {otherTitle}</p>
+                    )}
+                  </div>
+                  {busyId === v.id && <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} />}
+                </label>
+              )
+            })}
+          </div>
+        )}
+
+        <button onClick={onClose} className="btn-outline text-sm mt-4 w-full shrink-0">Yopish</button>
       </div>
     </div>
   )
