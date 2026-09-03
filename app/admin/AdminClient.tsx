@@ -9,6 +9,7 @@ import {
   Calendar, BookOpen, Headphones, CreditCard, BarChart2, Users,
   Tag, Plus, Trash2, ToggleLeft, ToggleRight, Edit3, Copy, Send, MessageSquare,
   Loader2, Upload, FileText, X, Music, Play, Keyboard, Sun, Moon, Sparkles, ListVideo,
+  Images,
 } from 'lucide-react'
 import { formatDate, formatPrice, formatTime } from '@/lib/utils/formatters'
 import { BOOK_CATEGORIES, BOOK_CATEGORY_COLORS, DEFAULT_BOOK_CATEGORY, type BookCategory } from '@/lib/utils/bookCategories'
@@ -5948,6 +5949,245 @@ function AiStudyPlanTab() {
   )
 }
 
+/* ── Landing sahifasi rasmlari (product proof galereyasi) ────────────────
+   Kirish sahifasidagi (/ -- login qilinmagan mehmon ko'radigan sahifa)
+   "mahsulot isboti" bo'limi uchun skrinshotlar shu yerdan yuklanadi.
+   Rasm to'g'ridan-to'g'ri Supabase Storage'ga signed URL orqali
+   yuklanadi (Vercel'ning 4.5MB body limitidan chetlab o'tish uchun --
+   book-cover-url'dagi bilan bir xil pattern), keyin DB qatori
+   yaratiladi. Tartib -- strelkalar bilan, har bir yangi rasm ro'yxat
+   oxiriga (max+1) tushgani uchun (playlist-videos'dagi kabi hammasi 0
+   bo'lib qolish muammosi bu yerda yo'q), shuning uchun har bir surish
+   atigi 2 ta yozuvni yangilaydi. */
+interface ShowcaseImage {
+  id: string
+  title: string | null
+  image_url: string
+  storage_path: string
+  order_index: number
+  is_published: boolean
+  created_at: string
+}
+
+function LandingShowcaseTab() {
+  const [items,      setItems]      = useState<ShowcaseImage[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [dbMissing,  setDbMissing]  = useState(false)
+  const [uploading,  setUploading]  = useState(false)
+  const [error,      setError]      = useState('')
+  const [busyId,     setBusyId]     = useState<string | null>(null)
+  const [titleDrafts, setTitleDrafts] = useState<Record<string, string>>({})
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const load = async () => {
+    setLoading(true)
+    const res = await fetch('/api/admin/landing-showcase')
+    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.ok) {
+      const d = await res.json()
+      setItems(Array.isArray(d) ? d : [])
+    }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function handleFileChosen(file: File) {
+    setError(''); setUploading(true)
+    try {
+      const urlRes = await fetch('/api/admin/landing-showcase/upload-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name }),
+      })
+      if (!urlRes.ok) { const e = await urlRes.json().catch(() => ({})); throw new Error(e.error ?? 'URL xato') }
+      const { signedUrl, contentType, publicUrl, storagePath } = await urlRes.json()
+
+      const upRes = await fetch(signedUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
+      if (!upRes.ok) throw new Error(`Storage xatosi ${upRes.status}`)
+
+      const recRes = await fetch('/api/admin/landing-showcase', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_url: publicUrl, storage_path: storagePath }),
+      })
+      if (!recRes.ok) { const e = await recRes.json().catch(() => ({})); throw new Error(e.error ?? 'Xatolik') }
+      const created = await recRes.json()
+      setItems(prev => [...prev, created])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Xatolik')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function saveTitle(item: ShowcaseImage) {
+    const draft = titleDrafts[item.id]
+    if (draft === undefined || draft === (item.title ?? '')) return
+    setBusyId(item.id)
+    const res = await fetch(`/api/admin/landing-showcase/${item.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: draft || null }),
+    })
+    if (res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, title: draft || null } : x))
+    setBusyId(null)
+  }
+
+  async function togglePublish(item: ShowcaseImage) {
+    setBusyId(item.id)
+    const res = await fetch(`/api/admin/landing-showcase/${item.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_published: !item.is_published }),
+    })
+    if (res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, is_published: !item.is_published } : x))
+    setBusyId(null)
+  }
+
+  async function handleDelete(item: ShowcaseImage) {
+    if (!confirm("Bu rasmni o'chirishni tasdiqlaysizmi?")) return
+    setBusyId(item.id)
+    const res = await fetch(`/api/admin/landing-showcase/${item.id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) setItems(prev => prev.filter(x => x.id !== item.id))
+    setBusyId(null)
+  }
+
+  async function moveImage(item: ShowcaseImage, direction: -1 | 1) {
+    const sorted = [...items].sort((a, b) => a.order_index - b.order_index)
+    const idx = sorted.findIndex(x => x.id === item.id)
+    const swapIdx = idx + direction
+    if (idx === -1 || swapIdx < 0 || swapIdx >= sorted.length) return
+    const other = sorted[swapIdx]
+
+    setBusyId(item.id)
+    const [resA, resB] = await Promise.all([
+      fetch(`/api/admin/landing-showcase/${item.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_index: other.order_index }),
+      }),
+      fetch(`/api/admin/landing-showcase/${other.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_index: item.order_index }),
+      }),
+    ])
+    if (resA.ok && resB.ok) {
+      setItems(prev => prev.map(x => {
+        if (x.id === item.id) return { ...x, order_index: other.order_index }
+        if (x.id === other.id) return { ...x, order_index: item.order_index }
+        return x
+      }))
+    } else {
+      alert("Tartiblashda xatolik yuz berdi. Qayta urinib ko'ring.")
+    }
+    setBusyId(null)
+  }
+
+  if (loading) return <div className="card p-12 text-center" style={{ color: 'var(--text-muted)' }}>Yuklanmoqda...</div>
+
+  if (dbMissing) {
+    return (
+      <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
+        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ landing_showcase_images jadvali topilmadi</p>
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          Supabase Dashboard → SQL Editor&apos;da <code>041_landing_showcase.sql</code> migratsiyasini ishga tushiring, keyin sahifani yangilang.
+        </p>
+      </div>
+    )
+  }
+
+  const sorted = [...items].sort((a, b) => a.order_index - b.order_index)
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{items.length} ta rasm</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            Kirish sahifasidagi (/ -- tizimga kirmagan mehmonlar ko&apos;radigan bosh sahifa) &quot;mahsulot isboti&quot; galereyasi shu rasmlardan tuziladi.
+          </p>
+        </div>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50"
+        >
+          {uploading ? <><Loader2 size={14} className="animate-spin" /> Yuklanmoqda...</> : <><Upload size={14} /> Rasm qo&apos;shish</>}
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileChosen(f) }}
+        />
+      </div>
+
+      {error && <p className="text-xs" style={{ color: 'var(--error)' }}>❌ {error}</p>}
+
+      {sorted.length === 0 ? (
+        <div className="card p-16 text-center">
+          <Images size={40} className="mx-auto mb-3 opacity-20" style={{ color: 'var(--text-muted)' }} />
+          <p style={{ color: 'var(--text-muted)' }}>Hali rasm qo&apos;shilmagan</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {sorted.map((item, i) => (
+            <div key={item.id} className="card overflow-hidden">
+              <div style={{ position: 'relative', width: '100%', paddingTop: '60%', background: 'var(--bg-secondary)' }}>
+                <img
+                  src={item.image_url}
+                  alt={item.title ?? ''}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div className="absolute top-2 left-2 flex flex-col gap-0.5">
+                  <button
+                    type="button" onClick={() => moveImage(item, -1)} disabled={i === 0 || busyId === item.id}
+                    title="Yuqoriga"
+                    className="w-6 h-6 flex items-center justify-center rounded-md disabled:opacity-30"
+                    style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+                    <ChevronUp size={14} />
+                  </button>
+                  <button
+                    type="button" onClick={() => moveImage(item, 1)} disabled={i === sorted.length - 1 || busyId === item.id}
+                    title="Pastga"
+                    className="w-6 h-6 flex items-center justify-center rounded-md disabled:opacity-30"
+                    style={{ background: 'rgba(0,0,0,0.55)', color: '#fff' }}>
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              </div>
+              <div className="p-3 space-y-2">
+                <input
+                  className="input-field text-sm w-full"
+                  placeholder="Tagsarlavha (ixtiyoriy) -- masalan: Reading test interfeysi"
+                  value={titleDrafts[item.id] ?? item.title ?? ''}
+                  onChange={e => setTitleDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                  onBlur={() => saveTitle(item)}
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button" onClick={() => togglePublish(item)} disabled={busyId === item.id}
+                    className="text-xs px-2.5 py-1 rounded-full font-medium disabled:opacity-50"
+                    style={item.is_published
+                      ? { background: 'rgba(34,197,94,0.1)', color: 'var(--success)', border: '1px solid rgba(34,197,94,0.25)' }
+                      : { background: 'var(--bg-secondary)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+                  >
+                    {item.is_published ? "Saytda ko'rinadi" : 'Yashirilgan'}
+                  </button>
+                  <button
+                    type="button" onClick={() => handleDelete(item)} disabled={busyId === item.id}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:opacity-80 disabled:opacity-50"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--error)' }}
+                  >
+                    {busyId === item.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'payments',  label: 'To\'lovlar',      Icon: CreditCard },
   { id: 'reading',   label: 'Reading Tests',   Icon: BookOpen },
@@ -5965,6 +6205,7 @@ const TABS = [
   { id: 'typing',        label: 'Typing',           Icon: Keyboard },
   { id: 'feedback',      label: 'Feedback',         Icon: MessageSquare },
   { id: 'ai-study-plan', label: 'AI Study Plan',    Icon: Sparkles },
+  { id: 'landing-showcase', label: 'Sayt rasmlari', Icon: Images },
 ] as const
 type TabId = typeof TABS[number]['id']
 
@@ -6093,6 +6334,7 @@ export function AdminClient({
       {activeTab === 'typing'               && <TypingEssaysTab />}
       {activeTab === 'feedback'              && <FeedbackTab />}
       {activeTab === 'ai-study-plan'         && <AiStudyPlanTab />}
+      {activeTab === 'landing-showcase'      && <LandingShowcaseTab />}
     </div>
   )
 }

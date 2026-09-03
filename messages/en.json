@@ -1080,6 +1080,10 @@
       "communityComingSoon": "Community (Coming soon)",
       "rights": "All rights reserved"
     },
+    "showcase": {
+      "title": "See the platform itself",
+      "subtitle": "No marketing talk -- real screenshots of the actual interface."
+    },
     "featuresSection": {
       "title": "Everything you need to succeed",
       "subtitle": "Six ways the platform helps you go from your first practice test to your target band.",

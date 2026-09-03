@@ -12,11 +12,23 @@ import {
   LandingFooter,
 } from '@/components/landing/LandingContent'
 import { LandingSilk } from '@/components/landing/LandingSilk'
+import { LandingShowcase } from '@/components/landing/LandingShowcase'
 
 export default async function LandingPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const ctaHref = user ? '/dashboard' : '/login'
+
+  // "Mahsulot isboti" galereyasi -- admin panelning "Sayt rasmlari"
+  // bo'limidan boshqariladi. RLS "is_published=true" bo'lganlarnigina
+  // ochadi, shuning uchun bu yerda qo'shimcha filtr shart emas, lekin
+  // tartib (order_index) uchun .order() kerak. Jadval hali migratsiya
+  // qilinmagan bo'lsa (yangi loyihalarda), xatoni jim yutamiz --
+  // galereya shunchaki ko'rsatilmaydi.
+  const { data: showcaseImages } = await supabase
+    .from('landing_showcase_images')
+    .select('id, title, image_url')
+    .order('order_index', { ascending: true })
 
   return (
     // `overflow-x-hidden` emas, `overflow-x-clip` ishlatilyabdi -- 'hidden'
@@ -85,6 +97,10 @@ export default async function LandingPage() {
 
       {/* Hero -- floating cards + shimmer + scroll indicator */}
       <HeroClient ctaHref={ctaHref} hasUser={!!user} />
+
+      {/* Mahsulot isboti -- haqiqiy sayt skrinshotlari, admin
+          boshqaradi. Rasm bo'lmasa hech narsa render qilinmaydi. */}
+      <LandingShowcase images={showcaseImages ?? []} />
 
       {/* Sections translated via LanguageContext (client components) */}
       <LandingFeaturesSection />
