@@ -4211,13 +4211,19 @@ function VideoLessonsTab() {
     const wasInThis = v.playlist_id === playlist.id
     const prevPlaylistId = v.playlist_id
     const nextPlaylistId = wasInThis ? null : playlist.id
+    // Yangi qo'shilayotgan video ro'yxat OXIRIGA tushsin -- eskiroq
+    // order_in_playlist qiymati (odatda 0) tufayli boshqa videolar
+    // orasiga chalkashib kirib qolmasin.
+    const nextOrder = wasInThis ? 0 : (
+      Math.max(0, ...videos.filter(x => x.playlist_id === playlist.id).map(x => x.order_in_playlist ?? 0)) + 1
+    )
     setPlVideoBusyId(v.id)
     const res = await fetch(`/api/admin/video-lessons/${v.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playlist_id: nextPlaylistId }),
+      body: JSON.stringify({ playlist_id: nextPlaylistId, order_in_playlist: nextOrder }),
     })
     if (res.ok) {
-      setVideos(prev => prev.map(x => x.id === v.id ? { ...x, playlist_id: nextPlaylistId } : x))
+      setVideos(prev => prev.map(x => x.id === v.id ? { ...x, playlist_id: nextPlaylistId, order_in_playlist: nextOrder } : x))
       setPlaylists(prev => prev.map(p => {
         let delta = 0
         if (p.id === playlist.id) delta += wasInThis ? -1 : 1
@@ -4225,6 +4231,40 @@ function VideoLessonsTab() {
         return delta !== 0 ? { ...p, video_count: Math.max(0, p.video_count + delta) } : p
       }))
     }
+    setPlVideoBusyId(null)
+  }
+
+  // Playlist ichidagi videolarni yuqoriga/pastga surish -- ko'pchilik
+  // video hali order_in_playlist=0 (default) bo'lgani uchun, birinchi
+  // marta bosilganda butun ro'yxat joriy tartib bo'yicha ketma-ket
+  // raqamlarga normallashtiriladi (0..n-1), so'ng ikkita element
+  // almashtiriladi. Faqat qiymati o'zgargan videolar PATCH qilinadi.
+  const moveVideoInPlaylist = async (video: AdminVideo, playlist: AdminPlaylist, direction: -1 | 1) => {
+    const list = videos
+      .filter(v => v.playlist_id === playlist.id)
+      .sort((a, b) => (a.order_in_playlist ?? 0) - (b.order_in_playlist ?? 0) || a.created_at.localeCompare(b.created_at))
+    const idx = list.findIndex(v => v.id === video.id)
+    const swapIdx = idx + direction
+    if (idx === -1 || swapIdx < 0 || swapIdx >= list.length) return
+
+    const reordered = [...list]
+    ;[reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]]
+    const updates = reordered
+      .map((v, i) => ({ v, newOrder: i }))
+      .filter(({ v, newOrder }) => (v.order_in_playlist ?? 0) !== newOrder)
+    if (updates.length === 0) return
+
+    setPlVideoBusyId(video.id)
+    await Promise.all(updates.map(({ v, newOrder }) =>
+      fetch(`/api/admin/video-lessons/${v.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_in_playlist: newOrder }),
+      })
+    ))
+    setVideos(prev => prev.map(x => {
+      const u = updates.find(u => u.v.id === x.id)
+      return u ? { ...x, order_in_playlist: u.newOrder } : x
+    }))
     setPlVideoBusyId(null)
   }
 
@@ -4756,6 +4796,7 @@ function VideoLessonsTab() {
           playlists={playlists}
           busyId={plVideoBusyId}
           onToggle={v => toggleVideoInPlaylist(v, plVideosModal)}
+          onMove={(v, dir) => moveVideoInPlaylist(v, plVideosModal, dir)}
           onClose={() => setPlVideosModal(null)}
         />
       )}
@@ -4869,18 +4910,23 @@ function PlaylistsView({
    playlistga tegishli bo'lishi mumkin (schema), shuning uchun boshqa
    playlistdagi videoni belgilasa, u shu playlistga "ko'chadi". */
 function PlaylistVideosModal({
-  playlist, videos, playlists, busyId, onToggle, onClose,
+  playlist, videos, playlists, busyId, onToggle, onMove, onClose,
 }: {
   playlist: AdminPlaylist
   videos: AdminVideo[]
   playlists: AdminPlaylist[]
   busyId: string | null
   onToggle: (v: AdminVideo) => void
+  onMove: (v: AdminVideo, direction: -1 | 1) => void
   onClose: () => void
 }) {
-  const inThis = videos.filter(v => v.playlist_id === playlist.id)
+  // Playlist ichidagilar -- tartib bo'yicha (order_in_playlist, teng
+  // bo'lsa qo'shilgan vaqti bo'yicha) -- yuqorida, tartiblash strelkalari
+  // bilan. Qolgan videolar pastda, faqat "qo'shish" checkbox'i bilan.
+  const inThis = videos
+    .filter(v => v.playlist_id === playlist.id)
+    .sort((a, b) => (a.order_in_playlist ?? 0) - (b.order_in_playlist ?? 0) || a.created_at.localeCompare(b.created_at))
   const others = videos.filter(v => v.playlist_id !== playlist.id)
-  const ordered = [...inThis, ...others]
   const otherPlaylistTitle = (id: string | null) => id ? (playlists.find(p => p.id === id)?.title ?? null) : null
 
   return (
@@ -4899,7 +4945,7 @@ function PlaylistVideosModal({
           </button>
         </div>
         <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
-          <strong style={{ color: 'var(--text-primary)' }}>{playlist.title}</strong> playlistiga kiritmoqchi bo&apos;lgan videolarni belgilang.
+          <strong style={{ color: 'var(--text-primary)' }}>{playlist.title}</strong> playlistidagi videolar tartibi -- strelkalar bilan surating, checkbox bilan qo&apos;shing/chiqaring.
         </p>
 
         {videos.length === 0 ? (
@@ -4907,41 +4953,96 @@ function PlaylistVideosModal({
             Hali umuman video qo&apos;shilmagan. Avval &quot;Videolar&quot; ko&apos;rinishidan video qo&apos;shing.
           </div>
         ) : (
-          <div className="overflow-y-auto space-y-1.5 pr-1" style={{ flex: 1 }}>
-            {ordered.map(v => {
-              const checked = v.playlist_id === playlist.id
-              const otherTitle = !checked ? otherPlaylistTitle(v.playlist_id) : null
-              return (
-                <label key={v.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
-                  style={{
-                    background: checked ? 'rgba(99,102,241,0.08)' : 'var(--bg-secondary)',
-                    border: `1px solid ${checked ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={busyId === v.id}
-                    onChange={() => onToggle(v)}
-                    className="w-4 h-4 shrink-0"
-                  />
-                  <div className="w-12 h-8 rounded-md overflow-hidden shrink-0 flex items-center justify-center"
-                    style={{ background: 'var(--bg-primary)' }}>
-                    {v.thumbnail_url
-                      ? <img src={v.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <Play size={12} style={{ color: 'var(--text-muted)' }} />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
-                    {otherTitle && (
-                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>Hozir boshqa playlistda: {otherTitle}</p>
-                    )}
-                  </div>
-                  {busyId === v.id && <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} />}
-                </label>
-              )
-            })}
+          <div className="overflow-y-auto pr-1" style={{ flex: 1 }}>
+            {inThis.length > 0 && (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Playlistdagi videolar ({inThis.length})
+                </p>
+                <div className="space-y-1.5 mb-4">
+                  {inThis.map((v, i) => (
+                    <div key={v.id}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl"
+                      style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.3)' }}
+                    >
+                      <span className="text-xs font-bold w-5 text-center shrink-0" style={{ color: 'var(--accent)' }}>{i + 1}</span>
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button" onClick={() => onMove(v, -1)} disabled={i === 0 || busyId === v.id}
+                          title="Yuqoriga surish"
+                          className="w-5 h-4 flex items-center justify-center rounded disabled:opacity-25 hover:opacity-70"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          <ChevronUp size={13} />
+                        </button>
+                        <button
+                          type="button" onClick={() => onMove(v, 1)} disabled={i === inThis.length - 1 || busyId === v.id}
+                          title="Pastga surish"
+                          className="w-5 h-4 flex items-center justify-center rounded disabled:opacity-25 hover:opacity-70"
+                          style={{ color: 'var(--text-secondary)' }}>
+                          <ChevronDown size={13} />
+                        </button>
+                      </div>
+                      <div className="w-12 h-8 rounded-md overflow-hidden shrink-0 flex items-center justify-center"
+                        style={{ background: 'var(--bg-primary)' }}>
+                        {v.thumbnail_url
+                          ? <img src={v.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <Play size={12} style={{ color: 'var(--text-muted)' }} />}
+                      </div>
+                      <p className="text-sm font-medium truncate flex-1 min-w-0" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                      {busyId === v.id
+                        ? <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} />
+                        : (
+                          <button type="button" onClick={() => onToggle(v)} title="Playlistdan chiqarish"
+                            className="w-6 h-6 flex items-center justify-center rounded-lg shrink-0 hover:opacity-80"
+                            style={{ background: 'rgba(239,68,68,0.08)', color: 'var(--error)' }}>
+                            <X size={12} />
+                          </button>
+                        )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--text-muted)' }}>
+              Qo&apos;shish uchun boshqa videolar ({others.length})
+            </p>
+            {others.length === 0 ? (
+              <p className="text-sm px-1" style={{ color: 'var(--text-muted)' }}>Boshqa video yo&apos;q -- hammasi shu playlistda.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {others.map(v => {
+                  const otherTitle = otherPlaylistTitle(v.playlist_id)
+                  return (
+                    <label key={v.id}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        disabled={busyId === v.id}
+                        onChange={() => onToggle(v)}
+                        className="w-4 h-4 shrink-0"
+                      />
+                      <div className="w-12 h-8 rounded-md overflow-hidden shrink-0 flex items-center justify-center"
+                        style={{ background: 'var(--bg-primary)' }}>
+                        {v.thumbnail_url
+                          ? <img src={v.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <Play size={12} style={{ color: 'var(--text-muted)' }} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.title}</p>
+                        {otherTitle && (
+                          <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>Hozir boshqa playlistda: {otherTitle}</p>
+                        )}
+                      </div>
+                      {busyId === v.id && <Loader2 size={14} className="animate-spin shrink-0" style={{ color: 'var(--text-muted)' }} />}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
