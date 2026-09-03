@@ -4255,16 +4255,22 @@ function VideoLessonsTab() {
     if (updates.length === 0) return
 
     setPlVideoBusyId(video.id)
-    await Promise.all(updates.map(({ v, newOrder }) =>
-      fetch(`/api/admin/video-lessons/${v.id}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_in_playlist: newOrder }),
-      })
-    ))
-    setVideos(prev => prev.map(x => {
-      const u = updates.find(u => u.v.id === x.id)
-      return u ? { ...x, order_in_playlist: u.newOrder } : x
-    }))
+    // Hammasi BITTA so'rovda -- avval har biriga alohida parallel PATCH
+    // yuborilardi, bu ba'zida qisman jim muvaffaqiyatsizlikka olib
+    // kelardi (admin ekranida "yangilandi" ko'ringan, lekin bazada
+    // yangilanmagan videolar qolardi). Endi natija tekshiriladi.
+    const res = await fetch('/api/admin/video-lessons/reorder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: updates.map(({ v, newOrder }) => ({ id: v.id, order_in_playlist: newOrder })) }),
+    })
+    if (res.ok) {
+      setVideos(prev => prev.map(x => {
+        const u = updates.find(u => u.v.id === x.id)
+        return u ? { ...x, order_in_playlist: u.newOrder } : x
+      }))
+    } else {
+      alert("Tartiblashda xatolik yuz berdi. Qayta urinib ko'ring.")
+    }
     setPlVideoBusyId(null)
   }
 
