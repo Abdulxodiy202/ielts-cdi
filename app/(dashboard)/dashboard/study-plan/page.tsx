@@ -460,8 +460,12 @@ export default function StudyPlanPage() {
   // ISO ("YYYY-MM-DD") formatda bo'lgani uchun oddiy satr solishtirish
   // yetarli (backenddagi isFinalDayReached() bilan bir xil mantiq).
   const lastDay = days[days.length - 1] ?? null
-  const weekFinished = !lastDay || todayStr >= lastDay.date
-  const canChangeRegime = !plan || weekFinished
+  // 2026-09 o'zgarishi: avval faqat hafta tugagach (weekFinished)
+  // o'zgartirish mumkin edi -- endi bu cheklov olib tashlandi, foydalanuvchi
+  // istalgan vaqtda "Yangi hafta uchun rejim tanlash" tugmasini bosib
+  // rejimni/rejani qayta tuzishi mumkin (backend ham endi cheklamaydi --
+  // qarang: app/api/study-plan/ai-generate/route.ts POST).
+  const canChangeRegime = true
   const showTimePicker = !plan || (choosingTime && canChangeRegime)
 
   return (

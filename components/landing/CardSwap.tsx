@@ -36,7 +36,18 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(({ customClass, ...rest }, ref) => (
-  <div ref={ref} {...rest} className={`card ${customClass ?? ''} ${rest.className ?? ''}`.trim()} />
+  // MUHIM: bu yerda umumiy "card" klassi ATAYLAB ishlatilmaydi -- loyihada
+  // globals.css'dagi saytning umumiy .card utility klassi (dashboard,
+  // pricing, feature kartalari va h.k. hammasi shundan foydalanadi) bilan
+  // NOM to'qnashuvi bo'lgan edi. CardSwap.css'dagi .card{position:absolute...}
+  // qoidasi @layer'siz (oddiy) yozilgani uchun CSS qoidasiga ko'ra u
+  // globals.css'ning @layer components ichidagi .card'dan HAR DOIM ustun
+  // chiqadi -- natijada BUTUN saytdagi .card klassli elementlar sahifa
+  // markaziga "yopishtirilib", bir-birining ustiga tushib qolgan edi
+  // (pricing/feature/band-table kartalari, dashboard'dagi referral va
+  // leaderboard overlap -- hammasi shu bitta sababdan). Shuning uchun bu
+  // komponent endi faqat o'ziga xos "card-swap-item" klassidan foydalanadi.
+  <div ref={ref} {...rest} className={`card-swap-item ${customClass ?? ''} ${rest.className ?? ''}`.trim()} />
 ))
 Card.displayName = 'Card'
 

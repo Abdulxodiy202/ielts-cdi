@@ -708,31 +708,14 @@ export async function POST(request: Request) {
     return Response.json({ error: 'Bu funksiya faqat premium foydalanuvchilar uchun mavjud.', code: 'PREMIUM_REQUIRED' }, { status: 403 })
   }
 
-  // Rejim (dailyMinutes) haftada FAQAT BIR MARTA tanlanadi -- joriy
-  // reja hali "hafta oxiri"ga yetmagan bo'lsa, yangi reja (demak yangi
-  // rejim) tuzishga ruxsat berilmaydi, hatto foydalanuvchi frontend'ni
-  // chetlab o'tib to'g'ridan-to'g'ri shu endpoint'ga so'rov yuborsa ham.
-  // "Hafta tugadi" degani AYNAN bonus berishda ishlatiladigan
-  // isFinalDayReached() bilan bir xil qoida (joriy rejaning eng oxirgi
-  // kuni yetib kelgan yoki o'tib ketgan) -- shu bilan butun tizimda
-  // "hafta tugadi" bir xil ma'noni anglatadi.
-  const { data: existingRow } = await admin
-    .from('ai_study_plans')
-    .select('plan_json')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  const existingDays = existingRow?.plan_json
-  if (existingRow && isValidPlan(existingDays) && !isFinalDayReached(existingDays)) {
-    const lastDate = existingDays[existingDays.length - 1].date
-    return Response.json({
-      error: `Joriy haftalik rejangiz hali yakunlanmagan. Kunlik vaqtni (rejimni) faqat hafta tugagach -- ${lastDate} kunidan keyin -- o'zgartirishingiz mumkin.`,
-      code: 'PLAN_IN_PROGRESS',
-      lastDate,
-    }, { status: 409 })
-  }
+  // 2026-09 o'zgarishi: avval rejim (dailyMinutes) haftada FAQAT BIR
+  // MARTA tanlanardi -- joriy reja hali "hafta oxiri"ga yetmagan bo'lsa,
+  // yangi reja tuzishga ruxsat berilmasdi. Foydalanuvchi (sayt egasi)
+  // buni olib tashlashni so'radi -- endi istalgan vaqtda, hafta
+  // tugash-tugamasligidan qat'i nazar, yangi reja/rejim tanlash mumkin.
+  // Eski joriy reja qatori bazada qoladi (o'chirilmaydi), shunchaki
+  // pastdagi INSERT unga qo'shimcha yangi qator sifatida qo'shiladi va
+  // GET/PATCH har doim ENG OXIRGI (created_at bo'yicha) qatorni oladi.
 
   const body = await request.json().catch(() => ({}))
   const rawMinutes = Number((body as { dailyMinutes?: unknown })?.dailyMinutes)
