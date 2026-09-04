@@ -8,7 +8,11 @@
    Qo'shimcha: prefers-reduced-motion yoqilgan foydalanuvchilarda avtomatik
    almashish (interval) butunlay o'chiriladi -- kartalar shunchaki
    joylashtirilgan holatda, statik ko'rinadi (hech qanday sakrash/aylanish
-   bo'lmaydi). Original kod bunga e'tibor bermagan edi, biz qo'shdik. */
+   bo'lmaydi). Original kod bunga e'tibor bermagan edi, biz qo'shdik.
+
+   `onActiveChange` -- har safar eng oldingi (faol) karta almashganda uning
+   asl indeksini beradi, shu orqali tashqi komponent (masalan, yon matn)
+   joriy rasmga sinxron holda yangilanishi mumkin. */
 
 import React, {
   Children,
@@ -71,6 +75,11 @@ export interface CardSwapProps {
   delay?: number
   pauseOnHover?: boolean
   onCardClick?: (idx: number) => void
+  // Har safar eng oldingi (faol) karta almashganda chaqiriladi -- yangi
+  // faol kartaning asl (children ichidagi) indeksini beradi. Masalan,
+  // shu indeksdan foydalanib chap tomondagi matnni joriy rasmga mos
+  // ravishda yangilash mumkin.
+  onActiveChange?: (idx: number) => void
   skewAmount?: number
   easing?: 'elastic' | 'linear'
   children: ReactNode
@@ -84,6 +93,7 @@ const CardSwap = ({
   delay = 5000,
   pauseOnHover = false,
   onCardClick,
+  onActiveChange,
   skewAmount = 6,
   easing = 'elastic',
   children,
@@ -134,6 +144,10 @@ const CardSwap = ({
       if (r.current) placeNow(r.current, makeSlot(i, cardDistance, verticalDistance, total), skewAmount)
     })
 
+    // Boshlang'ich holatda eng oldingi (0-indeksli) karta faol -- chaqiruvchi
+    // tomon (masalan, chap tomondagi matn) shu bilan sinxronlanadi.
+    if (total > 0) onActiveChange?.(order.current[0])
+
     // Kamaytirilgan harakat yoqilgan bo'lsa yoki bitta kartadan kam bo'lsa --
     // hech qanday avtomatik aylanish/timer ishga tushirilmaydi.
     if (reduceMotion || total < 2) return
@@ -174,6 +188,7 @@ const CardSwap = ({
       )
       tl.call(() => {
         order.current = [...rest, front]
+        onActiveChange?.(order.current[0])
       })
     }
 
@@ -200,7 +215,7 @@ const CardSwap = ({
     }
     return () => clearInterval(intervalRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardDistance, verticalDistance, delay, pauseOnHover, skewAmount, easing, refs])
+  }, [cardDistance, verticalDistance, delay, pauseOnHover, skewAmount, easing, refs, onActiveChange])
 
   const rendered = childArr.map((child, i) =>
     isValidElement(child)
