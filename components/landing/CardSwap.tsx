@@ -116,7 +116,13 @@ const CardSwap = ({
   )
   const order = useRef<number[]>(Array.from({ length: childArr.length }, (_, i) => i))
   const tlRef = useRef<gsap.core.Timeline | null>(null)
-  const intervalRef = useRef<ReturnType<typeof window.setInterval> | undefined>(undefined)
+  // number aniq belgilangan -- ReturnType<typeof setInterval> ishlatilmaydi,
+  // chunki loyihada @types/node ham mavjud va bu holda TypeScript ba'zan
+  // Node'ning "Timeout" turini DOM'ning "number" turi bilan chalkashtirib,
+  // "Type 'number' is not assignable to type 'Timeout'" xatosini beradi.
+  // Bu komponent faqat brauzerda ('use client') ishlaydi, shuning uchun
+  // window.setInterval har doim number qaytaradi.
+  const intervalRef = useRef<number | undefined>(undefined)
   const container = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
