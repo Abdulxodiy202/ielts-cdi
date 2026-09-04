@@ -21,6 +21,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   const allowed: Record<string, unknown> = {}
   if ('title' in body) allowed.title = body.title ? String(body.title).trim() : null
+  if ('title_en' in body) allowed.title_en = body.title_en ? String(body.title_en).trim() : null
   if ('is_published' in body) allowed.is_published = Boolean(body.is_published)
   if ('order_index' in body) allowed.order_index = Number.isFinite(body.order_index) ? body.order_index : 0
 
@@ -28,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from('landing_showcase_images')
     .update(allowed)
     .eq('id', id)
-    .select('id, title, image_url, storage_path, order_index, is_published, created_at')
+    .select('id, title, title_en, image_url, storage_path, order_index, is_published, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 500 })

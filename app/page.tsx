@@ -6,6 +6,7 @@ import { HeroClient } from '@/components/landing/HeroClient'
 import {
   LandingNavLinks,
   LandingAuthCta,
+  LandingLanguageToggle,
   LandingFeaturesSection,
   LandingBandTableSection,
   LandingPricingSection,
@@ -27,7 +28,7 @@ export default async function LandingPage() {
   // galereya shunchaki ko'rsatilmaydi.
   const { data: showcaseImages } = await supabase
     .from('landing_showcase_images')
-    .select('id, title, image_url')
+    .select('id, title, title_en, image_url')
     .order('order_index', { ascending: true })
 
   return (
@@ -91,6 +92,7 @@ export default async function LandingPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <LandingLanguageToggle />
           <LandingAuthCta hasUser={!!user} />
         </div>
       </nav>

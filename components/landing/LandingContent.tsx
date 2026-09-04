@@ -62,6 +62,37 @@ export function LandingNavLinks() {
   )
 }
 
+/* Kirish sahifasi navbar'i uchun ixcham til almashtirgich (UZ/EN).
+   Dashboard sidebar'idagi bayroqli variantdan farqli o'laroq, bu yerda
+   joy tor (navbar bitta qatorda) -- shuning uchun oddiy matnli
+   segmented-control ko'rinishida, faol til aksent rangda ajratiladi. */
+export function LandingLanguageToggle() {
+  const { lang, setLang } = useLanguage()
+  return (
+    <div
+      className="flex items-center rounded-full p-0.5"
+      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}
+      role="group"
+      aria-label="Til / Language"
+    >
+      {(['uz', 'en'] as const).map((code) => (
+        <button
+          key={code}
+          type="button"
+          onClick={() => setLang(code)}
+          className="px-2.5 py-1 text-xs font-bold rounded-full transition-all"
+          style={{
+            background: lang === code ? 'var(--accent)' : 'transparent',
+            color: lang === code ? '#fff' : 'var(--text-muted)',
+          }}
+        >
+          {code.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function LandingAuthCta({ hasUser }: { hasUser: boolean }) {
   const { t } = useLanguage()
   if (hasUser) {

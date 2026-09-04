@@ -5962,6 +5962,7 @@ function AiStudyPlanTab() {
 interface ShowcaseImage {
   id: string
   title: string | null
+  title_en: string | null
   image_url: string
   storage_path: string
   order_index: number
@@ -5973,16 +5974,27 @@ function LandingShowcaseTab() {
   const [items,      setItems]      = useState<ShowcaseImage[]>([])
   const [loading,    setLoading]    = useState(true)
   const [dbMissing,  setDbMissing]  = useState(false)
+  // true bo'lsa jadval umuman yo'q (birinchi migratsiya kerak), false
+  // bo'lsa jadval bor-yu, faqat title_en ustuni yo'q (ikkinchi, kichik
+  // migratsiya kerak) -- ikkalasi ham dbMissing=true holatida farqlanadi.
+  const [migrationNeeded, setMigrationNeeded] = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState('')
   const [busyId,     setBusyId]     = useState<string | null>(null)
   const [titleDrafts, setTitleDrafts] = useState<Record<string, string>>({})
+  const [titleEnDrafts, setTitleEnDrafts] = useState<Record<string, string>>({})
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = async () => {
     setLoading(true)
     const res = await fetch('/api/admin/landing-showcase')
-    if (res.status === 503) { setDbMissing(true); setLoading(false); return }
+    if (res.status === 503) {
+      const e = await res.json().catch(() => ({} as { error?: string }))
+      setDbMissing(true)
+      setMigrationNeeded(e?.error === 'DB_MIGRATION_NEEDED')
+      setLoading(false)
+      return
+    }
     if (res.ok) {
       const d = await res.json()
       setItems(Array.isArray(d) ? d : [])
@@ -6028,6 +6040,22 @@ function LandingShowcaseTab() {
       body: JSON.stringify({ title: draft || null }),
     })
     if (res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, title: draft || null } : x))
+    setBusyId(null)
+  }
+
+  // Ingliz tilidagi sarlavha -- foydalanuvchi saytda tilni "EN"ga
+  // o'zgartirganda shu matn ko'rsatiladi (bo'sh qoldirilsa, sayt
+  // avtomatik o'zbekcha sarlavhaga qaytadi -- LandingShowcase.tsx'dagi
+  // fallback mantiqiga qarang).
+  async function saveTitleEn(item: ShowcaseImage) {
+    const draft = titleEnDrafts[item.id]
+    if (draft === undefined || draft === (item.title_en ?? '')) return
+    setBusyId(item.id)
+    const res = await fetch(`/api/admin/landing-showcase/${item.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title_en: draft || null }),
+    })
+    if (res.ok) setItems(prev => prev.map(x => x.id === item.id ? { ...x, title_en: draft || null } : x))
     setBusyId(null)
   }
 
@@ -6084,10 +6112,24 @@ function LandingShowcaseTab() {
   if (dbMissing) {
     return (
       <div className="card p-6 space-y-3" style={{ border: '1px solid rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.05)' }}>
-        <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ landing_showcase_images jadvali topilmadi</p>
-        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          Supabase Dashboard → SQL Editor&apos;da <code>041_landing_showcase.sql</code> migratsiyasini ishga tushiring, keyin sahifani yangilang.
-        </p>
+        {migrationNeeded ? (
+          <>
+            <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ &quot;title_en&quot; ustuni topilmadi</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Supabase Dashboard → SQL Editor&apos;da quyidagini ishga tushiring, keyin sahifani yangilang:
+            </p>
+            <pre className="text-xs p-3 rounded-lg overflow-x-auto" style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border)', whiteSpace: 'pre-wrap' }}>
+              {`ALTER TABLE landing_showcase_images ADD COLUMN IF NOT EXISTS title_en text;`}
+            </pre>
+          </>
+        ) : (
+          <>
+            <p className="font-bold text-sm" style={{ color: 'var(--warning)' }}>⚠️ landing_showcase_images jadvali topilmadi</p>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+              Supabase Dashboard → SQL Editor&apos;da <code>041_landing_showcase.sql</code> migratsiyasini ishga tushiring, keyin sahifani yangilang.
+            </p>
+          </>
+        )}
       </div>
     )
   }
@@ -6156,10 +6198,17 @@ function LandingShowcaseTab() {
               <div className="p-3 space-y-2">
                 <input
                   className="input-field text-sm w-full"
-                  placeholder="Tagsarlavha (ixtiyoriy) -- masalan: Reading test interfeysi"
+                  placeholder="Tagsarlavha -- o'zbekcha (masalan: Reading test interfeysi)"
                   value={titleDrafts[item.id] ?? item.title ?? ''}
                   onChange={e => setTitleDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
                   onBlur={() => saveTitle(item)}
+                />
+                <input
+                  className="input-field text-sm w-full"
+                  placeholder="Tagsarlavha -- inglizcha (EN) -- bo'sh qoldirilsa, EN tilida ham o'zbekcha matn chiqadi"
+                  value={titleEnDrafts[item.id] ?? item.title_en ?? ''}
+                  onChange={e => setTitleEnDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                  onBlur={() => saveTitleEn(item)}
                 />
                 <div className="flex items-center justify-between gap-2">
                   <button

@@ -22,11 +22,14 @@ export async function GET() {
 
   const { data, error } = await admin
     .from('landing_showcase_images')
-    .select('id, title, image_url, storage_path, order_index, is_published, created_at')
+    .select('id, title, title_en, image_url, storage_path, order_index, is_published, created_at')
     .order('order_index', { ascending: true })
 
   if (error) {
     if ((error as { code?: string }).code === '42P01') return Response.json({ error: 'TABLE_NOT_FOUND' }, { status: 503 })
+    // title_en ustuni hali qo'shilmagan bo'lsa (eski loyihalarda) --
+    // migratsiya kerakligini bildiramiz, lekin sahifani butunlay buzmaymiz.
+    if ((error as { code?: string }).code === '42703') return Response.json({ error: 'DB_MIGRATION_NEEDED' }, { status: 503 })
     return Response.json({ error: error.message }, { status: 500 })
   }
   return Response.json(data)
@@ -37,7 +40,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   if (!await guardAdmin()) return Response.json({ error: 'Forbidden' }, { status: 403 })
   const body = await request.json()
-  const { title, image_url, storage_path } = body as { title?: string; image_url?: string; storage_path?: string }
+  const { title, title_en, image_url, storage_path } = body as { title?: string; title_en?: string; image_url?: string; storage_path?: string }
 
   if (!image_url || !storage_path) {
     return Response.json({ error: 'image_url va storage_path kerak' }, { status: 400 })
@@ -58,12 +61,13 @@ export async function POST(request: NextRequest) {
     .from('landing_showcase_images')
     .insert({
       title: title?.trim() || null,
+      title_en: title_en?.trim() || null,
       image_url,
       storage_path,
       order_index: nextOrder,
       is_published: true,
     })
-    .select('id, title, image_url, storage_path, order_index, is_published, created_at')
+    .select('id, title, title_en, image_url, storage_path, order_index, is_published, created_at')
     .single()
 
   if (error) return Response.json({ error: error.message }, { status: 400 })

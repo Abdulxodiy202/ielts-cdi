@@ -1081,8 +1081,9 @@
       "rights": "All rights reserved"
     },
     "showcase": {
-      "title": "See the platform itself",
-      "subtitle": "No marketing talk -- real screenshots of the actual interface."
+      "title": "This is what IELTS.PRO looks like",
+      "subtitle": "No marketing talk -- just real screens from inside the platform, exactly as you'll see them.",
+      "nowShowing": "Now showing"
     },
     "featuresSection": {
       "title": "Everything you need to succeed",

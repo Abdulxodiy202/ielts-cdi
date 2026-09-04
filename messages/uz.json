@@ -1081,8 +1081,9 @@
       "rights": "Barcha huquqlar himoyalangan"
     },
     "showcase": {
-      "title": "Platformaning o'zini ko'ring",
-      "subtitle": "Marketing gaplari emas -- haqiqiy interfeys skrinshotlari."
+      "title": "IELTS.PRO platformasi shunday ishlaydi",
+      "subtitle": "Reklama gaplari emas -- platformaning ichini, xuddi o'zingiz kirganingizdek, aynan shunday ko'rsatamiz.",
+      "nowShowing": "Hozir ko'rsatilmoqda"
     },
     "featuresSection": {
       "title": "Muvaffaqiyat uchun hamma narsa",

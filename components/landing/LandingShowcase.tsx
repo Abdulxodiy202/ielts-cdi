@@ -30,7 +30,18 @@ import CardSwap, { Card } from '@/components/landing/CardSwap'
 export interface ShowcaseImage {
   id: string
   title: string | null
+  title_en: string | null
   image_url: string
+}
+
+// Joriy tilga mos sarlavhani tanlaydi -- admin faqat bitta tilga
+// sarlavha yozgan bo'lsa ham (masalan title_en bo'sh qoldirilgan),
+// bo'lim "sarlavha yo'q" bo'lib bo'sh ko'rinib qolmasligi uchun
+// mavjud bo'lgan tilga qaytadi (fallback).
+function pickTitle(img: ShowcaseImage | undefined, lang: 'en' | 'uz'): string | null {
+  if (!img) return null
+  const preferred = lang === 'en' ? img.title_en : img.title
+  return preferred || img.title || img.title_en || null
 }
 
 const CHROME_HEIGHT = 36
@@ -39,7 +50,7 @@ const CHROME_HEIGHT = 36
 const SWAP_DELAY_MS = 4200
 
 export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [activeIndex, setActiveIndex] = useState(0)
 
   // CardSwap effekt ichida chaqiradi -- useState setter allaqachon
@@ -50,6 +61,7 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
   if (images.length === 0) return null
 
   const active = images[activeIndex] ?? images[0]
+  const activeTitle = pickTitle(active, lang)
 
   return (
     <SectionReveal id="showcase" className="max-w-6xl mx-auto px-6 py-20 relative">
@@ -64,26 +76,51 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
 
           {/* Joriy (eng oldingi) rasmga mos sarlavha -- rasm almashganda
               silliq fade bilan yangilanadi. Admin shu rasmga sarlavha
-              yozmagan bo'lsa, umuman ko'rsatilmaydi. */}
-          <div className="mt-6 min-h-[44px] flex justify-center lg:justify-start">
+              yozmagan bo'lsa, umuman ko'rsatilmaydi.
+
+              2026-09 dizayn: avvalgi kichik "chat pufakcha" pill o'rniga --
+              endi kichik nuqta+harakatlanuvchi chiziqcha "hozir ko'rsatilmoqda"
+              yorlig'i (kicker) + uning ostida katta, qalin sarlavha matni.
+              Bu matn faqat shu yerda (chap tomonda) ko'rinadi -- rasm
+              ustidagi eski dublikat overlay olib tashlandi (pastga qarang). */}
+          <div className="mt-8 min-h-[70px] flex flex-col items-center lg:items-start">
             <AnimatePresence mode="wait">
-              {active?.title && (
-                <motion.span
+              {activeTitle && (
+                <motion.div
                   key={active.id}
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
+                  exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.35, ease: 'easeOut' }}
-                  className="inline-flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full"
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text-primary)',
-                  }}
                 >
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#60a5fa' }} />
-                  {active.title}
-                </motion.span>
+                  <div className="flex items-center gap-2 justify-center lg:justify-start mb-1.5">
+                    <span
+                      className="relative flex items-center justify-center"
+                      style={{ width: 8, height: 8 }}
+                    >
+                      <span
+                        className="absolute inline-flex h-full w-full rounded-full animate-ping"
+                        style={{ background: '#60a5fa', opacity: 0.6 }}
+                      />
+                      <span
+                        className="relative inline-flex rounded-full"
+                        style={{ width: 8, height: 8, background: '#60a5fa' }}
+                      />
+                    </span>
+                    <span
+                      className="text-xs font-bold uppercase tracking-wide"
+                      style={{ color: 'var(--accent)' }}
+                    >
+                      {t('landing.showcase.nowShowing')}
+                    </span>
+                  </div>
+                  <h3
+                    className="text-xl md:text-2xl font-bold leading-snug pl-4"
+                    style={{ borderLeft: '3px solid var(--accent)', color: 'var(--text-primary)' }}
+                  >
+                    {activeTitle}
+                  </h3>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
@@ -118,7 +155,7 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
                   {/* eslint-disable-next-line @next/next/no-img-element -- rasm soni dinamik, next/image domain whitelist qo'shishni talab qiladi */}
                   <img
                     src={img.image_url}
-                    alt={img.title ?? 'IELTS.PRO'}
+                    alt={pickTitle(img, lang) ?? 'IELTS.PRO'}
                     loading="lazy"
                     style={{
                       position: 'absolute',
@@ -129,17 +166,10 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
                       objectPosition: 'top',
                     }}
                   />
-                  {img.title && (
-                    <div
-                      className="absolute bottom-0 left-0 right-0 text-xs font-semibold text-center py-2 px-2"
-                      style={{
-                        background: 'color-mix(in srgb, var(--bg-card) 82%, transparent)',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      {img.title}
-                    </div>
-                  )}
+                  {/* 2026-09: rasm ustidagi sarlavha overlay olib tashlandi --
+                      matn endi FAQAT chap tomondagi katta sarlavhada (yuqorida)
+                      ko'rinadi, rasmning o'zi esa toza (faqat skrinshot)
+                      ko'rinishda qoladi. */}
                 </div>
               </Card>
             ))}
