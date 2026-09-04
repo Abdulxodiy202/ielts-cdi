@@ -18,7 +18,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  type CSSProperties,
   type HTMLAttributes,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -207,13 +206,19 @@ const CardSwap = ({
     isValidElement(child)
       ? cloneElement(child, {
           key: i,
+          // `as any` -- React 19'ning cloneElement turlari 'ref'ni
+          // Partial<CardProps> & Attributes ichida "noma'lum xususiyat"
+          // deb hisoblaydi (forwardRef orqali yaratilgan komponent uchun
+          // generic tur query'da ref avtomatik chiqarilmaydi). Ishlash
+          // vaqtida forwardRef orqali ref to'g'ri uzatiladi -- bu faqat
+          // qattiqlashtirilgan overload tekshiruvini chetlab o'tish.
           ref: refs[i],
-          style: { width, height, ...(child.props.style ?? {}) } as CSSProperties,
+          style: { width, height, ...(child.props.style ?? {}) },
           onClick: (e: ReactMouseEvent<HTMLDivElement>) => {
             child.props.onClick?.(e)
             onCardClick?.(i)
           },
-        })
+        } as any)
       : child
   )
 
