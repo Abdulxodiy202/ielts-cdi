@@ -168,6 +168,24 @@ const CardSwap = ({
       const [front, ...rest] = order.current
       const elFront = refs[front]?.current
       if (!elFront) return
+
+      // MUHIM: `onActiveChange` endi animatsiya TUGAGANDA emas, balki
+      // almashish BOSHLANGANDA (shu yerda, darhol) chaqiriladi.
+      //
+      // Avval bu chaqiruv timeline oxirida (~2.3s dan keyin, butun
+      // "tushish + qaytish" animatsiyasi tugagach) turardi. Lekin yangi
+      // oldingi karta ("promote" bosqichi) allaqachon ~0.2s-2.2s oralig'ida
+      // ko'rinadigan joyga chiqib bo'lardi -- ya'ni rasm allaqachon
+      // almashgan, lekin chap tomondagi matn hali eski rasmning
+      // sarlavhasini ko'rsatardi (+ framer-motion'ning fade animatsiyasi
+      // yana ~0.7s qo'shib, matnni yanada orqada qoldirardi). Natijada
+      // foydalanuvchi "matn boshqa rasmga to'g'ri kelib qolyapti" deb
+      // shikoyat qildi. Endi order/callback aynan shu yerda -- gsap
+      // animatsiyasi hali boshlanmasdan turib -- yangilanadi, shunda matn
+      // rasm bilan bir vaqtda (yoki undan ozgina oldinroq) o'zgaradi.
+      order.current = [...rest, front]
+      onActiveChange?.(order.current[0])
+
       const tl = gsap.timeline()
       tlRef.current = tl
       tl.to(elFront, { y: '+=500', duration: config.durDrop, ease: config.ease })
@@ -197,10 +215,6 @@ const CardSwap = ({
         { x: backSlot.x, y: backSlot.y, z: backSlot.z, duration: config.durReturn, ease: config.ease },
         'return'
       )
-      tl.call(() => {
-        order.current = [...rest, front]
-        onActiveChange?.(order.current[0])
-      })
     }
 
     swap()
