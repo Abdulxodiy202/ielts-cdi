@@ -21,8 +21,10 @@
    avtomatik almashishni to'xtatadi (qarang: CardSwap.tsx) -- shu holatda
    chap tomondagi matn ham birinchi rasmda statik qoladi. */
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
+import { X, ChevronLeft, ChevronRight, Maximize2 } from 'lucide-react'
 import { useLanguage } from '@/lib/i18n/LanguageContext'
 import { SectionReveal } from '@/components/landing/SectionReveal'
 import CardSwap, { Card } from '@/components/landing/CardSwap'
@@ -58,10 +60,48 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
   // aniqlik uchun eksplitsit qoldiramiz.
   const handleActiveChange = useCallback((idx: number) => setActiveIndex(idx), [])
 
+  // 2026-09: kartani bosganda rasm to'liq ekranga "kattalashadi" (lightbox) --
+  // Telegram/rasm ko'ruvchilarga o'xshab, chapga/o'ngga strelkalar bilan
+  // boshqa rasmlarga o'tish mumkin. `lightboxIndex` -- images massividagi
+  // asl indeks (CardSwap animatsiyasi tartibiga bog'liq emas).
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
+  const closeLightbox = useCallback(() => setLightboxIndex(null), [])
+  const showPrev = useCallback(
+    () => setLightboxIndex(i => (i === null ? null : (i - 1 + images.length) % images.length)),
+    [images.length]
+  )
+  const showNext = useCallback(
+    () => setLightboxIndex(i => (i === null ? null : (i + 1) % images.length)),
+    [images.length]
+  )
+
+  // Lightbox ochiq bo'lganda: Esc -- yopish, ←/→ -- rasm almashtirish,
+  // va orqa fondagi sahifa scroll bo'lib ketmasligi uchun body scroll
+  // vaqtincha o'chiriladi.
+  useEffect(() => {
+    if (lightboxIndex === null) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox()
+      else if (e.key === 'ArrowLeft') showPrev()
+      else if (e.key === 'ArrowRight') showNext()
+    }
+    window.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [lightboxIndex, closeLightbox, showPrev, showNext])
+
   if (images.length === 0) return null
 
   const active = images[activeIndex] ?? images[0]
   const activeTitle = pickTitle(active, lang)
+  const lightboxImg = lightboxIndex !== null ? images[lightboxIndex] : null
 
   return (
     <SectionReveal id="showcase" className="max-w-6xl mx-auto px-6 py-20 relative">
@@ -136,9 +176,10 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
             pauseOnHover
             skewAmount={4}
             onActiveChange={handleActiveChange}
+            onCardClick={(idx) => setLightboxIndex(idx)}
           >
             {images.map((img) => (
-              <Card key={img.id}>
+              <Card key={img.id} customClass="group" style={{ cursor: 'pointer' }}>
                 <div
                   className="flex items-center gap-1.5 px-3"
                   style={{
@@ -169,13 +210,113 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
                   {/* 2026-09: rasm ustidagi sarlavha overlay olib tashlandi --
                       matn endi FAQAT chap tomondagi katta sarlavhada (yuqorida)
                       ko'rinadi, rasmning o'zi esa toza (faqat skrinshot)
-                      ko'rinishda qoladi. */}
+                      ko'rinishda qoladi.
+
+                      2026-09: bosilsa kattalashishini bildirish uchun hover'da
+                      chiqadigan kichik "kattalashtirish" belgisi -- karta
+                      bosilganda pastdagi lightbox ochiladi. */}
+                  <div
+                    className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    style={{ background: 'rgba(0,0,0,0.28)' }}
+                  >
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ background: 'rgba(255,255,255,0.92)', color: '#111' }}
+                    >
+                      <Maximize2 size={16} />
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}
           </CardSwap>
         </div>
       </div>
+
+      {/* Lightbox -- karta bosilganda rasm to'liq ekranga kattalashadi.
+          document.body'ga portal orqali chiqariladi -- SectionReveal
+          o'zining scroll-animatsiyasi uchun `transform` qo'yadi, bu esa
+          `position: fixed` uchun yangi containing block yaratib, lightbox'ni
+          butun ekran o'rniga shu bo'lim ichiga qamab qo'yishi mumkin edi.
+          Portal shu muammoni butunlay chetlab o'tadi. */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {lightboxImg && (
+            <motion.div
+              key="showcase-lightbox"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex items-center justify-center px-4 py-10 sm:px-10"
+              style={{ background: 'rgba(10,10,20,0.88)', backdropFilter: 'blur(4px)', zIndex: 200 }}
+              onClick={closeLightbox}
+            >
+              <button
+                type="button"
+                onClick={closeLightbox}
+                aria-label="Yopish"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
+              >
+                <X size={20} />
+              </button>
+
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); showPrev() }}
+                    aria-label="Oldingi rasm"
+                    className="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                    style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
+                  >
+                    <ChevronLeft size={22} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); showNext() }}
+                    aria-label="Keyingi rasm"
+                    className="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center hover:opacity-80 transition-opacity"
+                    style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}
+                  >
+                    <ChevronRight size={22} />
+                  </button>
+                </>
+              )}
+
+              <motion.div
+                key={lightboxImg.id}
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                className="max-w-4xl w-full flex flex-col items-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- lightbox'da domain whitelist shart emas */}
+                <img
+                  src={lightboxImg.image_url}
+                  alt={pickTitle(lightboxImg, lang) ?? 'IELTS.PRO'}
+                  className="max-h-[75vh] w-auto rounded-xl"
+                  style={{ boxShadow: '0 24px 70px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}
+                />
+                {pickTitle(lightboxImg, lang) && (
+                  <p className="mt-4 text-sm sm:text-base font-medium text-center px-4" style={{ color: '#f1f5f9' }}>
+                    {pickTitle(lightboxImg, lang)}
+                  </p>
+                )}
+                {images.length > 1 && (
+                  <p className="mt-1 text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                    {(lightboxIndex as number) + 1} / {images.length}
+                  </p>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </SectionReveal>
   )
 }
