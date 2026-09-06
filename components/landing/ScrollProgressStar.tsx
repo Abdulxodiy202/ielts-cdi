@@ -107,6 +107,13 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
   // "Ekran markazida hozir qaysi hujjat nuqtasi turibdi" -- har freymda
   // HAQIQIY piksel o'lchovlaridan (taxminiy formula emas) hisoblanadi.
   const rawCenterFrac = useMotionValue(0)
+  // Bo'lim OXIRIGA qanchalik yaqinligini -- mavhum foiz (centerFrac)
+  // emas, HAQIQIY piksel masofa orqali -- alohida kuzatib boramiz. Bu
+  // yulduzning `sticky` sifatida ekrandan chiqib ketishi bilan AYNAN
+  // bir vaqtda so'nishini kafolatlaydi (ular ikkalasi ham xuddi shu
+  // geometriyaga -- konteyner tagi ekran tagiga qanchalik yaqinligiga
+  // -- asoslangan).
+  const rawEndFade = useMotionValue(1)
 
   useEffect(() => {
     if (reduce) return
@@ -121,6 +128,17 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
       const docYAtCenter = -rect.top + vh / 2
       const frac = rect.height > 0 ? docYAtCenter / rect.height : 0
       rawCenterFrac.set(Math.min(1, Math.max(0, frac)))
+
+      // Konteynerning PASTKI cheti ekran pastidan hali qancha piksel
+      // uzoqligini hisoblaymiz. Bu masofa yarim ekran balandligidan
+      // kamayganda, effekt asta so'na boshlaydi -- aynan sticky
+      // yulduz "joyi tugab" ekrandan chiqib keta boshlaydigan payt
+      // bilan bir xil geometrik shart.
+      const distanceToBottom = rect.bottom - vh
+      const fadeRange = vh * 0.6
+      const endFade =
+        distanceToBottom >= fadeRange ? 1 : distanceToBottom <= 0 ? 0 : distanceToBottom / fadeRange
+      rawEndFade.set(endFade)
     }
     const onScrollOrResize = () => {
       if (ticking) return
@@ -135,21 +153,28 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
       window.removeEventListener('resize', onScrollOrResize)
       cancelAnimationFrame(frameId)
     }
-  }, [reduce, rawCenterFrac])
+  }, [reduce, rawCenterFrac, rawEndFade])
 
   // Yumshatish (spring) -- tez scroll qilinganda ham keskin sakramasdan
   // silliq harakat uchun. Chiziq VA yulduz ikkalasi ham AYNAN shu bitta
   // silliqlangan qiymatdan hisoblanadi -- shuning uchun ular hech qachon
   // ajralib qolmaydi.
   const centerFrac = useSpring(rawCenterFrac, { stiffness: 220, damping: 32, mass: 0.4 })
+  const endFade = useSpring(rawEndFade, { stiffness: 220, damping: 32, mass: 0.4 })
 
-  // Boshida qanday asta paydo bo'lsa (0 -> 0.03), oxirida ham xuddi
-  // shunday asta yo'qolishi kerak (0.95 -> 1) -- aks holda bo'lim
-  // tugashi bilan yulduz `sticky`dan chiqib ketib, ortida "kesilgan",
-  // egasiz xira chiziq qoldirib ketardi. Endi butun effekt (chiziq +
-  // yulduz) bo'lim oxiriga yetguncha silliq so'nib, hech narsa
-  // "yalang'och" qolmaydi.
-  const opacity = useTransform(centerFrac, [0, 0.03, 0.95, 1], [0, 1, 1, 0])
+  // Boshida qanday asta paydo bo'lsa, oxirida ham xuddi shunday asta
+  // yo'qolishi kerak -- aks holda bo'lim tugashi bilan yulduz
+  // `sticky`dan chiqib ketib, ortida "kesilgan", egasiz xira chiziq
+  // qoldirib ketardi. `startFade` bo'lim BOSHIGA, `endFade` esa
+  // (haqiqiy piksel masofaga asoslangan) bo'lim OXIRIGA yaqinlashganda
+  // so'ndiradi -- ikkalasi ko'paytiriladi, shunda effekt ikkala
+  // uchida ham silliq, hech narsa "yalang'och" qolmasdan paydo
+  // bo'ladi/yo'qoladi.
+  const startFade = useTransform(centerFrac, [0, 0.03], [0, 1])
+  const opacity = useTransform([startFade, endFade], (v) => {
+    const [s, e] = v as number[]
+    return s * e
+  })
   const starLeft = useTransform(centerFrac, (v) => `${waveX(v)}%`)
 
   // Rangli (bosib o'tilgan) chiziqning ikkita nusxasi -- keng+xira

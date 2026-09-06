@@ -14,20 +14,28 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
 })
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Default endi "light" (Ocean Blue -- oq va ko'k rang kombinatsiyasi).
-  // Foydalanuvchi avval boshqa temani tanlagan bo'lsa, localStorage'dagi
-  // qiymat pastdagi useEffect orqali baribir ustunlik qiladi.
-  const [theme, setThemeState] = useState<Theme>('light')
-
-  useEffect(() => {
-    const stored = localStorage.getItem('ielts-theme') as Theme | null
-    if (stored) setThemeState(stored)
-  }, [])
+// MUHIM (FOUC tuzatish): endi SERVER o'zi `app/layout.tsx`da cookie'dan
+// o'qib, to'g'ri `data-theme` bilan HTML'ni chiqaradi -- shuning uchun
+// bu Provider'ning boshlang'ich qiymati `initialTheme` prop orqali
+// SERVER'da hisoblangan qiymatdan olinadi (localStorage'dan emas, u
+// faqat brauzerda mavjud). Shu tufayli birinchi renderda hech qanday
+// "oq keyin ko'k" sakrashi bo'lmaydi -- server va client boshidanoq
+// bir xil (to'g'ri) temani ko'rsatadi.
+export function ThemeProvider({
+  children,
+  initialTheme = 'light',
+}: {
+  children: React.ReactNode
+  initialTheme?: Theme
+}) {
+  const [theme, setThemeState] = useState<Theme>(initialTheme)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('ielts-theme', theme)
+    // Keyingi tashriflarda SERVER ham to'g'ri temani bilishi uchun
+    // cookie'ga ham yozamiz (localStorage serverga ko'rinmaydi).
+    document.cookie = `ielts-theme=${theme}; path=/; max-age=31536000; SameSite=Lax`
   }, [theme])
 
   const setTheme = (t: Theme) => setThemeState(t)

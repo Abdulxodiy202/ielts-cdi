@@ -1,35 +1,27 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { cookies } from 'next/headers'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/ThemeProvider'
 import { LanguageProvider } from '@/lib/i18n/LanguageContext'
 import { SidebarProvider } from '@/contexts/SidebarContext'
 
-// Sahifa hydrate bo'lishidan OLDIN data-theme atributini qo'yib qo'yadi,
-// shunda foydalanuvchi avval "dark" temani tanlagan bo'lsa, birinchi
-// render'da default OQ ("Ocean Blue") fondan ko'k/to'q temaga bir lahza
-// "yalt etib" o'tish (FOUC) bo'lmaydi. ThemeProvider'dagi useEffect
-// keyinroq shu bilan sync bo'ladi.
+// MUHIM (FOUC -- "oq keyin ko'k" muammosining ILDIZIDAN tuzatilishi):
+// avval tema faqat brauzerdagi localStorage'da saqlanardi, va uni JS
+// (hatto eng tez skript bilan ham) hydratsiyadan OLDIN o'qib bo'lmasdi
+// -- chunki SERVER umuman localStorage'ni ko'ra olmaydi. Natijada
+// SERVER doim standart (OQ) temani chiqarardi, va faqat brauzerda JS
+// ishga tushgach ko'k temaga "sakrardi" -- xoh script sinxron bo'lsin.
 //
-// MUHIM: bu ATAYLAB oddiy `<script>` (next/script'ning `Script`
-// komponenti EMAS) -- brauzer buni HTML'ni parslashda duch kelgan
-// zahoti, hech qanday kechikishsiz, SINXRON tarzda ishga tushiradi va
-// undan keyingi <body> render qilinishidan OLDIN to'xtatib turadi.
-// `next/script`'ning `beforeInteractive` strategiyasi "hydratsiyadan
-// oldin" kafolatlaydi, lekin amalda ba'zan <body> allaqachon (default
-// OQ tema bilan) chizib ulgurgandan KEYIN ishga tushishi mumkin edi --
-// aynan shu "oq tez ko'k bo'lib qolish" muammosining sababi shu edi.
-const THEME_INIT_SCRIPT = `
-(function(){
-  try {
-    var t = localStorage.getItem('ielts-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', t);
-  } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'light');
-  }
-})();
-`
-
+// ENDI tema COOKIE'ga HAM yoziladi (ThemeProvider'da). Cookie -- server
+// HAM o'qiy oladigan yagona joy. Shuning uchun bu yerda (Server
+// Component) cookie'dan tema o'qiladi va <html data-theme="..."> ATTRIBUTI
+// TO'G'RIDAN-TO'G'RI SERVER TOMONIDA, birinchi HTML baytidayoq to'g'ri
+// qiymat bilan chiqadi. JS umuman kerak emas, kutish yo'q -- demak
+// FOUC STRUKTURAVIY jihatdan mumkin emas endi (birinchi marta tashrif
+// buyurgan, cookie hali yo'q foydalanuvchi uchun "light" -- bu ham
+// to'g'ri, chunki loyiha qoidasiga ko'ra yangi foydalanuvchi uchun
+// standart tema OQ bo'lishi kerak).
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
@@ -44,15 +36,16 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies()
+  const themeCookie = cookieStore.get('ielts-theme')?.value
+  const theme = themeCookie === 'dark' ? 'dark' : 'light'
+
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
+    <html lang="en" data-theme={theme} suppressHydrationWarning>
       <body className={inter.className}>
         <LanguageProvider>
-          <ThemeProvider>
+          <ThemeProvider initialTheme={theme}>
             <SidebarProvider>{children}</SidebarProvider>
           </ThemeProvider>
         </LanguageProvider>
