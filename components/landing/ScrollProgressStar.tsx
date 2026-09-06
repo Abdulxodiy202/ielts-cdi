@@ -7,39 +7,55 @@
    "bosib o'tilgan" qismi yorqin (gradient) bo'lib qoladi, hali yetib
    bormagan qismi esa punktir bo'lib turadi.
 
-   3-versiyadagi XATO (tuzatildi): oldingi versiyada yulduzning VERTIKAL
-   pozitsiyasi `position: sticky; top: 50vh` bilan ekran markaziga
-   "yopishtirilgan" edi, lekin FON CHIZIG'I (SVG path, uning "ochilgan"
-   -- porlagan -- qismi) hujjat (document) koordinatasida, oddiy scroll
-   bilan siljib turardi. Bu IKKI XIL koordinata tizimi edi: chiziqning
-   yorug' uchi (dash-reveal) bitta joyda, yulduzning o'zi esa BUTUNLAY
-   BOSHQA joyda (ekran markazida) tugab qolardi -- shuning uchun
-   foydalanuvchi "chiziq yulduzdan oldin ketyabdi, boshqa-boshqa joyda"
-   deb to'g'ri payqagan edi.
+   4-versiyadagi vazifa: ikkita talab BIR VAQTDA bajarilishi kerak --
+   (1) yulduz DOIM ekranning vertikal MARKAZIDA tursin (scroll qilinsa
+   ham joyidan qo'zg'almasin), VA (2) rangli (ochilgan) chiziq AYNAN
+   yulduz turgan joygacha yetib borsin -- ya'ni yulduz hech qachon
+   "orqada qolib" ko'rinmasin.
 
-   YECHIM: yulduz endi FON CHIZIG'I BILAN AYNAN BIR XIL formula va
-   AYNAN BIR XIL koordinata tizimidan foydalanadi -- ya'ni ikkalasi ham
-   xuddi shu `progress` qiymatidan `waveX(progress)` (gorizontal) va
-   `progress*100%` (vertikal) orqali hisoblanadi. Shu sababli yulduz
-   DOIM chiziqning aynan "ochilgan" uchida turadi -- hech qachon
-   ajralib qolmaydi.
+   Bu ikkalasi ALOHIDA-ALOHIDA hal qilinsa bir-biriga to'g'ri kelmaydi:
+   agar chiziq oddiy `scrollYProgress`ga (0=bo'lim boshi, 1=bo'lim oxiri)
+   qarab ochilsa, u HUJJAT bo'yicha harakatlanadi -- lekin yulduz
+   `sticky` bilan EKRAN markazida qolsa, ikkalasi boshqa-boshqa
+   koordinatada bo'lib qoladi (aynan avvalgi versiyadagi xato shu edi).
 
-   "Sudralib qolish" muammosi (uzun bo'limda yulduz sekin harakatlanib
-   ko'rinishi) esa boshqacha, to'g'riroq usul bilan yumshatildi:
-   `useSpring` orqali xom scroll qiymatini "silliqlash" (smoothing) --
-   bu yulduz VA chiziqni bab-baravar, tez scroll paytida ham keskin
-   sakramasdan, biroz "erkin" (elastik) tarzda orqadan yetib olishga
-   majbur qiladi -- lekin ikkalasi ALOHIDA emas, XUDDI BIR XIL smooth
-   qiymatdan kelib chiqqani uchun ular hech qachon bir-biridan
-   ajralmaydi, faqat harakat umuman silliqroq bo'ladi.
+   YECHIM -- matematik: "hozir ekranning vertikal markazida qanday
+   hujjat nuqtasi turibdi" ni hisoblab, CHIZIQ aynan O'SHA nuqtagacha
+   ochiladi (bu qiymatni `centerFrac` deb ataymiz):
 
-   Bo'lim HALI boshlanmagan bo'lsa (foydalanuvchi hali Hero'da, pastga
-   scroll qilmagan) progress = 0 va `opacity` ham 0 -- shuning uchun
-   boshida chiziq/yulduz umuman ko'rinmaydi, faqat scroll qila
+     scrollY(progress) = containerTop + progress * (containerHeight - viewportHeight)
+     markazdagi hujjat nuqtasi = scrollY + viewportHeight / 2
+     centerFrac = (markazdagi hujjat nuqtasi - containerTop) / containerHeight
+                = progress * (1 - viewportHeight/containerHeight)
+                  + (viewportHeight / 2) / containerHeight
+
+   `containerHeight` (o'ragich balandligi) va `viewportHeight` (ekran
+   balandligi) haqiqiy piksellarda o'lchanadi (ResizeObserver + resize
+   eventi orqali). Shu `centerFrac` bilan: (a) chiziqning ochilgan qismi
+   (dashoffset) va (b) yulduzning gorizontal (to'lqin) pozitsiyasi
+   hisoblanadi -- shuning uchun ular AYNAN bir xil hujjat nuqtasiga mos
+   keladi. Yulduzning VERTIKAL joyi esa oddiy CSS `position: sticky;
+   top: 50vh` bilan -- bu uni har doim ekran markazida ushlab turadi,
+   hech qanday JS hisob-kitobsiz, 100% silliq.
+
+   Natija: yulduz DOIM ekran markazida, VA rangli chiziq DOIM aynan
+   yulduz turgan joygacha (na undan oldinroq, na undan keyinroq)
+   ochiladi -- ikkalasi endi hech qachon ajralib qolmaydi.
+
+   Bo'lim HALI boshlanmagan bo'lsa (foydalanuvchi hali Hero'da) --
+   `opacity` 0, chiziq/yulduz umuman ko'rinmaydi, faqat scroll qila
    boshlagach paydo bo'ladi. */
 
-import { useRef, type ReactNode } from 'react'
-import { motion, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion'
+import { useEffect, useRef, type ReactNode } from 'react'
+import {
+  motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from 'framer-motion'
 
 // Chiziq markazdan chapga/o'ngga necha % (o'ragichning o'z kengligiga
 // nisbatan) tebranadi -- kattaroq qiymat = kengroq "ilon izi".
@@ -71,19 +87,51 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion()
   const containerRef = useRef<HTMLDivElement>(null)
   const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end end'] })
-
-  // MUHIM: pastdagi HAMMA qiymat (opacity, chiziq reveal, yulduzning
-  // left VA top'i) shu BITTA `progress`dan kelib chiqadi -- shuning
-  // uchun ular hech qachon bir-biridan ajralmaydi. `useSpring` xom
-  // scroll signalini yumshatadi (tez scroll'da keskin sakrash o'rniga
-  // silliq "erkin" harakat) -- lekin baribir bitta manba bo'lgani
-  // uchun chiziq va yulduz doim sinxron qoladi.
+  // Xom scroll signalini yumshatish -- tez scroll qilinganda ham
+  // keskin sakramasdan, silliq harakat uchun.
   const progress = useSpring(scrollYProgress, { stiffness: 220, damping: 32, mass: 0.4 })
 
+  // O'ragich va ekran balandligini piksellarda kuzatib boramiz --
+  // "hozir ekran markazida qaysi hujjat nuqtasi turibdi" formulasi
+  // uchun kerak.
+  const containerHeightRef = useRef(0)
+  const viewportHeightRef = useRef(0)
+
+  useEffect(() => {
+    const measure = () => {
+      if (containerRef.current) containerHeightRef.current = containerRef.current.offsetHeight
+      viewportHeightRef.current = window.innerHeight
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
+    if (ro && containerRef.current) ro.observe(containerRef.current)
+    return () => {
+      window.removeEventListener('resize', measure)
+      ro?.disconnect()
+    }
+  }, [])
+
+  // `centerFrac` -- ekran markazida hozir turgan hujjat nuqtasining
+  // o'ragich balandligiga nisbatan foizi (0-1). Chiziq VA yulduz
+  // gorizontal pozitsiyasi shu qiymatdan hisoblanadi, shuning uchun
+  // ular hech qachon ajralib qolmaydi.
+  const centerFrac = useMotionValue(0)
+  useMotionValueEvent(progress, 'change', (p) => {
+    const ch = containerHeightRef.current
+    const vh = viewportHeightRef.current
+    if (!ch) {
+      centerFrac.set(p)
+      return
+    }
+    const ratio = vh / ch
+    const val = p * (1 - ratio) + ratio / 2
+    centerFrac.set(Math.min(1, Math.max(0, val)))
+  })
+
   const opacity = useTransform(progress, [0, 0.04], [0, 1])
-  const starLeft = useTransform(progress, (v) => `${waveX(v)}%`)
-  const starTop = useTransform(progress, (v) => `${v * 100}%`)
-  const dashOffset = useTransform(progress, (v) => 1 - v)
+  const starLeft = useTransform(centerFrac, (v) => `${waveX(v)}%`)
+  const dashOffset = useTransform(centerFrac, (v) => 1 - v)
 
   return (
     <div ref={containerRef} className="relative">
@@ -109,10 +157,9 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
                 strokeLinecap="round"
                 vectorEffect="non-scaling-stroke"
               />
-              {/* Bosib o'tilgan qism -- yorqin gradient, `progress`
-                  bo'yicha yuqoridan pastga silliq "ochiladi". Yulduz
-                  DOIM shu chiziqning tugagan (ochilgan) uchida turadi,
-                  chunki ikkalasi ham bir xil `progress`dan hisoblanadi. */}
+              {/* Bosib o'tilgan qism -- AYNAN "ekran markazidagi hujjat
+                  nuqtasi"gacha (centerFrac) ochiladi -- shuning uchun
+                  doim pastdagi yulduz turgan joyda tugaydi. */}
               <motion.path
                 d={PATH_D}
                 fill="none"
@@ -132,26 +179,32 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
               </defs>
             </svg>
 
-            {/* Yorqin "kometa boshi" -- left VA top ikkalasi ham AYNAN
-                yuqoridagi SVG path'ni chizishda ishlatilgan formula
-                bilan (waveX(progress), progress*100%) hisoblanadi --
-                shuning uchun yulduz matematik jihatdan HAR DOIM
-                chiziqning ustida, aynan uning "ochilgan" uchida turadi. */}
-            <motion.div
-              className="absolute"
-              style={{ left: starLeft, top: starTop, translateX: '-50%', translateY: '-50%' }}
-            >
-              <span
-                className="block rounded-full"
-                style={{
-                  width: 22,
-                  height: 22,
-                  background: 'radial-gradient(circle at 35% 32%, #ffffff, #bfdbfe 35%, #60a5fa 70%, #3b82f6 100%)',
-                  boxShadow:
-                    '0 0 10px 3px #ffffff, 0 0 22px 8px #60a5fa, 0 0 44px 16px rgba(96,165,250,0.65), 0 0 72px 28px rgba(96,165,250,0.3)',
-                }}
-              />
-            </motion.div>
+            {/* Yorqin "kometa boshi" -- `position: sticky; top: 50vh`
+                orqali DOIM ekran vertikal markazida turadi (JS
+                hisob-kitobsiz, brauzerning o'z mexanizmi). Gorizontal
+                (`left`) pozitsiyasi esa `centerFrac`dan -- AYNAN SVG
+                chizig'i qaysi nuqtagacha ochilgan bo'lsa, o'sha
+                nuqtaning x-koordinatasi bilan bir xil formula
+                (`waveX`) orqali hisoblanadi. Shuning uchun yulduz HAR
+                DOIM chiziqning aynan ochilgan uchida turadi -- na
+                oldinda, na orqada qolmaydi. */}
+            <div className="sticky pointer-events-none" style={{ top: '50vh', height: 0 }}>
+              <motion.div
+                className="absolute"
+                style={{ left: starLeft, top: 0, translateX: '-50%', translateY: '-50%' }}
+              >
+                <span
+                  className="block rounded-full"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    background: 'radial-gradient(circle at 35% 32%, #ffffff, #bfdbfe 35%, #60a5fa 70%, #3b82f6 100%)',
+                    boxShadow:
+                      '0 0 10px 3px #ffffff, 0 0 22px 8px #60a5fa, 0 0 44px 16px rgba(96,165,250,0.65), 0 0 72px 28px rgba(96,165,250,0.3)',
+                  }}
+                />
+              </motion.div>
+            </div>
           </motion.div>
         </div>
       )}
