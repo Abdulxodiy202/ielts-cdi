@@ -143,7 +143,13 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
   // ajralib qolmaydi.
   const centerFrac = useSpring(rawCenterFrac, { stiffness: 220, damping: 32, mass: 0.4 })
 
-  const opacity = useTransform(centerFrac, [0, 0.03], [0, 1])
+  // Boshida qanday asta paydo bo'lsa (0 -> 0.03), oxirida ham xuddi
+  // shunday asta yo'qolishi kerak (0.95 -> 1) -- aks holda bo'lim
+  // tugashi bilan yulduz `sticky`dan chiqib ketib, ortida "kesilgan",
+  // egasiz xira chiziq qoldirib ketardi. Endi butun effekt (chiziq +
+  // yulduz) bo'lim oxiriga yetguncha silliq so'nib, hech narsa
+  // "yalang'och" qolmaydi.
+  const opacity = useTransform(centerFrac, [0, 0.03, 0.95, 1], [0, 1, 1, 0])
   const starLeft = useTransform(centerFrac, (v) => `${waveX(v)}%`)
 
   // Rangli (bosib o'tilgan) chiziqning ikkita nusxasi -- keng+xira
