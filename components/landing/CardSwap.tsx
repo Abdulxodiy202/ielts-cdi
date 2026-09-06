@@ -165,6 +165,31 @@ const CardSwap = ({
 
     const swap = () => {
       if (order.current.length < 2) return
+
+      // O'Z-O'ZINI TUZATISH (muhim barqarorlik tuzatishi): agar oldingi
+      // tsikl animatsiyasi biror sababdan (masalan brauzer bir lahza
+      // sekinlashib, freym tashlab yuborgan bo'lsa) hali TUGAMAGAN
+      // bo'lsa-yu, shu orada navbatdagi `swap()` (interval bo'yicha)
+      // ishga tushib qolsa -- ikkita GSAP timeline BIR XIL kartalarga
+      // BIR VAQTDA ta'sir qilib, ularni chala/noto'g'ri holatda (masalan
+      // ekrandan tashqarida, yoki old kartaning aynan ustida "yashirin")
+      // qoldirib ketishi mumkin edi. Bu holat esa keyingi tsikllarga ham
+      // "yuqib", stack asta-sekin bitta kartaga aylanib qolgandek
+      // ko'rinishga (foydalanuvchi "kartalar g'alati bo'lib qolyapti"
+      // deb ta'riflagan holatga) sabab bo'lardi.
+      //
+      // Yechim: har bir yangi `swap()` boshida -- ANIQLIK uchun -- avval
+      // eski timeline'ni DARHOL to'xtatamiz, so'ng BARCHA kartalarni
+      // joriy `order.current` tartibiga mos, matematik jihatdan TO'G'RI
+      // joylarga qat'iy (animatsiyasiz) o'rnatib qo'yamiz. Shundan keyin
+      // yangi almashish animatsiyasi har doim TOZA, izchil holatdan
+      // boshlanadi -- hech qanday eski xato "meros" bo'lib qolmaydi.
+      tlRef.current?.kill()
+      order.current.forEach((idx, i) => {
+        const el = refs[idx]?.current
+        if (el) gsap.set(el, makeSlot(i, cardDistance, verticalDistance, refs.length))
+      })
+
       const [front, ...rest] = order.current
       const elFront = refs[front]?.current
       if (!elFront) return
