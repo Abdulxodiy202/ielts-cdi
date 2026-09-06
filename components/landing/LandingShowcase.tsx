@@ -192,7 +192,23 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#f59e0b' }} />
                   <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#22c55e' }} />
                 </div>
-                <div style={{ position: 'relative', width: '100%', height: `calc(100% - ${CHROME_HEIGHT}px)` }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: `calc(100% - ${CHROME_HEIGHT}px)`,
+                    background: 'var(--bg-secondary)',
+                  }}
+                >
+                  {/* 2026-09: `cover` o'rniga `contain` ishlatilyapti -- admin
+                      turli o'lchamdagi skrinshotlar yuklaydi (keng desktop
+                      view, tor sidebar/mobile ko'rinish va h.k.). `cover` +
+                      `objectPosition:'top'` tor/uzun rasmlarni qattiq kesib
+                      tashlab, "g'alati" ko'rinishga olib kelardi. `contain`
+                      rasmni HECH QACHON kesmaydi -- kerak bo'lsa yon
+                      tomonlarida (yoki tepa-pastda) fon rangi bilan bo'sh joy
+                      qoldiradi, natijada har qanday o'lchamdagi skrinshot ham
+                      toza va tekis ko'rinadi. */}
                   {/* eslint-disable-next-line @next/next/no-img-element -- rasm soni dinamik, next/image domain whitelist qo'shishni talab qiladi */}
                   <img
                     src={img.image_url}
@@ -203,8 +219,8 @@ export function LandingShowcase({ images }: { images: ShowcaseImage[] }) {
                       inset: 0,
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'top',
+                      objectFit: 'contain',
+                      objectPosition: 'center',
                     }}
                   />
                   {/* 2026-09: rasm ustidagi sarlavha overlay olib tashlandi --

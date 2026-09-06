@@ -14,6 +14,7 @@ import {
 } from '@/components/landing/LandingContent'
 import { LandingSilk } from '@/components/landing/LandingSilk'
 import { LandingShowcase } from '@/components/landing/LandingShowcase'
+import { ScrollProgressStar } from '@/components/landing/ScrollProgressStar'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -58,6 +59,13 @@ export default async function LandingPage() {
 
       {/* Barcha content Silk ustida -- relative + z-10 stacking context */}
       <div className="relative" style={{ zIndex: 10 }}>
+
+      {/* Scroll-progress "yulduz" -- sahifani pastga scroll qilgan sayin
+          chap chetdagi chiziq bo'ylab pastga tushib, ortidan yorqin iz
+          qoldiradi (crackd.it'dagi effektga o'xshab). Butun sahifa
+          scrolliga bog'langan, fixed pozitsiyada -- shuning uchun DOM'da
+          qayerda joylashgani muhim emas. */}
+      <ScrollProgressStar />
 
       {/* Navbar -- glass effekt, o'rtada nav link'lar. Fon endi
           var(--bg-primary) asosida (color-mix) -- dark temada to'q,
