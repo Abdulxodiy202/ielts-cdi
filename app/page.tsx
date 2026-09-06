@@ -15,6 +15,7 @@ import {
 import { LandingSilk } from '@/components/landing/LandingSilk'
 import { LandingShowcase } from '@/components/landing/LandingShowcase'
 import { ScrollSnakeTrail } from '@/components/landing/ScrollProgressStar'
+import { SmoothScroll } from '@/components/landing/SmoothScroll'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -41,6 +42,11 @@ export default async function LandingPage() {
     // xuddi shunday gorizontal tashqariga chiqishni kesadi, lekin scroll
     // konteyner yaratmaydi -- navbar endi doim ko'rinadi. 2026-08-28.
     <div className="min-h-screen relative overflow-x-clip" style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+      {/* Sichqoncha g'ildiragi bilan scroll qilishni silliq/inersiyali
+          qiladi -- faqat shu kirish sahifasida (dashboard/testlarda
+          emas). Ko'rinadigan hech narsa render qilmaydi. */}
+      <SmoothScroll />
+
       {/* Silk WebGL fon -- fixed inset-0, z-index 0.
 
           2026-08-27 tuzatish: kirish sahifasi endi profildan tanlangan

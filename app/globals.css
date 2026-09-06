@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/* Navbardagi "Features/Band Table/Pricing" kabi ichki havolalar
+   bosilganda sahifa keskin sakramasdan, silliq tarzda o'sha bo'limga
+   aylanib boradi. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 /* ── Theme: Default Light ("Ocean Blue") ──────────────────────────
    2026-08-27: :root endi ASOSIY (birlamchi) fon sifatida to'g'ridan-
    to'g'ri OQ/Ocean Blue qiymatlarni ushlaydi -- data-theme atributi

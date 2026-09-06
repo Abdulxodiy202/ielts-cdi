@@ -40,13 +40,24 @@
 
    Yulduzning o'zi CSS `position: sticky; top: 50vh` bilan DOIM ekran
    vertikal markazida turadi. Gorizontal joyi va chiziqning uzunligi
-   bitta umumiy `centerFrac` qiymatidan kelib chiqadi -- bu qiymat har
-   freymda `getBoundingClientRect()` orqali ANIQ (taxminiy emas)
-   hisoblanadi: "hozir ekran markazida qaysi hujjat nuqtasi turibdi".
+   bitta umumiy `centerFrac` qiymatidan kelib chiqadi -- bu qiymat
+   `getBoundingClientRect()` orqali ANIQ (taxminiy emas) hisoblanadi:
+   "hozir ekran markazida qaysi hujjat nuqtasi turibdi".
 
-   Bo'lim HALI boshlanmagan bo'lsa (foydalanuvchi hali Hero'da) --
-   `opacity` 0, chiziq/yulduz umuman ko'rinmaydi, faqat scroll qila
-   boshlagach paydo bo'ladi. */
+   3) MUHIM ISHLASH TEZLIGI TUZATISHI -- avvalgi versiyada bu o'lchov
+      CHEKSIZ `requestAnimationFrame` sikli orqali, HAR FREYMDA, HATTO
+      foydalanuvchi umuman scroll qilmayotganda ham ishlab turardi.
+      Bu doimiy fon yuki butun sahifani asta-sekin sekinlashtirib,
+      boshqa animatsiyalarga (masalan CardSwap'ning GSAP jadvaliga)
+      xalaqit berib, ular bir muncha vaqtdan keyin bir-biriga
+      "ustma-ust tushib" g'alati ko'rinishga kirib qolishiga sabab
+      bo'lgan edi -- va umuman scroll ham "og'ir"/"silliq emas" his
+      qilinardi.
+
+      YECHIM: endi o'lchov FAQAT haqiqiy `scroll` yoki `resize`
+      hodisasi bo'lganda ishlaydi (va shundan keyin bitta freymga
+      "yig'ib" qo'yiladi) -- foydalanuvchi scroll qilmasa, bu komponent
+      MUTLAQO hech qanday ish qilmaydi, protsessorni band qilmaydi. */
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import {
@@ -99,20 +110,31 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (reduce) return
+    let ticking = false
     let frameId = 0
-    const update = () => {
+    const measure = () => {
+      ticking = false
       const el = containerRef.current
-      if (el) {
-        const rect = el.getBoundingClientRect()
-        const vh = window.innerHeight
-        const docYAtCenter = -rect.top + vh / 2
-        const frac = rect.height > 0 ? docYAtCenter / rect.height : 0
-        rawCenterFrac.set(Math.min(1, Math.max(0, frac)))
-      }
-      frameId = requestAnimationFrame(update)
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const vh = window.innerHeight
+      const docYAtCenter = -rect.top + vh / 2
+      const frac = rect.height > 0 ? docYAtCenter / rect.height : 0
+      rawCenterFrac.set(Math.min(1, Math.max(0, frac)))
     }
-    frameId = requestAnimationFrame(update)
-    return () => cancelAnimationFrame(frameId)
+    const onScrollOrResize = () => {
+      if (ticking) return
+      ticking = true
+      frameId = requestAnimationFrame(measure)
+    }
+    onScrollOrResize()
+    window.addEventListener('scroll', onScrollOrResize, { passive: true })
+    window.addEventListener('resize', onScrollOrResize)
+    return () => {
+      window.removeEventListener('scroll', onScrollOrResize)
+      window.removeEventListener('resize', onScrollOrResize)
+      cancelAnimationFrame(frameId)
+    }
   }, [reduce, rawCenterFrac])
 
   // Yumshatish (spring) -- tez scroll qilinganda ham keskin sakramasdan
