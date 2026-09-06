@@ -4,58 +4,45 @@
    crackd.it saytida ko'rgan effektga o'xshab: sahifa markazida, chapga-
    o'ngga tebranib pastga tushuvchi to'lqinsimon chiziq, uning ustida esa
    yorqin porlaydigan "kometa boshi" (yulduz) ko'rinadi. Chiziqning
-   "bosib o'tilgan" qismi yorqin (gradient) bo'lib qoladi, hali yetib
-   bormagan qismi esa punktir bo'lib turadi.
+   "bosib o'tilgan" qismi yorqin bo'lib qoladi, hali yetib bormagan
+   qismi esa punktir bo'lib turadi.
 
-   4-versiyadagi vazifa: ikkita talab BIR VAQTDA bajarilishi kerak --
-   (1) yulduz DOIM ekranning vertikal MARKAZIDA tursin (scroll qilinsa
-   ham joyidan qo'zg'almasin), VA (2) rangli (ochilgan) chiziq AYNAN
-   yulduz turgan joygacha yetib borsin -- ya'ni yulduz hech qachon
-   "orqada qolib" ko'rinmasin.
+   5-versiyadagi ikkita tuzatish:
 
-   Bu ikkalasi ALOHIDA-ALOHIDA hal qilinsa bir-biriga to'g'ri kelmaydi:
-   agar chiziq oddiy `scrollYProgress`ga (0=bo'lim boshi, 1=bo'lim oxiri)
-   qarab ochilsa, u HUJJAT bo'yicha harakatlanadi -- lekin yulduz
-   `sticky` bilan EKRAN markazida qolsa, ikkalasi boshqa-boshqa
-   koordinatada bo'lib qoladi (aynan avvalgi versiyadagi xato shu edi).
+   1) ANIQ (taxminiy emas) moslashuv -- avvalgi versiyada "ekran
+      markazida hozir qaysi hujjat nuqtasi turibdi" degan qiymat
+      `scrollYProgress`dan ANALITIK FORMULA orqali (taxminiy) hisoblanar
+      edi. Endi bu qiymat har animatsiya freymida (`requestAnimationFrame`)
+      TO'G'RIDAN-TO'G'RI `getBoundingClientRect()` orqali -- ya'ni
+      brauzerning o'zi bergan HAQIQIY piksel o'lchovi bilan -- hisoblanadi:
 
-   YECHIM -- matematik: "hozir ekranning vertikal markazida qanday
-   hujjat nuqtasi turibdi" ni hisoblab, CHIZIQ aynan O'SHA nuqtagacha
-   ochiladi (bu qiymatni `centerFrac` deb ataymiz):
+        el.getBoundingClientRect().top  -- o'ragichning hozir ekranga
+                                            nisbatan qayerdaligi
+        window.innerHeight              -- ekranning haqiqiy balandligi
 
-     scrollY(progress) = containerTop + progress * (containerHeight - viewportHeight)
-     markazdagi hujjat nuqtasi = scrollY + viewportHeight / 2
-     centerFrac = (markazdagi hujjat nuqtasi - containerTop) / containerHeight
-                = progress * (1 - viewportHeight/containerHeight)
-                  + (viewportHeight / 2) / containerHeight
+        markazdagi hujjat nuqtasi (ekran yuqorisidan) = -rect.top + vh/2
+        centerFrac = shu qiymat / rect.height   (0 dan 1 gacha, kesilgan)
 
-   `containerHeight` (o'ragich balandligi) va `viewportHeight` (ekran
-   balandligi) haqiqiy piksellarda o'lchanadi (ResizeObserver + resize
-   eventi orqali). Shu `centerFrac` bilan: (a) chiziqning ochilgan qismi
-   (dashoffset) va (b) yulduzning gorizontal (to'lqin) pozitsiyasi
-   hisoblanadi -- shuning uchun ular AYNAN bir xil hujjat nuqtasiga mos
-   keladi. Yulduzning VERTIKAL joyi esa oddiy CSS `position: sticky;
-   top: 50vh` bilan -- bu uni har doim ekran markazida ushlab turadi,
-   hech qanday JS hisob-kitobsiz, 100% silliq.
+      Bu qiymat orqali HAM chiziqning ochilishi (dashoffset), HAM
+      yulduzning gorizontal joyi (`waveX`) hisoblanadi -- ikkalasi bir
+      xil, ANIQ manbadan kelgani uchun endi hech qachon ajralib
+      qolmaydi. Yulduzning o'zi esa CSS `position: sticky; top: 50vh`
+      bilan ekran markazida turadi.
 
-   Natija: yulduz DOIM ekran markazida, VA rangli chiziq DOIM aynan
-   yulduz turgan joygacha (na undan oldinroq, na undan keyinroq)
-   ochiladi -- ikkalasi endi hech qachon ajralib qolmaydi.
+   2) Chiziqning rangi endi DOIM BIR XIL (statik, dinamik gradient
+      emas) -- avval "bosib o'tilgan" qism sahifadagi ABSOLYUT
+      joylashuviga qarab rangini o'zgartirardi (yuqorida ochroq ko'k,
+      pastda boshqacha rang) - bu esa yulduz atrofidagi chiziqni
+      ba'zan xira/kutilmagan rangda ko'rsatardi. Endi bitta qat'iy,
+      yorqin rangda (`#60a5fa`, yulduzning o'z rangi bilan mos) --
+      qayerda bo'lishidan qat'i nazar doim bir xil ko'rinadi.
 
    Bo'lim HALI boshlanmagan bo'lsa (foydalanuvchi hali Hero'da) --
    `opacity` 0, chiziq/yulduz umuman ko'rinmaydi, faqat scroll qila
    boshlagach paydo bo'ladi. */
 
 import { useEffect, useRef, type ReactNode } from 'react'
-import {
-  motion,
-  useMotionValue,
-  useMotionValueEvent,
-  useReducedMotion,
-  useScroll,
-  useSpring,
-  useTransform,
-} from 'framer-motion'
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion'
 
 // Chiziq markazdan chapga/o'ngga necha % (o'ragichning o'z kengligiga
 // nisbatan) tebranadi -- kattaroq qiymat = kengroq "ilon izi".
@@ -86,50 +73,36 @@ const PATH_D = buildWavePath()
 export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
   const reduce = useReducedMotion()
   const containerRef = useRef<HTMLDivElement>(null)
-  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end end'] })
-  // Xom scroll signalini yumshatish -- tez scroll qilinganda ham
-  // keskin sakramasdan, silliq harakat uchun.
-  const progress = useSpring(scrollYProgress, { stiffness: 220, damping: 32, mass: 0.4 })
 
-  // O'ragich va ekran balandligini piksellarda kuzatib boramiz --
-  // "hozir ekran markazida qaysi hujjat nuqtasi turibdi" formulasi
-  // uchun kerak.
-  const containerHeightRef = useRef(0)
-  const viewportHeightRef = useRef(0)
+  // "Ekran markazida hozir qaysi hujjat nuqtasi turibdi" -- har freymda
+  // HAQIQIY piksel o'lchovlaridan (taxminiy formula emas) hisoblanadi.
+  const rawCenterFrac = useMotionValue(0)
 
   useEffect(() => {
-    const measure = () => {
-      if (containerRef.current) containerHeightRef.current = containerRef.current.offsetHeight
-      viewportHeightRef.current = window.innerHeight
+    if (reduce) return
+    let frameId = 0
+    const update = () => {
+      const el = containerRef.current
+      if (el) {
+        const rect = el.getBoundingClientRect()
+        const vh = window.innerHeight
+        const docYAtCenter = -rect.top + vh / 2
+        const frac = rect.height > 0 ? docYAtCenter / rect.height : 0
+        rawCenterFrac.set(Math.min(1, Math.max(0, frac)))
+      }
+      frameId = requestAnimationFrame(update)
     }
-    measure()
-    window.addEventListener('resize', measure)
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
-    if (ro && containerRef.current) ro.observe(containerRef.current)
-    return () => {
-      window.removeEventListener('resize', measure)
-      ro?.disconnect()
-    }
-  }, [])
+    frameId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(frameId)
+  }, [reduce, rawCenterFrac])
 
-  // `centerFrac` -- ekran markazida hozir turgan hujjat nuqtasining
-  // o'ragich balandligiga nisbatan foizi (0-1). Chiziq VA yulduz
-  // gorizontal pozitsiyasi shu qiymatdan hisoblanadi, shuning uchun
-  // ular hech qachon ajralib qolmaydi.
-  const centerFrac = useMotionValue(0)
-  useMotionValueEvent(progress, 'change', (p) => {
-    const ch = containerHeightRef.current
-    const vh = viewportHeightRef.current
-    if (!ch) {
-      centerFrac.set(p)
-      return
-    }
-    const ratio = vh / ch
-    const val = p * (1 - ratio) + ratio / 2
-    centerFrac.set(Math.min(1, Math.max(0, val)))
-  })
+  // Yumshatish (spring) -- tez scroll qilinganda ham keskin sakramasdan
+  // silliq harakat uchun. Chiziq VA yulduz ikkalasi ham AYNAN shu bitta
+  // silliqlangan qiymatdan hisoblanadi -- shuning uchun ular hech qachon
+  // ajralib qolmaydi.
+  const centerFrac = useSpring(rawCenterFrac, { stiffness: 220, damping: 32, mass: 0.4 })
 
-  const opacity = useTransform(progress, [0, 0.04], [0, 1])
+  const opacity = useTransform(centerFrac, [0, 0.03], [0, 1])
   const starLeft = useTransform(centerFrac, (v) => `${waveX(v)}%`)
   const dashOffset = useTransform(centerFrac, (v) => 1 - v)
 
@@ -158,36 +131,33 @@ export function ScrollSnakeTrail({ children }: { children: ReactNode }) {
                 vectorEffect="non-scaling-stroke"
               />
               {/* Bosib o'tilgan qism -- AYNAN "ekran markazidagi hujjat
-                  nuqtasi"gacha (centerFrac) ochiladi -- shuning uchun
-                  doim pastdagi yulduz turgan joyda tugaydi. */}
+                  nuqtasi"gacha (centerFrac) ochiladi, shuning uchun doim
+                  pastdagi yulduz turgan joyda tugaydi. Rangi ENDI BITTA
+                  QAT'IY rangda (dinamik gradient emas) -- sahifadagi
+                  joyidan qat'i nazar doim bir xil ko'rinadi. */}
               <motion.path
                 d={PATH_D}
                 fill="none"
-                stroke="url(#snakeTrailGradient)"
+                stroke="#60a5fa"
                 strokeWidth={1.8}
                 strokeLinecap="round"
                 pathLength={1}
-                style={{ strokeDasharray: 1, strokeDashoffset: dashOffset }}
+                style={{
+                  strokeDasharray: 1,
+                  strokeDashoffset: dashOffset,
+                  filter: 'drop-shadow(0 0 4px rgba(96,165,250,0.65))',
+                }}
                 vectorEffect="non-scaling-stroke"
               />
-              <defs>
-                <linearGradient id="snakeTrailGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#bfdbfe" />
-                  <stop offset="55%" stopColor="#60a5fa" />
-                  <stop offset="100%" stopColor="var(--accent)" />
-                </linearGradient>
-              </defs>
             </svg>
 
             {/* Yorqin "kometa boshi" -- `position: sticky; top: 50vh`
-                orqali DOIM ekran vertikal markazida turadi (JS
-                hisob-kitobsiz, brauzerning o'z mexanizmi). Gorizontal
+                orqali DOIM ekran vertikal markazida turadi. Gorizontal
                 (`left`) pozitsiyasi esa `centerFrac`dan -- AYNAN SVG
                 chizig'i qaysi nuqtagacha ochilgan bo'lsa, o'sha
                 nuqtaning x-koordinatasi bilan bir xil formula
                 (`waveX`) orqali hisoblanadi. Shuning uchun yulduz HAR
-                DOIM chiziqning aynan ochilgan uchida turadi -- na
-                oldinda, na orqada qolmaydi. */}
+                DOIM chiziqning aynan ochilgan uchida turadi. */}
             <div className="sticky pointer-events-none" style={{ top: '50vh', height: 0 }}>
               <motion.div
                 className="absolute"
