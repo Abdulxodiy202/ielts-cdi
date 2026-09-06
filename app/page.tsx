@@ -14,7 +14,7 @@ import {
 } from '@/components/landing/LandingContent'
 import { LandingSilk } from '@/components/landing/LandingSilk'
 import { LandingShowcase } from '@/components/landing/LandingShowcase'
-import { ScrollProgressStar } from '@/components/landing/ScrollProgressStar'
+import { ScrollSnakeTrail } from '@/components/landing/ScrollProgressStar'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -60,13 +60,6 @@ export default async function LandingPage() {
       {/* Barcha content Silk ustida -- relative + z-10 stacking context */}
       <div className="relative" style={{ zIndex: 10 }}>
 
-      {/* Scroll-progress "yulduz" -- sahifani pastga scroll qilgan sayin
-          chap chetdagi chiziq bo'ylab pastga tushib, ortidan yorqin iz
-          qoldiradi (crackd.it'dagi effektga o'xshab). Butun sahifa
-          scrolliga bog'langan, fixed pozitsiyada -- shuning uchun DOM'da
-          qayerda joylashgani muhim emas. */}
-      <ScrollProgressStar />
-
       {/* Navbar -- glass effekt, o'rtada nav link'lar. Fon endi
           var(--bg-primary) asosida (color-mix) -- dark temada to'q,
           light temada oq shisha effekti beradi. */}
@@ -108,14 +101,20 @@ export default async function LandingPage() {
       {/* Hero -- floating cards + shimmer + scroll indicator */}
       <HeroClient ctaHref={ctaHref} hasUser={!!user} />
 
-      {/* Mahsulot isboti -- haqiqiy sayt skrinshotlari, admin
-          boshqaradi. Rasm bo'lmasa hech narsa render qilinmaydi. */}
-      <LandingShowcase images={showcaseImages ?? []} />
+      {/* Scroll-snake effekti (crackd.it'dagi kabi) -- Hero'dan KEYINGI
+          barcha bo'limlarni o'raydi. Shu o'ragich hali boshlanmagan joyda
+          (ya'ni Hero ichida) chiziq/yulduz OPACITY=0 -- umuman ko'rinmaydi,
+          foydalanuvchi shu bo'limga scroll qila boshlagach paydo bo'ladi. */}
+      <ScrollSnakeTrail>
+        {/* Mahsulot isboti -- haqiqiy sayt skrinshotlari, admin
+            boshqaradi. Rasm bo'lmasa hech narsa render qilinmaydi. */}
+        <LandingShowcase images={showcaseImages ?? []} />
 
-      {/* Sections translated via LanguageContext (client components) */}
-      <LandingFeaturesSection />
-      <LandingBandTableSection />
-      <LandingPricingSection ctaHref={ctaHref} />
+        {/* Sections translated via LanguageContext (client components) */}
+        <LandingFeaturesSection />
+        <LandingBandTableSection />
+        <LandingPricingSection ctaHref={ctaHref} />
+      </ScrollSnakeTrail>
       <LandingFooter ctaHref={ctaHref} />
       </div>{/* /content wrapper (z-10) */}
     </div>
